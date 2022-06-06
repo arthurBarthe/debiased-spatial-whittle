@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "debiased-spatial-whittle"
+version = "0.1.1"
+description = ""
+authors = ["arthur <ahw795@qmul.ac.uk>"]
+include = ["france.jpg"]
+homepage = "http://arthurpgb.pythonanywhere.com/sdw"
+keywords = ["random fields", "statistics", "whittle", "spatial", "matern", "kriging", "interpolation"]
+
+[tool.poetry.dependencies]
+python = ">=3.8, <3.11"
+numpy = "^1.21.5"
+matplotlib = "^3.1.2"
+scipy = "^1.7.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
