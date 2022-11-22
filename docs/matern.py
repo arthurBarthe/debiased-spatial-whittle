@@ -2,7 +2,7 @@
 to the need to evaluate the modified Bessel function of the second order. """
 
 import numpy as np
-from debiasedwhittle import exp_cov2, sim_circ_embedding, fit, matern
+from debiasedwhittle import sim_circ_embedding, fit, matern
 import matplotlib.pyplot as plt
 
 rho, nu, sigma = 15, 0.3, 1.
@@ -11,19 +11,19 @@ init_guess = np.array([10., 0.5, 1.1])
 cov = matern
 cov_func = lambda lags: cov(lags, rho, nu, sigma)
 
-shape = (128, 128)
-z = sim_circ_embedding(cov_func, shape)
+shape = (512, 512)
+z, _ = sim_circ_embedding(cov_func, shape)
 plt.imshow(z, cmap='coolwarm')
 plt.show()
 est = fit(z, np.ones_like(z), cov, init_guess, fold=True)
 print(est)
 
 
-def run_experiment(sim_params, est_params, n_samples=100):
+def run_experiment(sim_params, est_params, n_samples=10):
     est = np.zeros(n_samples)
     for i in range(n_samples):
         print(i, end=': ')
-        z = sim_circ_embedding(*sim_params)
+        z, _ = sim_circ_embedding(*sim_params)
         est[i] = fit(z, np.ones_like(z), *est_params)[0]
         print(est[i])
     return est

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "debiased-spatial-whittle"
-version = "0.1.1"
+version = "0.2"
 description = ""
 authors = ["arthur <ahw795@qmul.ac.uk>"]
 include = ["france.jpg"]

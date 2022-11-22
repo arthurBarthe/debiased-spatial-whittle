@@ -81,3 +81,66 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
         warnings.warn('Issue during optimization')
 
     return est_
+
+
+
+#########NEW OOP version
+from expected_periodogram import ExpectedPeriodogram
+from models import CovarianceModel
+
+class Periodogram:
+    """Class that allows to define a periodogram"""
+
+    def __init__(self, taper = None, scaling='ortho'):
+        if taper is None:
+            self.taper = 1
+        self.scaling = scaling
+        #TODO add possibility to not fold?
+        self.fold = True
+
+    def __call__(self, z: np.ndarray):
+        z_taper = z * self.taper
+        f = np.abs(fftn(z, norm=self.scaling))**2
+        return f
+
+
+
+class DebiasedWhittle:
+    def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
+        self.periodogram = periodogram
+        self.expected_periodogram = expected_periodogram
+
+    def get_h(self, model):
+        pass
+
+    def get_j(self, model):
+        pass
+
+    def __call__(self, z: np.ndarray, model: CovarianceModel):
+        # TODO add a class sample which contains the data and the grid?
+        """Computes the likelihood for this data"""
+        p = self.periodogram(z)
+        ep = self.expected_periodogram(model)
+        return 1 / z.shape[0] / z.shape[1] * np.sum(np.log(ep) + p / ep)
+
+
+class Estimator:
+    def __init__(self, likelihood, max_iter=100):
+        self.likelihood = likelihood
+        self.max_iter = 100
+
+    def __call__(self, model: CovarianceModel, z: np.ndarray):
+        free_params = model.free_params
+        free_params_names = free_params.names
+
+        # function to be optimized
+        def func(param_values):
+            updates = dict(zip(free_params_names, param_values))
+            free_params.update_values(updates)
+            return self.likelihood(z, model)
+
+        bounds = model.free_param_bounds
+        init_guess = np.array(free_params.init_guesses)
+        # TODO add the case where gradient is available
+        fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=True, maxiter=self.max_iter)
+        return model
