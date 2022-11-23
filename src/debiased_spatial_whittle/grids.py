@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 import matplotlib.pyplot as plt
-
 import numpy as np
-
 from typing import Tuple
 
 PATH_TO_FRANCE_IMG = str(Path(__file__).parents[1] / 'france.jpg')
@@ -97,3 +95,72 @@ class ImgGrid(Grid):
 
     def get_new(self):
         return self.interpolate()
+
+
+
+###NEW OOP VERSION
+from .models import CovarianceModel, SeparableModel
+from numpy.fft import ifftshift
+from typing import List
+
+
+# TODO add non-orthogonal grids and lattices
+
+
+class RectangularGrid:
+    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
+        self.n = shape
+        self._delta = delta
+        self._mask = mask
+
+    @property
+    def ndim(self):
+        return len(self.n)
+
+    @property
+    def delta(self):
+        if self._delta is None:
+            return [1, ] * len(self.n)
+        return self._delta
+
+    @delta.setter
+    def delta(self, value):
+        assert len(value) == len(self.n), "The length of delta should be equal to the number of dimensions"
+        self._delta = value
+
+    @property
+    def mask(self):
+        if self._mask is None:
+            return np.ones(self.n)
+        else:
+            return self._mask
+
+    @mask.setter
+    def mask(self, value: np.ndarray):
+        assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+        self._mask = value
+
+    @property
+    def lags_unique(self) -> List[np.ndarray]:
+        shape = self.n
+        delta = self.delta
+        return np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+
+    def autocov(self, model: CovarianceModel):
+        """Compute the covariance function on a grid of lags determined by the passed shape.
+        In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
+        0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
+        when computing the expecting periodogram"""
+        #TODO check that the ifftshift "trick" works for odd sizes
+        return ifftshift(model(self.lags_unique))
+
+    def autocov_separable(self, model: SeparableModel):
+        assert isinstance(model, SeparableModel), "You can only call autocov_separable on a separable model"
+        n1, n2 = self.n
+        lag1, lag2 = np.arange(-n1 + 1, n1), np.arange(-n2 + 1, n2)
+        lag1, lag2 = ifftshift(lag1), ifftshift(lag2)
+        model1, model2 = model.models
+        cov1 = model1([lag1, ]).reshape((-1, 1))
+        cov2 = model2([lag2, ]).reshape((1, -1))
+        return cov1 * cov2
+
