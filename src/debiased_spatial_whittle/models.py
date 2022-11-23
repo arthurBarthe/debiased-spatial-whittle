@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 
 from typing import Tuple, List, Dict
 
-from expected_periodogram import compute_ep
-
 
 class Parameter:
     def __init__(self, name: str, bounds: Tuple[float, float]):
@@ -200,7 +198,7 @@ class CovarianceModel(ABC):
                 gradient[p.name] += np.take(g, i, axis=-1)
         return gradient
 
-    #@abstractmethod
+    @abstractmethod
     def _gradient(self, x: np.ndarray):
         pass
 
@@ -305,21 +303,30 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d = np.abs(lags[self.axis])
         return self.sigma.value ** 2 * np.exp(- d / self.rho.value)
 
+    def _gradient(self, lags: np.ndarray):
+        d = np.abs(lags[self.axis])
+        d_rho = (self.sigma.value / self.rho.value) ** 2 * d * np.exp(- d / self.rho.value)
+        d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
+        return np.stack((d_rho, d_sigma), axis=-1)
 
 
-if __name__ == '__main__':
-    m1 = ExponentialModelUniDirectional(axis=0)
-    m1.rho = 8
-    m1.sigma = 1
-    m2 = ExponentialModelUniDirectional(axis=1)
-    m2.rho = 32
-    m2.sigma = 2
-    model = SeparableModel((m1, m2))
 
-    g = RectangularGrid((128, 128))
-    sampler = SamplerOnRectangularGrid(model, g)
-
-    z = sampler()
-    plt.figure()
-    plt.imshow(z, cmap='Spectral')
-    plt.show()
+def test_gradient_cov():
+    """
+    This test verifies that the analytical gradient of the covariance is close to a
+    numerical approximation to that gradient.
+    :return:
+    """
+    from numpy.testing import assert_allclose
+    from .grids import RectangularGrid
+    g = RectangularGrid((64, 64))
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = 10
+    epsilon = 1e-3
+    acv1 = model(g.lags_unique)
+    model.rho = 10 + epsilon
+    acv2 = model(g.lags_unique)
+    g = model.gradient(g.lags_unique, Parameters([model.rho, ]))['rho']
+    g2 = (acv2 - acv1) / epsilon
+    assert_allclose(g, g2, rtol=1e-3)

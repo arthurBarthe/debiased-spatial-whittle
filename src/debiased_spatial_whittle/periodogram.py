@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.fft import fft, ifft, fftn, ifftn, fftshift, ifftshift
 from .spatial_kernel import spatial_kernel
+from .models import Parameters
 
 
 def autocov(cov_func, shape):
@@ -55,15 +56,32 @@ def compute_ep(cov_func, grid, fold=True):
     return result
 
 
-
 ####NEW OOP VERSION
-from models import CovarianceModel, SeparableModel
-from likelihood import Periodogram
-from grids import RectangularGrid
+from .models import CovarianceModel, SeparableModel
+from .grids import RectangularGrid
+
+
+class Periodogram:
+    """Class that allows to define a periodogram"""
+
+    def __init__(self, taper = None, scaling='ortho'):
+        if taper is None:
+            self.taper = lambda x: np.ones_like(x)
+        self.scaling = scaling
+        #TODO add possibility to not fold?
+        #TODO add scaling
+        self.fold = True
+
+    def __call__(self, z: np.ndarray):
+        # TODO add tapering
+        z_taper = z
+        f = 1 / z.shape[0] / z.shape[1] * np.abs(fftn(z))**2
+        return f
 
 
 class ExpectedPeriodogram:
-    """Class to obtain the expected periodogram in the most general case"""
+    """Class to obtain the expected periodogram when no assumptions are made about the form of the covariance
+    model (e.g. separability)."""
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
         self.grid = grid
         self.periodogram = periodogram
@@ -82,9 +100,22 @@ class ExpectedPeriodogram:
         self._taper = value.taper(self.grid)
 
     def __call__(self, model: CovarianceModel):
-        return self.compute_ep(model, self.grid, self.periodogram.fold)
+        acv = self.grid.autocov(model)
+        return self.compute_ep(acv, self.grid, self.periodogram.fold)
 
-    def compute_ep(self, model, grid, fold=True):
+    def gradient(self, model: CovarianceModel, params: Parameters):
+        """Provides the derivatives of the expected periodogram with respect to the parameters of the model
+        at all frequencies of the Fourier grid. The last dimension is used for different parameters."""
+        lags = self.grid.lags_unique
+        d_acv = model.gradient(lags, params)
+        d_ep = []
+        for p_name in params.names:
+            aux = ifftshift(d_acv[p_name])
+            d_ep.append(self.compute_ep(aux, self.grid, self.periodogram.fold))
+        return np.stack(d_ep, axis=-1)
+
+
+    def compute_ep(self, acv, grid, fold=True):
         """Computes the expected periodogram, for the passed covariance function and grid. The grid is an array, in
         the simplest case just an array of ones
         :param cov_func: covariance function
@@ -95,12 +126,12 @@ class ExpectedPeriodogram:
         shape = grid.n
         n_dim = grid.ndim
         # In the case of a complete grid, cg takes a closed form.
-        cg = spatial_kernel(self.grid.mask * self.taper)
-        acv = self.grid.autocov(model)
+        cg = spatial_kernel(self.grid.mask)
+        # TODO add tapering
         cbar = cg * acv
         # now we need to "fold"
         if fold:
-            result = np.zeros_like(grid)
+            result = np.zeros(grid.n)
             # TODO make this work for any dimension
             if n_dim == 1:
                 for i in range(2):
@@ -134,8 +165,8 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
     be computed as the outer product of the expected periodograms in the lower dimensions."""
     # TODO we should ensure the grid is full (or separable for later)
 
-    def __init__(self, grid: RectangularGrid):
-        super().__init__(grid)
+    def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
+        super().__init__(grid, periodogram)
 
     def __call__(self, model: SeparableModel):
         model1, model2 = model.models

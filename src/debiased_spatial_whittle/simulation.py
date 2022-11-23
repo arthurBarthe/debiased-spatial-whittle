@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.fft import fftn, ifftn
 import warnings
-from .expected_periodogram import autocov
+from .periodogram import autocov
 from typing import List
 
 def prod_list(l: List[int]):
@@ -29,8 +29,8 @@ def sim_circ_embedding(cov_func, shape):
 
 ####NEW OOP VERSION
 from typing import Tuple
-from models import CovarianceModel
-from grids import RectangularGrid
+from .models import CovarianceModel
+from .grids import RectangularGrid
 
 
 def prod_list(l: Tuple[int]):

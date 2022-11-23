@@ -99,7 +99,7 @@ class ImgGrid(Grid):
 
 
 ###NEW OOP VERSION
-from models import CovarianceModel, SeparableModel
+from .models import CovarianceModel, SeparableModel
 from numpy.fft import ifftshift
 from typing import List
 
@@ -110,8 +110,8 @@ from typing import List
 class RectangularGrid:
     def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
         self.n = shape
-        self.delta = delta
-        self.mask = mask
+        self._delta = delta
+        self._mask = mask
 
     @property
     def ndim(self):
@@ -131,7 +131,7 @@ class RectangularGrid:
     @property
     def mask(self):
         if self._mask is None:
-            return 1
+            return np.ones(self.n)
         else:
             return self._mask
 
