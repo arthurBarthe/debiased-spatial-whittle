@@ -46,7 +46,7 @@ Tapering
 While tapering is not necessary for consistency of the SDW, it can be
 usefull for finite sample size in order to reduce variance, when
 remaining boundary effects are still important. In particular this
-is true for spectral models with a strong spectral slope, such as
+is true for spectral models with a strong dynamic range, such as
 the squared exponential covariance model.
 
 
