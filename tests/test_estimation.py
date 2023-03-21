@@ -8,16 +8,6 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit,
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel
 
-def test_non_negative():
-    """
-    This test verifies that the expected periodogram is non-negative.
-    """
-    m, n = 128, 64
-    cov_func = lambda lags: exp_cov(lags, rho=10.)
-    z = sim_circ_embedding(cov_func, (m, n))
-    e_per = compute_ep(cov_func, np.ones_like(z))
-    assert np.all(e_per >= 0)
-
 
 def test_expcov():
     """

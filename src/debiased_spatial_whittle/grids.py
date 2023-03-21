@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-import matplotlib.pyplot as plt
-import numpy as np
 from typing import Tuple
+import numpy as np
+import matplotlib.pyplot as plt
 
-PATH_TO_FRANCE_IMG = str(Path(__file__).parents[1] / 'france.jpg')
+from debiased_spatial_whittle.spatial_kernel import spatial_kernel
+
+PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / 'france.jpg')
+
 
 class Grid(ABC):
     def __init__(self, shape: Tuple[int]):
@@ -101,7 +104,7 @@ class ImgGrid(Grid):
 ###NEW OOP VERSION
 from .models import CovarianceModel, SeparableModel
 from numpy.fft import ifftshift
-from typing import List
+from typing import List, Tuple
 
 
 # TODO add non-orthogonal grids and lattices
@@ -141,10 +144,51 @@ class RectangularGrid:
         self._mask = value
 
     @property
+    def n_points(self):
+        """Total number of points, irrespective of the mask"""
+        p = 1
+        for ni in self.n:
+            p *= ni
+        return p
+
+    @property
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
         return np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+
+    @property
+    def lag_matrix(self):
+        """
+        Matrix of lags between the points of the grids ordered according to their coordinates.
+
+        Returns
+        -------
+        lags
+            shape (n_points, n_points, n_dimensions).
+        """
+        xs = [np.arange(s, dtype=np.int64) for s in self.n]
+        grid = np.meshgrid(*xs, indexing='ij')
+        grid_vec = [g.reshape((-1, 1)) for g in grid]
+        lags = [g - g.T for g in grid_vec]
+        return lags
+
+    @property
+    def spatial_kernel(self):
+        if not hasattr(self, '_spatial_kernel'):
+            self._spatial_kernel = spatial_kernel(self.mask)
+        return self._spatial_kernel
+
+    def covariance_matrix(self, model: CovarianceModel):
+        """
+        Compute the full covariance matrix under the provided covariance model, while accounting for the mask.
+
+        Parameters
+        ----------
+        model
+            Covariance model
+        """
+        return model(self.lag_matrix) * np.dot(self.mask.reshape((-1, 1)), self.mask.reshape((1, -1)))
 
     def autocov(self, model: CovarianceModel):
         """Compute the covariance function on a grid of lags determined by the passed shape.
@@ -164,3 +208,9 @@ class RectangularGrid:
         cov2 = model2([lag2, ]).reshape((1, -1))
         return cov1 * cov2
 
+    def separate(self, dims):
+        shape = np.ones(self.ndim, dtype=np.int64)
+        for d in dims:
+            shape[d] = self.n[d]
+        g = RectangularGrid(shape)
+        return g

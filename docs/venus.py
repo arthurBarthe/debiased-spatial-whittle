@@ -2,7 +2,7 @@
 # topography.
 
 import numpy as np
-from debiasedwhittle import sim_circ_embedding, fit, matern
+from debiased_spatial_whittle import fit, matern
 import matplotlib.pyplot as plt
 import scipy.io
 
@@ -12,11 +12,12 @@ z = z / np.std(z)
 
 # plot
 plt.figure()
-plt.imshow(z)
+plt.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
 init_guess = np.array([50, .5, 1])
 
 cov = matern
+# TODO add spectral mask as in the paper to account for data processing
 est = fit(z, np.ones_like(z), cov, init_guess, fold=True)
 print(est)

@@ -1,13 +1,10 @@
 # In this file we define covariance models
 from abc import ABC, abstractmethod
-import numpy as np
-from numpy.fft import fft, fftn, ifftn, fftshift, ifftshift
-from scipy.optimize import fmin_l_bfgs_b
-import warnings
-import matplotlib.pyplot as plt
+from .backend import BackendManager
 
 from typing import Tuple, List, Dict
 
+np = BackendManager.get_backend()
 
 class Parameter:
     def __init__(self, name: str, bounds: Tuple[float, float]):
@@ -246,23 +243,27 @@ class SeparableModel(CovarianceModel):
     #TODO only works in dimension 2 right now
     #TODO we should allow for a semi-separable model: for instance, time and space are separable, but 2d space is not
 
-    def __init__(self, models: List[CovarianceModel]):
+    def __init__(self, models: List[CovarianceModel], dims: List):
         self.models = models
+        self.dims = dims
+        assert len(models) == len(dims)
         parameters = ParametersUnion([m.params for m in models])
         super(SeparableModel, self).__init__(parameters)
 
     def __call__(self, lags: List[np.ndarray]):
-        model1, model2 = self.models
-        cov1 = model1(lags)
-        cov2 = model2(lags)
-        return cov1 * cov2
+        lags = np.stack(lags, 0)
+        acvs = []
+        for i in range(len(self.models)):
+            acvs.append(self.models[i](np.take(lags, self.dims[i], 0)))
+        return np.prod(np.stack(acvs, 0), 0)
 
     def _gradient(self, lags):
-        covs = [model_i(lags) for model_i in self.models]
-        gradients = [model_i._gradient(lags) for model_i in self.models]
-        g1 = gradients[0] * np.expand_dims(covs[1], axis=-1)
-        g2 = gradients[1] * np.expand_dims(covs[0], axis=-1)
-        return np.concatenate((g1, g2), axis=-1)
+        raise NotImplementedError()
+        # covs = [model_i(lags) for model_i in self.models]
+        # gradients = [model_i._gradient(lags) for model_i in self.models]
+        # g1 = gradients[0] * np.expand_dims(covs[1], axis=-1)
+        # g2 = gradients[1] * np.expand_dims(covs[0], axis=-1)
+        # return np.concatenate((g1, g2), axis=-1)
 
     def __repr__(self):
         return 'SeparableModel(\n' + '\n'.join([m.__repr__() for m in self.models]) + '\n)'
@@ -276,7 +277,8 @@ class ExponentialModel(CovarianceModel):
         super(ExponentialModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        d = np.sqrt(sum((lag**2 for lag in lags)))
+        lags = np.stack(lags, axis=0)
+        d = np.sqrt(np.sum(lags**2, axis=0))
         return self.sigma.value**2 * np.exp(- d / self.rho.value)
 
     def _gradient(self, lags: np.ndarray):
@@ -307,6 +309,28 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d = np.abs(lags[self.axis])
         d_rho = (self.sigma.value / self.rho.value) ** 2 * d * np.exp(- d / self.rho.value)
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
+        return np.stack((d_rho, d_sigma), axis=-1)
+
+
+class SquaredExponentialModel(CovarianceModel):
+    def __init__(self):
+        sigma = Parameter('sigma', (0.01, 1000))
+        rho = Parameter('rho', (0.01, 1000))
+        parameters = Parameters([rho, sigma])
+        super(SquaredExponentialModel, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        d2 = sum((lag**2 for lag in lags))
+        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2)
+        result[np.all(lags == 0, axis=0)] += 0.0001
+        return result
+
+    def _gradient(self, lags: np.ndarray):
+        """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
+        the model's parameters"""
+        d2 = sum((lag ** 2 for lag in lags))
+        d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
+        d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
         return np.stack((d_rho, d_sigma), axis=-1)
 
 

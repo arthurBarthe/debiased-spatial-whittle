@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg
 
-from debiasedwhittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
-import debiasedwhittle.grids as grids
+from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
+import debiased_spatial_whittle.grids as grids
 
 cov = sq_exp_cov
 shape = (620 * 1, 620 * 1)

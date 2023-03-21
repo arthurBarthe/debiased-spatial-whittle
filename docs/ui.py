@@ -9,7 +9,7 @@ from matplotlib.figure import Figure
 
 import numpy as np
 from numpy.fft import fftshift
-from debiasedwhittle import exp_cov2, sim_circ_embedding, fit, matern, periodogram, compute_ep
+from debiased_spatial_whittle import sim_circ_embedding, fit, matern, periodogram, compute_ep
 
 cov = matern
 
@@ -99,7 +99,7 @@ class App(tkinter.Tk):
         self.cov_func = lambda lags: cov(lags, self.rho, self.nu, 1)
         # simulation
         self.g = np.ones(self.shape)
-        self.z = sim_circ_embedding(self.cov_func, self.shape)
+        self.z = sim_circ_embedding(self.cov_func, self.shape)[0]
         self.update_plot()
 
     def update_plot(self):

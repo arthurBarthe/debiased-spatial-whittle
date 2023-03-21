@@ -1,4 +1,8 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+
+BackendManager.set_backend('numpy')
+np = BackendManager.get_backend()
+
 from numpy.testing import assert_allclose
 from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep, periodogram
 from debiased_spatial_whittle.periodogram import autocov
@@ -68,3 +72,6 @@ def test_gradient_cov_merged_params():
     acv2 = model(grid.lags_unique)
     g2 = (acv2 - acv1) / epsilon
     assert_allclose(g, g2, rtol=1e-2)
+
+
+

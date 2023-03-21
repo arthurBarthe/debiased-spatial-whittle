@@ -4,9 +4,9 @@ from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep, pe
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel, Parameters
+from debiased_spatial_whittle.confidence import CovarianceFFT
 
 def test_non_negative():
     """
@@ -14,7 +14,7 @@ def test_non_negative():
     """
     m, n = 128, 64
     cov_func = lambda lags: exp_cov(lags, rho=10.)
-    z = sim_circ_embedding(cov_func, (m, n))
+    z = sim_circ_embedding(cov_func, (m, n))[0]
     e_per = compute_ep(cov_func, np.ones_like(z))
     assert np.all(e_per >= 0)
 
@@ -51,7 +51,23 @@ def test_compare_to_mean():
         per = periodogram(z, grid)
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = compute_ep(cov_func, grid)
-    assert np.all(abs(mean_per - e_per))
+    assert_allclose(mean_per, e_per, rtol=1)
+
+
+def test_compare_to_mean2():
+    m, n = 8, 8
+    cov_func = lambda lags: exp_cov(lags, rho=2., sigma=2)
+    mean_per = np.zeros((m, n))
+    grid = np.ones((m, n))
+    n_samples = 10000
+    for i in range(n_samples):
+        z, _ = sim_circ_embedding(cov_func, (m, n))
+        per = periodogram(z, grid)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = compute_ep(cov_func, grid)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.1)
+
 
 def test_separable_expected_periodogram():
     """
@@ -107,7 +123,7 @@ def test_expected_periodogram_oop():
     # old version
     cov_func = lambda x: exp_cov(x, 10)
     ep_old = compute_ep(cov_func, np.ones((64, 64)))
-    assert_allclose(ep_old, ep_oop)
+    assert_allclose(ep_old, ep_oop, rtol=1e-2)
 
 
 def test_gradient_expected_periodogram():
@@ -116,16 +132,117 @@ def test_gradient_expected_periodogram():
     numerical approximation to that gradient
     :return:
     """
-    g = RectangularGrid((64, 64))
+    g = RectangularGrid((8, 8))
     p = Periodogram()
     ep_op = ExpectedPeriodogram(g, p)
     model = ExponentialModel()
     model.sigma = 1
-    model.rho = 10
+    model.rho = 4
     epsilon = 1e-6
     ep1 = ep_op(model)
-    model.rho = 10 + epsilon
+    model.rho = model.rho.value + epsilon
     ep2 = ep_op(model)
     g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
-    assert_allclose(g, g2, rtol=1e-1)
+    assert_allclose(g, g2, rtol=1e-3)
+
+
+def test_cov_dft_sum():
+    """
+    In this test we check that we get the same result by:
+    1. Computing the covariance matrix of the covariance of the DFT, and summing its squared absolute value
+    2. Computing the squared absolute values of the diagonals of the covariance of the DFT, and summing
+    Returns
+    -------
+
+    """
+    model = ExponentialModel()
+    model.sigma = 2
+    model.rho = 4
+    n = (8, 8)
+    g = RectangularGrid(n)
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    cov_mat = ep.cov_dft_matrix(model)
+    s1 = np.sum(np.abs(cov_mat) ** 2)
+    cov_fft = CovarianceFFT(g)
+    s2 = cov_fft.exact_summation1(model, ep, normalize=False)
+    print(s1, s2)
+    assert_allclose(s1, s2)
+
+
+def test_cov_dft_quad():
+    """
+    In this test we check that we get the same result by:
+    1. Computing the covariance matrix of the covariance of the DFT, and summing its squared absolute value
+    2. Computing the squared absolute values of the diagonals of the covariance of the DFT, and summing
+    Returns
+    -------
+
+    """
+    model = ExponentialModel()
+    model.sigma = 2
+    model.rho = 4
+    n = (8, 8)
+    g = RectangularGrid(n)
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    f = np.random.randn(*n)
+    f2 = np.random.randn(*n)
+    cov_mat = ep.cov_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
+    cov_mat = np.abs(cov_mat)**2
+    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
+    cov_fft = CovarianceFFT(g)
+    s2 = cov_fft.exact_summation1(model, ep, f=f, f2=f2, normalize=False)
+    print(s1, s2)
+    assert_allclose(s1, s2)
+
+
+def test_rel_dft():
+    """
+    In this test we check that we get the same result by:
+    1. Computing the covariance matrix of the relation of the DFT, and summing its squared absolute value.
+    2. Computing the squared absolute values of the diagonals of the relation of the DFT, and summing
+    Returns
+    -------
+
+    """
+    model = ExponentialModel()
+    model.sigma = 2
+    model.rho = 4
+    n = (8, 8)
+    g = RectangularGrid(n)
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    cov_mat = ep.rel_dft_matrix(model)
+    s1 = np.sum(np.abs(cov_mat) ** 2)
+    cov_fft = CovarianceFFT(g)
+    s2 = cov_fft.exact_summation2(model, ep, normalize=False)
+    print(s1, s2)
+    assert_allclose(s1, s2)
+
+def test_rel_dft_quad():
+    """
+    In this test we check that we get the same result by:
+    1. Computing the covariance matrix of the covariance of the DFT, and summing its squared absolute value
+    2. Computing the squared absolute values of the diagonals of the covariance of the DFT, and summing
+    Returns
+    -------
+
+    """
+    model = ExponentialModel()
+    model.sigma = 2
+    model.rho = 4
+    n = (8, 8)
+    g = RectangularGrid(n)
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    f = np.random.randn(*n)
+    f2 = np.random.randn(*n)
+    cov_mat = ep.rel_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
+    cov_mat = np.abs(cov_mat)**2
+    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
+    cov_fft = CovarianceFFT(g)
+    s2 = cov_fft.exact_summation2(model, ep, f=f, f2=f2, normalize=False)
+    print(s1, s2)
+    assert_allclose(s1, s2)

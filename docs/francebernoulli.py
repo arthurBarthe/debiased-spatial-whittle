@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from debiasedwhittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit, matern15_cov_func
-import debiasedwhittle.grids as grids
+from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit, matern15_cov_func
+import debiased_spatial_whittle.grids as grids
 
 
 cov = sq_exp_cov

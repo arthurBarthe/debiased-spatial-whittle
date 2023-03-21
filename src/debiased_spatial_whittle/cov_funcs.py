@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import gamma, kv
 
+
 def exp_cov(lags, rho, sigma=1.):
      return sigma ** 2 * np.exp(-np.sqrt(sum((lag**2 for lag in lags))) / rho)
 

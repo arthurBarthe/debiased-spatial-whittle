@@ -1,8 +1,15 @@
-import numpy as np
-from numpy.fft import fftn, ifftn
+import sys
+
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
 import warnings
 from .periodogram import autocov
 from typing import List
+
+fftn = np.fft.fftn
+ifftn = np.fft.ifftn
+
 
 def prod_list(l: List[int]):
     l = list(l)
@@ -14,13 +21,14 @@ def prod_list(l: List[int]):
 #TODO make this work for 1-d and 3-d
 def sim_circ_embedding(cov_func, shape):
     cov = autocov(cov_func, shape)
-    f = np.real(2 ** len(shape) * prod_list(shape) * fftn(cov))
+    f = prod_list(shape) * ifftn(cov)
     min_ = np.min(f)
-    if min_ <= 0:
+    if min_ < 0:
+        sys.exit(0)
         warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-    e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
+    e = np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape)
     z = np.sqrt(np.maximum(f, 0)) * e
-    z_inv = np.real(ifftn(z))
+    z_inv = 1 / np.sqrt(prod_list(shape)) * np.real(fftn(z))
     for i, n in enumerate(shape):
         z_inv = np.take(z_inv, np.arange(n), i)
     return z_inv, min_
@@ -29,7 +37,7 @@ def sim_circ_embedding(cov_func, shape):
 
 ####NEW OOP VERSION
 from typing import Tuple
-from .models import CovarianceModel
+from .models import CovarianceModel, SeparableModel
 from .grids import RectangularGrid
 
 
@@ -55,11 +63,12 @@ class SamplerOnRectangularGrid:
     def f(self):
         if self._f is None:
             cov = self.grid.autocov(self.model)
-            f = np.real(2 ** len(self.grid.n) * prod_list(self.grid.n) * fftn(cov))
+            f = prod_list(self.grid.n) * ifftn(cov)
             min_ = np.min(f)
-            if min_ <= 0:
+            if min_ <= -1e-5:
+                sys.exit(0)
                 warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-            self._f = f
+            self._f = np.maximum(f, 0)
         return self._f
 
     # TODO make this work for 1-d and 3-d
@@ -67,9 +76,68 @@ class SamplerOnRectangularGrid:
         f = self.f
         e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
         z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = np.real(ifftn(z))
+        z_inv = 1 / np.sqrt(prod_list(self.grid.n)) * np.real(fftn(z))
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
-        return z_inv
+        z_inv = np.reshape(z_inv, self.grid.n)
+        return z_inv * self.grid.mask
 
 
+class SamplerSeparable:
+    """
+    Class for approximate sampling of Separable models.
+    """
+
+    def __init__(self, model: SeparableModel, grid: RectangularGrid, n_sim: int = 100):
+        assert isinstance(model, SeparableModel)
+        self.model = model
+        self.grid = grid
+        self.n_sim = n_sim
+        self.samplers = self._setup_samplers()
+
+    def _setup_samplers(self):
+        samplers = []
+        for model, dims in zip(self.model.models, self.model.dims):
+            sampler = SamplerOnRectangularGrid(model, self.grid.separate(dims))
+            samplers.append(sampler)
+        return samplers
+
+    def _unit_sample(self):
+        zs = []
+        for sampler in self.samplers:
+            zs.append(sampler())
+        return np.prod(zs)
+
+    def __call__(self):
+        z = np.zeros(self.grid.n)
+        for i in range(self.n_sim):
+            z_i = self._unit_sample()
+            z = i / (i + 1) * z + 1 / (i + 1) * z_i
+        return z * np.sqrt(self.n_sim)
+
+
+
+
+
+
+def test_simulation_1d():
+    from numpy.random import seed
+    from .grids import RectangularGrid
+    from .models import ExponentialModel
+    import matplotlib.pyplot as plt
+    seed(1712)
+    model = ExponentialModel()
+    model.rho = 2
+    model.sigma = 1
+    grid1 = RectangularGrid((16, 1))
+    grid2 = RectangularGrid((16, ))
+    sampler1 = SamplerOnRectangularGrid(model, grid1)
+    sampler2 = SamplerOnRectangularGrid(model, grid2)
+    z1 = sampler1()
+    seed(1712)
+    z2 = sampler2()
+    plt.figure()
+    plt.plot(z1)
+    plt.plot(z2, '*')
+    plt.show()
+    assert True

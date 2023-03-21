@@ -2,7 +2,7 @@
 theta. We jointly estimate the three parameters from the simulated data."""
 
 import numpy as np
-from src.debiased_spatial_whittle import exp_cov_anisotropic, sim_circ_embedding, fit
+from debiased_spatial_whittle import exp_cov_anisotropic, sim_circ_embedding, fit
 import matplotlib.pyplot as plt
 
 rho_1, rho_2, theta = 40, 10, 0.8

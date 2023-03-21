@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg
 
-from debiasedwhittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
+from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
 
 
 shape = (512 * 1, 512 * 1)
