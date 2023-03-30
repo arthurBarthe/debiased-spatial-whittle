@@ -28,29 +28,25 @@ def compute_ep(cov_func, grid, fold=True):
     :param fold: True if we compute the expected periodogram on the natural Fourier grid, False if we compute it on a
     frequency grid with twice higher resolution
     :return: """
+    n1,n2 = grid.shape
     shape = grid.shape
     n_dim = grid.ndim
     # In the case of a complete grid, cg takes a closed form.
     cg = spatial_kernel(grid)
     acv = autocov(cov_func, shape)
     cbar = cg * acv
+    
     # now we need to "fold"
     if fold:
-        result = np.zeros_like(grid, dtype=np.complex128)
-        if n_dim == 1:
-            for i in range(2):
-                result[i:] += cbar[i * shape[0]: (i + 1) * shape[0]]
-        elif n_dim == 2:
-            for i in range(2):
-                for j in range(2):
-                    result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
-        elif n_dim == 3:
-            for i in range(2):
-                for j in range(2):
-                    for k in range(2):
-                        result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-                                              j * shape[1]: (j + 1) * shape[1],
-                                              k * shape[2]: (k + 1) * shape[2]]
+        # result = np.zeros_like(grid, dtype=np.float64)
+        if n_dim == 2:
+            result = cbar[0:n1,0:n1] + np.pad(cbar[0:n1,n1:(n1*2)], (1,0), 'constant')[1:,:] \
+                   + np.pad(cbar[n1:(n1*2),0:n1],(1,0), 'constant')[:,1:] + np.pad(cbar[n1:(n1*2),n1:(n1*2)], (1,0), 'constant')
+            # print(result.dtype)
+        #     for i in range(2):
+        #         for j in range(2):
+                    # result += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+
     else:
         m, n = shape
         result = np.zeros((2 * m, 2 * n))
@@ -58,7 +54,7 @@ def compute_ep(cov_func, grid, fold=True):
         result[m+1:, :n] = cbar[m:, :n]
         result[m+1:, n+1:] = cbar[m:, n:]
         result[:m, n+1:] = cbar[:m, n:]
-    # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
+    # We take the real part of the fft only due to numerical precision, in theory this should be real
     result = np.real(fftn(result))
     return result
 
