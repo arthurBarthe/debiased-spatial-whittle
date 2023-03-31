@@ -1,15 +1,16 @@
 from itertools import product
 from typing import Tuple
 
-import numpy as np
+import autograd.numpy as np
+from autograd.numpy.fft import fft , fftn, ifftshift
 
 from .spatial_kernel import spatial_kernel
 from .models import Parameters
 from .utils import prod_list
 
-fft = np.fft.fft
-fftn = np.fft.fftn
-ifftshift = np.fft.ifftshift
+# fft = np.fft.fft
+# fftn = np.fft.fftn
+# ifftshift = np.fft.ifftshift
 
 def autocov(cov_func, shape):
     """Compute the covariance function on a grid of lags determined by the passed shape.
@@ -277,7 +278,9 @@ class ExpectedPeriodogram:
         """
         grid = self.grid
         shape = grid.n
+        n1,n2 = shape
         n_dim = grid.ndim
+        assert n1==n2, 'equal sized grids for now'
         # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
             cg = grid.spatial_kernel
@@ -289,26 +292,20 @@ class ExpectedPeriodogram:
         if fold:
             #TODO can we go back to complex64?
             result = np.zeros(grid.n, dtype=np.complex128)
+            # we could actually always use the general version below but we leave the 2d case as it is easier to
             if n_dim == 2:
-                # we could actually always use the general version below but we leave the 2d case as it is easier to
-                #read
-                for i in range(2):
-                    for j in range(2):
-                        result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
-            elif n_dim == 3:
-                # we could actually always use the general version below but we leave the 2d case as it is easier to
-                #read
-                for i in range(2):
-                    for j in range(2):
-                        for k in range(2):
-                            result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-                                                  j * shape[1]: (j + 1) * shape[1],
-                                                  k * shape[2]: (k + 1) * shape[2]]
+                # TODO: make this autograd compatible for any d with any n's
+                result = cbar[0:n1,0:n1] + np.pad(cbar[0:n1,n1:(n1*2)], (1,0), 'constant')[1:,:] \
+                       + np.pad(cbar[n1:(n1*2),0:n1],(1,0), 'constant')[:,1:] + np.pad(cbar[n1:(n1*2),n1:(n1*2)], (1,0), 'constant')
+                       
             else:
-                indexes = product(*[(0, 1) for i_dim in range(n_dim)])
-                for ijk in indexes:
-                    result[tuple([slice(i, None) for i in ijk])] += \
-                        cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
+                raise NotImplementedError('only 2d grids with n1=n2')
+
+            # else:
+            #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
+            #     for ijk in indexes:
+            #         result[tuple([slice(i, None) for i in ijk])] += \
+            #             cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
         else:
             m, n = shape
             result = np.zeros((2 * m, 2 * n))

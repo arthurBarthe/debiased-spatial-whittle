@@ -4,7 +4,7 @@ import numpy as np
 from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
 from scipy.linalg import inv
-
+from debiased_spatial_whittle.bayes import DeWhittle
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
@@ -35,3 +35,14 @@ fig = plt.figure()
 ax = fig.add_subplot()
 ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
+
+
+dw = DeWhittle(z, grid, SquaredExponentialModel())
+eI = dw.expected_periodogram([10,2])
+# plt.imshow(fftshift(eI))
+# plt.show()
+
+params = np.array([10.,1.5])
+print(dw.loglik(params))
+print(dw.logpost(params))
+

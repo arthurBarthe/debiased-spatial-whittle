@@ -1,7 +1,7 @@
-import numpy as np
-from numpy.fft import fftn, ifftn
+import autograd.numpy as np
+from autograd.numpy.fft import fftn, ifftn
 from typing import Tuple
-
+# TODO: have to adjust imports from backend
 
 def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
