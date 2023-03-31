@@ -1,7 +1,9 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple
-import numpy as np
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel

@@ -1,5 +1,3 @@
-import sys
-
 import numpy as np
 from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
@@ -10,6 +8,9 @@ from debiased_spatial_whittle.models import ExponentialModel, SquaredExponential
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
+from debiased_spatial_whittle.spatial_kernel import spatial_kernel
+
+fftn = np.fft.fftn
 
 n = (128, 128)
 rho, sigma = 10, 1
@@ -42,7 +43,12 @@ eI = dw.expected_periodogram([10,2])
 # plt.imshow(fftshift(eI))
 # plt.show()
 
-params = np.array([10.,1.5])
+params = np.log([10.,1.])
 print(dw.loglik(params))
 print(dw.logpost(params))
 
+from autograd import grad, hessian
+ll = lambda x: dw.loglik(x)
+print(grad(ll)(params))
+
+dw.fit(None, prior=True)

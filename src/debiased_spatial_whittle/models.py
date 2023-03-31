@@ -1,10 +1,10 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
 # In this file we define covariance models
 from abc import ABC, abstractmethod
-from .backend import BackendManager
 
 from typing import Tuple, List, Dict
-
-np = BackendManager.get_backend()
 
 class Parameter:
     def __init__(self, name: str, bounds: Tuple[float, float]):
@@ -321,8 +321,7 @@ class SquaredExponentialModel(CovarianceModel):
 
     def __call__(self, lags: np.ndarray):
         d2 = sum((lag**2 for lag in lags))
-        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2)
-        result[np.all(lags == 0, axis=0)] += 0.0001
+        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + 0.0001*np.all(lags == 0, axis=0)
         return result
 
     def _gradient(self, lags: np.ndarray):

@@ -1,16 +1,22 @@
 # import autograd.numpy as np
-from autograd.scipy import stats
-from autograd.numpy import ndarray
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from .models import CovarianceModel
 from .backend import BackendManager
 # TODO: why .backend??
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
+from autograd import grad, hessian
+from autograd.scipy import stats
+from autograd.numpy import ndarray
+from scipy.optimize import minimize, basinhopping
+from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
+from .models import CovarianceModel
+# TODO: fix backend imports for all imported modules!!
+
+ifftshift = np.fft.ifftshift
+
 class DeWhittle:
-    
+    # TODO: include time domain and regular whittle likelihoods
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
         self._z = z
         self.grid = grid
@@ -31,15 +37,22 @@ class DeWhittle:
     def I(self):
         return self._I
         
-
-    def expected_periodogram(self, params: ndarray) -> ndarray:
+    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:
+        '''compute covariance func on a grid of lags given parameters'''
+        # TODO: parameter transform is temporary
+        params = np.exp(params)
+        if lags is None:
+            lags = self.grid.lags_unique
+            
         free_params = self.model.params        
         updates = dict(zip(free_params.names, params))
         free_params.update_values(updates)
+        return ifftshift(self.model(self.grid.lags_unique))
         
-        ep = ExpectedPeriodogram(self.grid, self.periodogram)
-        print(self.model.params)
-        return ep(self.model)
+        
+    def expected_periodogram(self, params: ndarray) -> ndarray:
+        acf = self.cov_func(params, lags = None)
+        return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
     
     
     def loglik(self, params: ndarray) -> float:
@@ -60,27 +73,43 @@ class DeWhittle:
     def logpost(self, x: ndarray) -> float:
         return self.loglik(x) + self.logprior(x)
     
-    # def fit(self, basinhopping:bool=False):
+    def fit(self, x0: None|ndarray, prior:bool = True,  basin_hopping:bool = False, 
+                                                        niter:int = 100, 
+                                                        label: str = 'debiased Whittle', 
+                                                        print_res:bool = True, **optargs):
+        '''fit the model to data - includes optional global optimizer'''
         
+        if x0 is None:
+            x0 = np.zeros(self.n_params)
+            
+        if prior:
+            label += ' MAP'
+            def obj(x):     return -self.logpost(x)
+        else:
+            label += ' MLE'
+            def obj(x):     return -self.loglik(x)
+            
+        if basin_hopping:          # for global optimization
+            minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': grad(obj)}
+            self.res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs) # seed=234230
+            success = self.res.lowest_optimization_result['success']
+        else:            
+            self.res = minimize(x0=x0, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
+            success = self.res['success']
 
-
-
-
-
+        self.BIC = self.n_params*np.log(self.grid.n_points) - 2*self.loglik(self.res.x)         # negative logpost
+            
+        if not success:
+            print('Optimizer failed!')
+            # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
         
+        if print_res:
+            print(f'{label}:  {np.round(np.exp(self.res.x),3)}')
         
-    
-# M = Matrix(1000)
-# print(M.inv_mat)
-
-# class Thing:
-#     def __init__(self, my_word):
-#         self._word = my_word 
-#     @property
-#     def word(self):
-#         return self._word
-
-# print( Thing('ok').word )
-
-# A = Thing('ok')
-# A.word
+        try:
+            self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
+        except np.linalg.LinAlgError:
+            print('Singular propcov')
+            self.propcov = False
+            
+        return self.res, self.propcov
