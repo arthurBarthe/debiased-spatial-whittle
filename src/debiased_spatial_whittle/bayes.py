@@ -4,14 +4,15 @@ from .backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
+from time import time
 from autograd import grad, hessian
 from autograd.scipy import stats
 from autograd.numpy import ndarray
 from scipy.optimize import minimize, basinhopping
 from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from .models import CovarianceModel
-# TODO: fix backend imports for all imported modules!!
 
 ifftshift = np.fft.ifftshift
 
@@ -36,6 +37,12 @@ class DeWhittle:
     @property
     def I(self):
         return self._I
+    
+    def update_model_params(self, params: ndarray) -> None:
+        free_params = self.model.params        
+        updates = dict(zip(free_params.names, params))
+        free_params.update_values(updates)
+        return
         
     def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
@@ -43,10 +50,8 @@ class DeWhittle:
         params = np.exp(params)
         if lags is None:
             lags = self.grid.lags_unique
-            
-        free_params = self.model.params        
-        updates = dict(zip(free_params.names, params))
-        free_params.update_values(updates)
+
+        self.update_model_params(params)
         return ifftshift(self.model(self.grid.lags_unique))
         
         
@@ -55,13 +60,21 @@ class DeWhittle:
         return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
     
     
-    def loglik(self, params: ndarray) -> float:
+    def loglik(self, params: ndarray, I:None|ndarray=None, const:str='whittle') -> float:
         # TODO: transform params
+        
+        if I is None:
+            I = self.I
+            
         N = self.grid.n_points
         
         e_I = self.expected_periodogram(params)
-        # TODO: may need to change constant 1/N    
-        ll = -(1/N) * np.sum(np.log(e_I) + self.I / e_I)
+        if const=='whittle':
+            a=1/2
+        else:
+            a=1/N
+            
+        ll = -(a) * np.sum(np.log(e_I) + I / e_I)
         return ll
     
     def logprior(self, x: ndarray) -> float:
@@ -72,6 +85,7 @@ class DeWhittle:
     
     def logpost(self, x: ndarray) -> float:
         return self.loglik(x) + self.logprior(x)
+    
     
     def fit(self, x0: None|ndarray, prior:bool = True,  basin_hopping:bool = False, 
                                                         niter:int = 100, 
@@ -113,3 +127,74 @@ class DeWhittle:
             self.propcov = False
             
         return self.res, self.propcov
+    
+    
+    def estimate_standard_errors(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
+        
+        if monte_carlo:
+            i = 0
+            MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
+            while niter>i: 
+                self.update_model_params(np.exp(params))            # list() because of autograd box error
+                sampler = SamplerOnRectangularGrid(self.model, self.grid)
+                
+                _z = sampler()
+                _I = self.periodogram(_z)
+                
+                def obj(x):     return -self.loglik(x, I=_I, const=const)
+                _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
+                if not _res['success']:
+                    continue
+                else:
+                    print(f'{i+1})   MLE:  {np.round(np.exp(_res.x),3)}')
+                    MLEs[i] = _res.x
+                    i+=1
+            
+            # np.cov(MLEs.T)
+            return MLEs
+        
+        
+    
+    def RW_MH(self, niter:int, posterior_name:'str'='deWhittle', acceptance_lag:int=1000):
+        '''samples from the specified posterior'''
+        
+        # TODO: mcmc diagnostics
+        
+        if posterior_name=='deWhittle':
+            posterior = self.logpost
+        # elif cond:
+        #     pass
+        # else:
+        #     pass
+            
+        A     = np.zeros(niter, dtype=np.float64)
+        U     = np.random.rand(niter)
+            
+        h = 2.38/np.sqrt(self.n_params)        
+        props = h*np.random.multivariate_normal(np.zeros(self.n_params), self.propcov, size=niter)
+        
+        self.post_draws = np.zeros((niter, self.n_params))
+        
+        crnt_step = self.post_draws[0] = self.res.x
+        bottom    = posterior(crnt_step)
+        # print(bottom)
+        
+        print(f'{"initializing RWMH":-^50}')
+        t0 = time()
+        for i in range(1, niter):
+            
+            prop_step = crnt_step + props[i]
+            top       = posterior(prop_step)
+            # print(top)
+            
+            A[i]      = np.min((1., np.exp(top-bottom)))
+            if U[i] < A[i]:
+                crnt_step  = prop_step
+                bottom     = top
+            
+            self.post_draws[i]   = crnt_step
+                
+            if (i+1)%acceptance_lag==0:
+                print(f'Iteration: {i+1}    Acceptance rate: {A[i-(acceptance_lag-1): (i+1)].mean().round(3)}    Time: {np.round(time()-t0,3)}s')
+                
+        return self.post_draws, A
