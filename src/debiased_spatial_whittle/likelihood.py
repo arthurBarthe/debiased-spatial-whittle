@@ -115,6 +115,34 @@ def whittle_prime(per, e_per, e_per_prime):
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
 
+from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
+from numpy.linalg import slogdet, inv
+
+class MultivariateDebiasedWhittle:
+    def __init__(self, periodogram: MultPeriodogram, expected_periodogram: ExpectedPeriodogram):
+        self.periodogram = periodogram
+        self.expected_periodogram = expected_periodogram
+
+    def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
+        # TODO add a class sample which contains the data and the grid?
+        """Computes the likelihood for this data"""
+        p = self.periodogram([z[..., 0], z[..., 1]])
+        ep = self.expected_periodogram(model)
+        ep_inv = inv(ep)
+        term1 = slogdet(ep)[1]
+        term2 = np.trace(np.matmul(ep_inv, p), axis1=-2, axis2=-1)
+        # temporary fix specific to a given transform
+        print(term1.shape)
+        print(term2.shape)
+        term2 = np.squeeze(term2)
+        whittle = 1 / z.shape[0] / z.shape[1] * np.sum((term1 + term2))
+        if not params_for_gradient:
+            return whittle
+        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        d_whittle = whittle_prime(p, ep, d_ep)
+        return whittle, d_whittle
+
+
 class DebiasedWhittle:
     def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram

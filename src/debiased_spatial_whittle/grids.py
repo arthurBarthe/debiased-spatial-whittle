@@ -4,6 +4,7 @@ from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
+from numpy.fft import fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 
 PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / 'france.jpg')
@@ -150,6 +151,11 @@ class RectangularGrid:
         for ni in self.n:
             p *= ni
         return p
+
+    @property
+    def fourier_frequencies(self):
+        mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        return np.stack(mesh, axis=-1)
 
     @property
     def lags_unique(self) -> List[np.ndarray]:

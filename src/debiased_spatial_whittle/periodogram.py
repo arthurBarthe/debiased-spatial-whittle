@@ -288,17 +288,24 @@ class ExpectedPeriodogram:
         else:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering
+        # we allow for multivariate, but currently mask same for both grids
+        if cg.ndim < acv.ndim:
+            cg = np.expand_dims(cg, (-2, -1))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
             #TODO can we go back to complex64?
-            result = np.zeros(grid.n, dtype=np.complex128)
+            # TODO change made specifically for bivariate case. Make general. Should we have just one function for the
+            # general case?
+            result = np.zeros(grid.n + (2, 2), dtype=np.complex128)
             if n_dim == 2:
                 # we could actually always use the general version below but we leave the 2d case as it is easier to
                 #read
                 for i in range(2):
                     for j in range(2):
-                        result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+                        result[i:, j:, ...] += cbar[i * shape[0]: (i + 1) * shape[0],
+                                               j * shape[1]: (j + 1) * shape[1],
+                                               ...]
             elif n_dim == 3:
                 # we could actually always use the general version below but we leave the 2d case as it is easier to
                 #read
@@ -323,7 +330,8 @@ class ExpectedPeriodogram:
 
         if d == (0, 0):
             # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-            return np.real(fftn(result))
+            #TODO for multivariate we do not take the real part anymore
+            return fftn(result, axes=list(range(n_dim)))
         return fftn(result)
 
 

@@ -9,8 +9,8 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
-n = (256, 256)
-rho, sigma = 1, 1
+n = (64, 64)
+rho, sigma = 2, 1
 
 grid = RectangularGrid(n)
 model = ExponentialModel()
@@ -34,17 +34,17 @@ hmat = db.fisher(model, model.params)
 print(hmat)
 
 # variance matrix of the score
-jmat_mcmc = db.jmatrix(model, model.params, mcmc_mode=True)
+#jmat_mcmc = db.jmatrix(model, model.params, mcmc_mode=True)
 jmat = db.jmatrix(model, model.params)
-print(jmat_mcmc)
+#print(jmat_mcmc)
 print(jmat)
 
 # variance of estimates
-cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
+#cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
 cov_mat = db.variance_of_estimates(model, model.params, jmat)
 
 print('--------------')
-print(cov_mat_mcmc)
+#print(cov_mat_mcmc)
 print(cov_mat)
 
 if input('Run Monte Carlo simulations to compare with predicted variance (y/n)?') != 'y':

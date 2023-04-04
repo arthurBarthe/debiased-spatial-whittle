@@ -109,7 +109,7 @@ class App(tkinter.Tk):
             canvas.draw()
 
     def plot_data(self, ax):
-        ax.imshow(self.z, cmap='coolwarm', origin='lower')
+        ax.imshow(self.z, cmap='Spectral', origin='lower')
 
     def plot_periodogram(self, ax):
         e_per = compute_ep(self.cov_func, self.g)

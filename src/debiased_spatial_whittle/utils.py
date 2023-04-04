@@ -42,4 +42,5 @@ def video_plot_3d(y: np.ndarray):
     # writer = animation.FFMpegWriter(
     #     fps=15, metadata=dict(artist='Me'), bitrate=1800)
     # ani.save("movie.mp4", writer=writer)
+    plt.show()
     return ani

@@ -14,7 +14,7 @@ class Parameter:
         self.name = name
         self.bounds = bounds
         self.value = None
-        self.init_guess = 1.
+        self.init_guess = 0.9
 
     #TODO add property name and make it point to if adequate
 
@@ -320,7 +320,8 @@ class SquaredExponentialModel(CovarianceModel):
         super(SquaredExponentialModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        d2 = sum((lag**2 for lag in lags))
+        lags = np.stack(lags, axis=0)
+        d2 = np.sum(lags ** 2, axis=0)
         result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2)
         result[np.all(lags == 0, axis=0)] += 0.0001
         return result
@@ -333,6 +334,53 @@ class SquaredExponentialModel(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
         return np.stack((d_rho, d_sigma), axis=-1)
 
+
+class BivariateUniformCorrelation(CovarianceModel):
+    """
+    This class defines the simple case of a bivariate covariance model where a given univariate covariance model is
+    used in parallel to a uniform correlation parameter.
+    """
+    def __init__(self, base_model: CovarianceModel):
+        self.base_model = base_model
+        r = Parameter('r', (-0.99, 0.99))
+        parameters = ParametersUnion([Parameters([r, ]), base_model.params])
+        super(BivariateUniformCorrelation, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        acv11 = self.base_model(lags)
+        # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
+        acv12 = acv11 * self.r_0.value
+        out = np.zeros(acv11.shape + (2, 2))
+        out[..., 0, 0] = acv11
+        out[..., 1, 1] = acv11
+        out[..., 0, 1] = acv12
+        out[..., 1, 0] = acv12
+        return out
+
+    def _gradient(self, x: np.ndarray):
+        pass
+
+
+class TransformedModel(CovarianceModel):
+    """
+    This class defines a covariance model obtained from a covariance model for some input random fields,
+    to which a transform is applied in the spectral domain. For now this is specific to the biharmonic equation.
+    """
+    def __init__(self, input_model: CovarianceModel, transform_func):
+        self.input_model = input_model
+        self.transform_func = transform_func
+        transform_param = Parameter('logD', (1, 50))
+        parameters = ParametersUnion([Parameters([transform_param, ]), input_model.params])
+        super(TransformedModel, self).__init__(parameters)
+
+    def transform_on_grid(self, ks):
+        return self.transform_func(self.logD_0.value, ks)
+
+    def __call__(self):
+        raise NotImplementedError()
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
 
 
 def test_gradient_cov():
