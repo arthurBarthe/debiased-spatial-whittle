@@ -2,11 +2,16 @@
 from abc import ABC, abstractmethod
 from .backend import BackendManager
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 
 np = BackendManager.get_backend()
 
 class Parameter:
+    """
+    Class designed to handle parameters of model. Note that a Parameter can have it own core value, or might just
+    be a pointer to another parameter. In particular, two parameters might point to a single other parameter.
+    In that case, those two parameters always have the same value.
+    """
     def __init__(self, name: str, bounds: Tuple[float, float]):
         #TODO hide point_to
         #TODO add registry to ensure no duplicate names? Add access to registry by name of parameter?
@@ -35,7 +40,7 @@ class Parameter:
         return self.value is None
 
     def merge_with(self, other):
-        assert self.free and other.free
+        assert self.free and other.free, "Only free parameters (value set to None) can be merged together."
         new_name = self.name + ' and ' + other.name
         new_min = max(self.bounds[0], other.bounds[0])
         new_max = min(self.bounds[1], other.bounds[1])
@@ -64,7 +69,7 @@ class Parameter:
         return other / self.value
 
     def __repr__(self):
-        return f'{self.name}: {self.value}'
+        return f'{self.name}: {self.value} ... {self.bounds}'
 
 
 class Parameters:
@@ -81,18 +86,18 @@ class Parameters:
 
     @property
     def values(self):
-        return [p.value for p in self.param_dict.values()]
+        return [p.value for p in self]
 
     @property
     def bounds(self):
-        return [p.bounds for p in self.param_dict.values()]
+        return [p.bounds for p in self]
 
     @property
     def init_guesses(self):
-        return [p.init_guess for p in self.param_dict.values()]
+        return [p.init_guess for p in self]
 
     def free_params(self):
-        list_free = list(filter(lambda p: p.free, self.param_dict.values()))
+        list_free = list(filter(lambda p: p.free, self))
         return Parameters(list(set(list_free)))
 
     def __getitem__(self, item):
@@ -102,8 +107,11 @@ class Parameters:
     def __setitem__(self, key, value):
         self.param_dict[key] = value
 
+    def __iter__(self):
+        for p in self.param_dict.values():
+            yield p
+
     def __len__(self):
-        # TODO change to return the number of unique parameters?
         return len(self.param_dict.keys())
 
     def update_values(self, updates: Dict[str, float]):
@@ -111,7 +119,7 @@ class Parameters:
             self[p_name].value = value
 
     def __repr__(self):
-        return '\n'.join([p.__repr__() for p in self.param_dict.values()])
+        return '\n'.join([p.__repr__() for p in self])
 
 
 class ParametersUnion(Parameters):
@@ -121,8 +129,7 @@ class ParametersUnion(Parameters):
     def __init__(self, parameters: List[Parameters]):
         param_list = []
         for i, params in enumerate(parameters):
-            # TODO line below is ugly add property
-            for p in params.param_dict.values():
+            for p in params:
                 p.name = p.name + '_' + str(i)
                 param_list.append(p)
         super(ParametersUnion, self).__init__(param_list)
@@ -158,16 +165,15 @@ class CovarianceModel(ABC):
 
     @property
     def free_param_bounds(self):
-        free_params = self.free_params
-        return free_params.bounds
+        return self.free_params.bounds
 
     def update_free_params(self, updates):
         self.params.update(updates)
 
     def merge_parameters(self, param_names: Tuple[str, str]):
-        """Merges two parameters into one. This can only be done for two free parameters
-        as for fixed parameters this would not make sense except in the trivial case where
-        the two parameters are already equal."""
+        """
+        Merges two parameters into one. This can only be done for two free parameters
+        """
         p1_name, p2_name = param_names
         p1 = self.params[p1_name]
         p2 = self.params[p2_name]
@@ -189,8 +195,7 @@ class CovarianceModel(ABC):
         the passed parameters"""
         gradient = dict([(p.name, np.zeros_like(x[0], dtype=np.float64)) for p in params.param_dict.values()])
         g = self._gradient(x)
-        #TODO ugly line (also above and again further below)
-        for i, p in enumerate(self.params.param_dict.values()):
+        for i, p in enumerate(self.params):
             if p in params.param_dict.values():
                 gradient[p.name] += np.take(g, i, axis=-1)
         return gradient
@@ -199,10 +204,13 @@ class CovarianceModel(ABC):
     def _gradient(self, x: np.ndarray):
         pass
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Union[float, Parameter]):
         if 'params' in self.__dict__:
             if key in self.param_names:
-                self.params[key].value = value
+                if isinstance(value, Parameter):
+                    self.params[key] = value
+                else:
+                    self.params[key].value = value
                 return
         self.__dict__[key] = value
 
