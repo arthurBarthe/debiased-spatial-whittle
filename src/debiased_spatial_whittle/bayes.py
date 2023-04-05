@@ -77,6 +77,9 @@ class DeWhittle:
         ll = -(a) * np.sum(np.log(e_I) + I / e_I)
         return ll
     
+    def adjusted_loglik(self, x, C, **loglikargs): 
+        return self.loglik(self.MLE.x + C @ (x - self.MLE.x), **loglikargs)
+    
     def logprior(self, x: ndarray) -> float:
         '''uninformative prior on the transformed (unrestricted space)'''
         k = self.n_params
@@ -96,11 +99,11 @@ class DeWhittle:
         if x0 is None:
             x0 = np.zeros(self.n_params)
             
-        if prior:
-            label += ' MAP'
+        if prior:                                         # for large samples, the prior is negligible
+            attribute = 'MAP'
             def obj(x):     return -self.logpost(x)
         else:
-            label += ' MLE'
+            attribute = 'MLE'
             def obj(x):     return -self.loglik(x)
             
         if basin_hopping:          # for global optimization
@@ -110,15 +113,19 @@ class DeWhittle:
         else:            
             self.res = minimize(x0=x0, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
             success = self.res['success']
-
-        self.BIC = self.n_params*np.log(self.grid.n_points) - 2*self.loglik(self.res.x)         # negative logpost
             
         if not success:
             print('Optimizer failed!')
             # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
+            
+        self.res['type'] = attribute
+        setattr(self,attribute, self.res)
+        
+        if attribute=='MLE':
+            self.BIC = self.n_params*np.log(self.grid.n_points) - 2*self.loglik(self.res.x)         # negative logpost
         
         if print_res:
-            print(f'{label}:  {np.round(np.exp(self.res.x),3)}')
+            print(f'{label} {attribute}:  {np.round(np.exp(self.res.x),3)}')
         
         try:
             self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
@@ -155,23 +162,26 @@ class DeWhittle:
         
         
     
-    def RW_MH(self, niter:int, posterior_name:'str'='deWhittle', acceptance_lag:int=1000):
+    def RW_MH(self, niter:int, posterior_name:str='deWhittle', propcov:None|ndarray=None, acceptance_lag:int=1000, **postargs):
         '''samples from the specified posterior'''
         
         # TODO: mcmc diagnostics
         
         if posterior_name=='deWhittle':
             posterior = self.logpost
-        # elif cond:
-        #     pass
+        elif posterior_name=='adj deWhittle':
+            posterior = lambda x: self.adjusted_loglik(x, **postargs)
         # else:
         #     pass
+    
+        if propcov is None:
+            propcov = self.propcov
             
         A     = np.zeros(niter, dtype=np.float64)
         U     = np.random.rand(niter)
             
         h = 2.38/np.sqrt(self.n_params)        
-        props = h*np.random.multivariate_normal(np.zeros(self.n_params), self.propcov, size=niter)
+        props = h*np.random.multivariate_normal(np.zeros(self.n_params), propcov, size=niter)
         
         self.post_draws = np.zeros((niter, self.n_params))
         

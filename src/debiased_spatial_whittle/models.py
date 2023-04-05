@@ -321,7 +321,7 @@ class SquaredExponentialModel(CovarianceModel):
 
     def __call__(self, lags: np.ndarray):
         d2 = sum((lag**2 for lag in lags))
-        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + 0.0001*np.all(lags == 0, axis=0)
+        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + 0.1*np.all(lags == 0, axis=0)  # exp(0.5) as well
         return result
 
     def _gradient(self, lags: np.ndarray):

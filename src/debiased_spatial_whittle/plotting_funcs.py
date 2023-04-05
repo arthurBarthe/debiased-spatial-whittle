@@ -1,20 +1,33 @@
-from numpy import prod
+from math import prod
+from numpy import ndarray
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def plot_marginals(list_draws, truths, title, axis_labels, legend_labels, shape=None, **plotargs):
-    '''draws: list of arrays of samples to compare'''
-    nplots=len(axis_labels)
+def plot_marginals(list_draws: list[ndarray,...],
+                               truths:None|ndarray=None, 
+                               title:None|str=None,
+                               axis_labels:None|list=None,
+                               legend_labels:None|list=None,
+                               shape:None|tuple=None,
+                               figsize:tuple=(15,7), **plotargs):
+    
+    '''draws: list of arrays of samples to plot'''
+    
+    dims   = [draws.shape[1] for draws in list_draws]
+    nplots = max(dims)
+    print(nplots)
     
     ndistributions = len(list_draws)
-    dims = [draws.shape[1] for draws in list_draws]
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    if axis_labels is None:
+        axis_labels = list(range(nplots))
     
     if shape is None:
         shape = (1,nplots)
     else:
         assert prod(shape) >= nplots , 'shape not >= dim(theta)'
-    fig,ax_list = plt.subplots(*shape, figsize=(15,7))
+    fig,ax_list = plt.subplots(*shape, figsize=figsize)
     for i, ax in enumerate(ax_list.flatten()):
         
         if i>=nplots:
@@ -39,10 +52,16 @@ def plot_marginals(list_draws, truths, title, axis_labels, legend_labels, shape=
         ax.spines['left'].set_visible(False)
         ax.spines['right'].set_visible(False)
     
+    if title is None:
+        title = 'Marginal densities'
     fig.suptitle(title, fontsize=26, y=1.10)
+    
+    if legend_labels is None:
+        legend_labels = [f'density #{i}' for i in range(ndistributions)]
     if truths is not None:
-        legend_labels = ['True Parameter'] + legend_labels        
+        legend_labels.insert(0, 'True Parameter')
     fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.00,1.12))
     fig.tight_layout()
     plt.show()
+    return
     

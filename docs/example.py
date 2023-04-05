@@ -56,25 +56,22 @@ from autograd import grad, hessian
 ll = lambda x: dw.loglik(x)
 print(grad(ll)(params))
 
-dw.fit(None, prior=True)
+dw.fit(None, prior=False)
 # stop
 
-MLEs1 = dw.estimate_standard_errors(params, monte_carlo=True, niter=10000,  const='whittle')
-MLEs2 = dw.estimate_standard_errors(params, monte_carlo=True, niter=10000,  const='dewhittle')
-print(np.cov(MLEs1.T).round(3))
-print(np.cov(MLEs2.T).round(3))
+niter=5000
+dewhittle_post, A = dw.RW_MH(niter)
 
+MLEs = dw.estimate_standard_errors(params, monte_carlo=True, niter=500,  const='whittle')
+Sigma = np.cov(MLEs.T)
+B = np.linalg.cholesky(Sigma)
 
-title = 'MLE distribution'
-legend_labels = ['Whittle constant', 'deWhittle constant']
-plot_marginals([MLEs1, MLEs2], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+L_inv = np.linalg.inv(np.linalg.cholesky(dw.propcov))
+C = np.linalg.inv(B@L_inv)
 
+adj_deWhittle_propcov = np.linalg.inv(-hessian(dw.adjusted_loglik)(dw.MLE.x, C=C))
+adj_dewhittle_post, A = dw.RW_MH(niter, posterior_name='adj deWhittle', propcov=adj_deWhittle_propcov, C=C)
 
-post_samps,A = dw.RW_MH(5000)
-title = 'posterior'
-legend_labels = ['deWhittle posterior']
-plot_marginals([post_samps], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
-
-
-
-
+title = 'comparison'
+legend_labels = ['deWhittle', 'adj deWhittle', 'MLE distribution']
+plot_marginals([dewhittle_post, adj_dewhittle_post, MLEs], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
