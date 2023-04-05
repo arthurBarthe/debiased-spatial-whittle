@@ -15,7 +15,6 @@ def plot_marginals(list_draws: list[ndarray,...],
     
     dims   = [draws.shape[1] for draws in list_draws]
     nplots = max(dims)
-    print(nplots)
     
     ndistributions = len(list_draws)
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']

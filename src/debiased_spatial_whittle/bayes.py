@@ -77,8 +77,8 @@ class DeWhittle:
         ll = -(a) * np.sum(np.log(e_I) + I / e_I)
         return ll
     
-    def adjusted_loglik(self, x, C, **loglikargs): 
-        return self.loglik(self.MLE.x + C @ (x - self.MLE.x), **loglikargs)
+    def adjusted_loglik(self, x, **loglikargs): 
+        return self.loglik(self.MLE.x + self.C @ (x - self.MLE.x), **loglikargs)
     
     def logprior(self, x: ndarray) -> float:
         '''uninformative prior on the transformed (unrestricted space)'''
@@ -140,7 +140,7 @@ class DeWhittle:
         
         if monte_carlo:
             i = 0
-            MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
+            self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
             while niter>i: 
                 self.update_model_params(np.exp(params))            # list() because of autograd box error
                 sampler = SamplerOnRectangularGrid(self.model, self.grid)
@@ -154,13 +154,25 @@ class DeWhittle:
                     continue
                 else:
                     print(f'{i+1})   MLE:  {np.round(np.exp(_res.x),3)}')
-                    MLEs[i] = _res.x
+                    self.MLEs[i] = _res.x
                     i+=1
             
-            # np.cov(MLEs.T)
-            return MLEs
+            self.MLEs_cov = np.cov(self.MLEs.T)
+            return self.MLEs
         
+    def prepare_curvature_adjustment(self):
+        # TODO: singular value decomp
         
+        if not hasattr(self, 'MLE'):
+            raise TypeError('must optimize log-likelihood first')
+            
+        B = np.linalg.cholesky(self.MLEs_cov)
+
+        L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
+        self.C = np.linalg.inv(B@L_inv)
+        
+        self.adj_deWhittle_propcov = np.linalg.inv(-hessian(self.adjusted_loglik)(self.MLE.x))
+        return
     
     def RW_MH(self, niter:int, posterior_name:str='deWhittle', propcov:None|ndarray=None, acceptance_lag:int=1000, **postargs):
         '''samples from the specified posterior'''
@@ -169,6 +181,7 @@ class DeWhittle:
         
         if posterior_name=='deWhittle':
             posterior = self.logpost
+            # propcov = 
         elif posterior_name=='adj deWhittle':
             posterior = lambda x: self.adjusted_loglik(x, **postargs)
         # else:

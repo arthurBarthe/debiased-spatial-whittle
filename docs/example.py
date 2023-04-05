@@ -63,14 +63,9 @@ niter=5000
 dewhittle_post, A = dw.RW_MH(niter)
 
 MLEs = dw.estimate_standard_errors(params, monte_carlo=True, niter=500,  const='whittle')
-Sigma = np.cov(MLEs.T)
-B = np.linalg.cholesky(Sigma)
 
-L_inv = np.linalg.inv(np.linalg.cholesky(dw.propcov))
-C = np.linalg.inv(B@L_inv)
-
-adj_deWhittle_propcov = np.linalg.inv(-hessian(dw.adjusted_loglik)(dw.MLE.x, C=C))
-adj_dewhittle_post, A = dw.RW_MH(niter, posterior_name='adj deWhittle', propcov=adj_deWhittle_propcov, C=C)
+dw.prepare_curvature_adjustment()
+adj_dewhittle_post, A = dw.RW_MH(niter, posterior_name='adj deWhittle', propcov=dw.adj_deWhittle_propcov)
 
 title = 'comparison'
 legend_labels = ['deWhittle', 'adj deWhittle', 'MLE distribution']
