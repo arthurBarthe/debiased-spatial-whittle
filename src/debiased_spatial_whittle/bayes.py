@@ -4,6 +4,7 @@ from .backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
+
 from time import time
 from autograd import grad, hessian
 from autograd.scipy import stats
@@ -14,7 +15,10 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from .models import CovarianceModel
 
+fftn = np.fft.fftn
+fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
+
 
 class DeWhittle:
     # TODO: include time domain and regular whittle likelihoods
@@ -29,6 +33,8 @@ class DeWhittle:
         self.model = model
         self.free_params = model.free_params
         self.n_params = len(self.free_params)
+        
+        self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
         
     @property
     def z(self):
@@ -47,12 +53,13 @@ class DeWhittle:
     def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
         # TODO: parameter transform is temporary
-        params = np.exp(params)
+        
         if lags is None:
             lags = self.grid.lags_unique
 
         self.update_model_params(params)
-        return ifftshift(self.model(self.grid.lags_unique))
+        # TODO: ask why ifftshift
+        return ifftshift(self.model(lags))
         
         
     def expected_periodogram(self, params: ndarray) -> ndarray:
@@ -62,6 +69,8 @@ class DeWhittle:
     
     def loglik(self, params: ndarray, I:None|ndarray=None, const:str='whittle') -> float:
         # TODO: transform params
+        
+        params = np.exp(params)
         
         if I is None:
             I = self.I
@@ -90,21 +99,45 @@ class DeWhittle:
         return self.loglik(x) + self.logprior(x)
     
     
-    def fit(self, x0: None|ndarray, prior:bool = True,  basin_hopping:bool = False, 
-                                                        niter:int = 100, 
-                                                        label: str = 'debiased Whittle', 
-                                                        print_res:bool = True, **optargs):
+    
+    def whittle_loglik(self, params: ndarray, I:None|ndarray=None) -> float:
+        
+        params = np.exp(params)
+        
+        if I is None:
+            I = self.I
+            
+        acf = ifftshift(self.cov_func(params, self.g))  # ifftshift again?
+        f = np.real(fftn(fftshift(acf)))#/(2*np.pi)**2       # this may be unstable for small grids/nugget
+        assert np.all(f>0)
+        # print(f.min())
+        
+        ll = -(1/2) * np.sum(np.log(f) + I / f)
+        return ll
+        
+        
+    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
+                                                       niter:int = 100, 
+                                                       label: str = 'debiased Whittle', 
+                                                       print_res:bool = True, **optargs):
         '''fit the model to data - includes optional global optimizer'''
         
         if x0 is None:
             x0 = np.zeros(self.n_params)
             
+        
         if prior:                                         # for large samples, the prior is negligible
             attribute = 'MAP'
-            def obj(x):     return -self.logpost(x)
+            if label=='whittle':
+                def obj(x):     return -self.whittle_loglik(x)
+            else:
+                def obj(x):     return -self.logpost(x)
         else:
             attribute = 'MLE'
-            def obj(x):     return -self.loglik(x)
+            if label=='whittle':
+                def obj(x):     return -self.whittle_loglik(x)
+            else:                
+                def obj(x):     return -self.loglik(x)
             
         if basin_hopping:          # for global optimization
             minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': grad(obj)}

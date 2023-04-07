@@ -15,7 +15,7 @@ from debiased_spatial_whittle.plotting_funcs import plot_marginals
 
 fftn = np.fft.fftn
 
-np.random.seed(1252149)
+# np.random.seed(1252149)
 
 n = (128, 128)
 rho, sigma = 10, 1
@@ -57,12 +57,14 @@ ll = lambda x: dw.loglik(x)
 print(grad(ll)(params))
 
 dw.fit(None, prior=False)
-# stop
+
+dw.fit(None, prior=False, label='whittle')
+stop
 
 niter=5000
 dewhittle_post, A = dw.RW_MH(niter)
 
-MLEs = dw.estimate_standard_errors(params, monte_carlo=True, niter=500,  const='whittle')
+MLEs = dw.estimate_standard_errors(dw.res.x, monte_carlo=True, niter=500,  const='whittle')
 
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, posterior_name='adj deWhittle', propcov=dw.adj_deWhittle_propcov)
