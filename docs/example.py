@@ -11,6 +11,7 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
+from debiased_spatial_whittle.Likelihoods import DebiasedWhittle2
 
 
 fftn = np.fft.fftn
@@ -59,8 +60,19 @@ print(grad(ll)(params))
 dw.fit(None, prior=False)
 
 dw.fit(None, prior=False, label='whittle')
-stop
 
+
+dw2 = DebiasedWhittle2(z, grid, SquaredExponentialModel())
+dw2.fit(None, prior=False)
+
+from debiased_spatial_whittle.bayes2.funcs import gradf
+
+print(gradf(np.ones(5)))
+
+# stop
+
+
+dw.fit(None, prior=False)
 niter=5000
 dewhittle_post, A = dw.RW_MH(niter)
 

@@ -1,5 +1,5 @@
 # import autograd.numpy as np
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 # TODO: why .backend??
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
@@ -13,12 +13,14 @@ from scipy.optimize import minimize, basinhopping
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
-from .models import CovarianceModel
+from debiased_spatial_whittle.models import CovarianceModel
 
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
 
+def f(x):
+    return np.sum(x)*5
 
 class DeWhittle:
     # TODO: include time domain and regular whittle likelihoods
