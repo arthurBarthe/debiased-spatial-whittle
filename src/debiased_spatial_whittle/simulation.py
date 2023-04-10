@@ -2,6 +2,7 @@ import sys
 
 from .backend import BackendManager
 np = BackendManager.get_backend()
+np.random.seed(1252149)
 
 import warnings
 from .periodogram import autocov

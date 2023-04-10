@@ -1,10 +1,10 @@
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
 from abc import ABC, abstractmethod
 
-
+from time import time
 from autograd import grad, hessian
 from autograd.scipy import stats
 from autograd.numpy import ndarray
@@ -73,7 +73,7 @@ class Likelihood(ABC):
         pass
     
     @abstractmethod
-    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:     # TODO: lags input should be ndarray
+    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
         
         # TODO: only for dewhittle and whittle
@@ -82,7 +82,7 @@ class Likelihood(ABC):
 
         self.update_model_params(params)
         # TODO: ask why ifftshift
-        return ifftshift(self.model(lags))
+        return ifftshift(self.model(np.stack(lags)))
     
     
     @abstractmethod
@@ -132,7 +132,7 @@ class Likelihood(ABC):
             
         if basin_hopping:          # for global optimization
             minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': grad(obj)}
-            self.res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs) # seed=234230
+            self.res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
             success = self.res.lowest_optimization_result['success']
         else:            
             self.res = minimize(x0=x0, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
@@ -161,7 +161,7 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, **optargs) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -172,7 +172,7 @@ class Likelihood(ABC):
             _z = sampler()
             _I = self.periodogram(_z)
             
-            def obj(x):     return -self.loglik(x, I=_I, const=const)
+            def obj(x):     return -self(x, I=_I)    # TODO: likelihood_kwargs, e.g. const
             _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
             if not _res['success']:
                 continue
@@ -181,8 +181,8 @@ class Likelihood(ABC):
                 self.MLEs[i] = _res.x
                 i+=1
             
-            self.MLEs_cov = np.cov(self.MLEs.T)
-            return self.MLEs
+        self.MLEs_cov = np.cov(self.MLEs.T)
+        return self.MLEs
 
 
     @abstractmethod
@@ -201,81 +201,53 @@ class Likelihood(ABC):
         L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
         self.C = np.linalg.inv(B@L_inv)
         
-        self.adj_propcov = np.linalg.inv(-hessian(self.adjusted_loglik)(self.MLE.x))
+        self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.MLE.x))
         return
     
-    
-    
-class DebiasedWhittle2(Likelihood):
-    
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
-        super().__init__(z, grid, model, use_taper)
+    @abstractmethod
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
+        '''Random walk Metropolis-Hastings: samples the specified posterior'''
         
+        # TODO: mcmc diagnostics
         
-    def expected_periodogram(self, params: ndarray) -> ndarray:
-        acf = self.cov_func(params, lags = None)
-        return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
-
-        
-    def __call__(self, params: ndarray, I:None|ndarray=None, const:str='whittle') -> float: 
-        params = np.exp(params)
-        
-        if I is None:
-            I = self.I
+        if adjusted:
+            posterior = self.adj_logpost
+            propcov   = self.adj_propcov
+            label = 'adjusted ' + self.__repr__()
             
-        N = self.grid.n_points
-        
-        e_I = self.expected_periodogram(params)
-        if const=='whittle':
-            a=1/2
         else:
-            a=1/N
+            posterior = self.logpost
+            propcov   = self.propcov
+            label = self.__repr__()
+    
+        A     = np.zeros(niter, dtype=np.float64)
+        U     = np.random.rand(niter)
             
-        ll = -(a) * np.sum(np.log(e_I) + I / e_I)
-        return ll
+        h = 2.38/np.sqrt(self.n_params)        
+        props = h*np.random.multivariate_normal(np.zeros(self.n_params), propcov, size=niter)
         
-    def __repr__(self):
-        return 'Debiased Whittle'
-    
-    def update_model_params(self, params: ndarray) -> None:
-        return super().update_model_params(params)
-    
-    def cov_func(self, params: ndarray, lags: None|ndarray=None) -> ndarray:
-        return super().cov_func(params, lags)
-    
-    def logprior(self, x: ndarray):
-        return super().logprior(x)
+        self.post_draws = np.zeros((niter, self.n_params))
         
-    def logpost(self, x: ndarray):
-        return super().logpost(x)
+        crnt_step = self.post_draws[0] = self.res.x
+        bottom    = posterior(crnt_step)
+        # print(bottom)
         
-    def adj_loglik(self, x: ndarray):
-        return super().adjusted_loglik(x)
-        
-    def adj_logpost(self, x: ndarray):
-        return super().adjusted_logpost(x)
-        
-    def mymethod(self, x):
-        super().mymethod(x)
-    
-    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
-                                                       niter:int = 100, 
-                                                       print_res:bool = True,
-                                                       **optargs):
-        
-        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
-        return super().sim_MLEs(self, params, niter, const, **optargs)
-    
-    
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
-    
-        if monte_carlo:
-            super().sim_MLEs(params, niter)
-        else:
-            pass
-    
-    def prepare_curvature_adjustment(self):           # maybe not abstract method
-        return super().prepare_curvature_adjustment()
-    
+        print(f'{f"{label} MCMC":-^50}')
+        t0 = time()
+        for i in range(1, niter):
+            
+            prop_step = crnt_step + props[i]
+            top       = posterior(prop_step)
+            # print(top)
+            
+            A[i]      = np.min((1., np.exp(top-bottom)))
+            if U[i] < A[i]:
+                crnt_step  = prop_step
+                bottom     = top
+            
+            self.post_draws[i]   = crnt_step
+                
+            if (i+1)%acceptance_lag==0:
+                print(f'Iteration: {i+1}    Acceptance rate: {A[i-(acceptance_lag-1): (i+1)].mean().round(3)}    Time: {np.round(time()-t0,3)}s')
+                
+        return self.post_draws, A

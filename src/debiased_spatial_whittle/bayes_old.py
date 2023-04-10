@@ -4,6 +4,7 @@ from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
+np.random.seed(1252149)
 
 from time import time
 from autograd import grad, hessian
@@ -22,7 +23,7 @@ ifftshift = np.fft.ifftshift
 def f(x):
     return np.sum(x)*5
 
-class DeWhittle:
+class DeWhittle2:
     # TODO: include time domain and regular whittle likelihoods
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
         self._z = z
@@ -213,12 +214,12 @@ class DeWhittle:
         '''samples from the specified posterior'''
         
         # TODO: mcmc diagnostics
-        
+        np.random.seed(1252149)
         if posterior_name=='deWhittle':
             posterior = self.logpost
             # propcov = 
         elif posterior_name=='adj deWhittle':
-            posterior = lambda x: self.adjusted_loglik(x, **postargs)
+            posterior = lambda x: self.adjusted_loglik(x, **postargs) + self.logprior(x)
         # else:
         #     pass
     
@@ -227,7 +228,7 @@ class DeWhittle:
             
         A     = np.zeros(niter, dtype=np.float64)
         U     = np.random.rand(niter)
-            
+
         h = 2.38/np.sqrt(self.n_params)        
         props = h*np.random.multivariate_normal(np.zeros(self.n_params), propcov, size=niter)
         
@@ -236,7 +237,8 @@ class DeWhittle:
         crnt_step = self.post_draws[0] = self.res.x
         bottom    = posterior(crnt_step)
         # print(bottom)
-        
+        print(props)
+        print(U)        
         print(f'{"initializing RWMH":-^50}')
         t0 = time()
         for i in range(1, niter):
