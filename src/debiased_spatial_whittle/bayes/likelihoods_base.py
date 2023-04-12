@@ -53,6 +53,10 @@ class Likelihood(ABC):
     def free_params(self):
         return self._free_params
     
+    @property
+    def n_points(self):
+        return self.grid.n_points
+    
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
         free_params = self.model.params        
@@ -114,7 +118,7 @@ class Likelihood(ABC):
     
     @abstractmethod
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
-                                                       niter:int = 100, 
+                                                       niter:int = 100, approx_grad:bool=False,
                                                        print_res:bool = True, **optargs):
         '''fit the model to data - includes optional global optimizer'''
         
@@ -130,12 +134,17 @@ class Likelihood(ABC):
             attribute = 'MLE'
             def obj(x):     return -self(x)
             
+        if not approx_grad:
+            gradient = grad(obj)
+        else:
+            gradient = False
+            
         if basin_hopping:          # for global optimization
-            minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': grad(obj)}
+            minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
             self.res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
             success = self.res.lowest_optimization_result['success']
         else:            
-            self.res = minimize(x0=x0, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
+            self.res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
             success = self.res['success']
             
         if not success:
@@ -151,12 +160,15 @@ class Likelihood(ABC):
         if print_res:
             print(f'{self.__repr__()} {attribute}:  {np.round(np.exp(self.res.x),3)}')
         
-        try:
-            self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
-        except np.linalg.LinAlgError:
-            print('Singular propcov')
-            self.propcov = False
-            
+        if approx_grad:
+            self.propcov = self.res.hess_inv.todense()
+        else:    
+            try:
+                self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
+            except np.linalg.LinAlgError:
+                print('Singular propcov')
+                self.propcov = False
+                
         return self.res, self.propcov
     
     

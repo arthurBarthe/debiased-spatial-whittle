@@ -319,10 +319,18 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma])
         super(SquaredExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray):
-        d2 = sum((lag**2 for lag in lags))
-        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + 0.1*np.all(lags == 0, axis=0)  # exp(0.5) as well
-        return result
+    def __call__(self, lags: np.ndarray, time_domain:bool=False):
+        
+        nugget = 0.1
+        if time_domain:
+            d2 = lags         # this is the full covariance matrix
+            nugget_effect = nugget*np.eye(len(lags))
+        else:
+            d2 = sum((lag**2 for lag in lags))
+            nugget_effect = nugget*np.all(lags == 0, axis=0)
+            
+        acf = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
+        return acf
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to

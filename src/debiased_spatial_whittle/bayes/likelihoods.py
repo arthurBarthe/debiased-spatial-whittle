@@ -16,6 +16,8 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
 
+import autograd.scipy.linalg as spl
+npl = np.linalg
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
@@ -176,3 +178,92 @@ class Whittle(Likelihood):
     
     def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
         return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, **postargs)
+
+
+class Gaussian(Likelihood):
+
+
+        
+        
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel):
+        
+        if grid.n_points>10000:
+            ValueError('Too many observations for Gaussian likelihood')
+            
+        self.norm2 = np.sum((lags**2 for lags in grid.lag_matrix))
+        super().__init__(z, grid, model, use_taper=None)
+
+    def __call__(self, params: ndarray, z:None|ndarray=None) -> float:
+        '''Computes Gaussian likelihood in O(|n|^3) time'''
+        params = np.exp(params)
+        
+        if z is None:
+            z = self.z
+        
+        N = self.n_points
+        covMat = self.cov_func(params, lags=self.norm2)
+   
+        L  = npl.cholesky(covMat)
+        S1 = spl.solve_triangular(L,   z.flatten(),  lower=True)
+        S2 = spl.solve_triangular(L.T, S1, lower=False)
+       
+        ll = -np.sum(np.log(np.diag(L)))             \
+              -0.5*np.dot(z.flatten(),S2)        \
+              -0.5*N*np.log(2*np.pi)
+        return ll
+        
+    def __repr__(self):
+        return 'Gaussian'
+    
+    def update_model_params(self, params: ndarray) -> None:
+        return super().update_model_params(params)
+    
+    def cov_func(self, params: ndarray, lags: None|ndarray=None) -> ndarray:
+        
+        if lags is None:
+            lags = self.norm2
+
+        self.update_model_params(params)
+        return self.model(lags, time_domain=True)
+
+    
+    def logprior(self, x: ndarray):
+        return super().logprior(x)
+        
+    def logpost(self, x: ndarray):
+        return super().logpost(x)
+        
+    def adj_loglik(self, x: ndarray):
+        raise ValueError('too ')
+        return super().adj_loglik(x)
+        
+    def adj_logpost(self, x: ndarray):
+        return super().adj_logpost(x)
+        
+    def mymethod(self, x):
+        super().mymethod(x)
+    
+    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
+                                                        niter:int = 100, 
+                                                        print_res:bool = True,
+                                                        **optargs):
+        
+        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
+    
+    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
+        return super().sim_MLEs(self, params, niter, const, **optargs)
+    
+    
+    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
+    
+        if monte_carlo:
+            return super().sim_MLEs(params, niter)
+        else:
+            pass   # https://en.wikipedia.org/wiki/Fisher_information#Multivariate_normal_distribution
+    
+    def prepare_curvature_adjustment(self):           # maybe not abstract method
+        return super().prepare_curvature_adjustment()
+    
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
+        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, **postargs)
+
