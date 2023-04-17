@@ -173,7 +173,7 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, **optargs) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:None|int=10, **optargs) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -182,6 +182,19 @@ class Likelihood(ABC):
             sampler = SamplerOnRectangularGrid(self.model, self.grid)
             
             _z = sampler()
+            if t_random_field:
+                if df == np.inf:
+                    chi = np.ones(self.n_points)
+                else:
+                    chi = np.random.chisquare(df, self.n_points)/df
+                
+                _z /= np.sqrt(chi.reshape(self.grid.n))
+                
+                if False:
+                    import matplotlib.pyplot as plt
+                    plt.imshow(_z)
+                    plt.show()
+                
             _I = self.periodogram(_z)
             
             def obj(x):     return -self(x, I=_I)    # TODO: likelihood_kwargs, e.g. const

@@ -83,3 +83,15 @@ plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], params, title
 gauss = Gaussian(z, grid, SquaredExponentialModel())
 gauss.fit(None, prior=False, approx_grad=True)
 print(gauss(params))
+
+
+
+
+# dfs = list(range(5,15+1)) + [9999]
+# MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, df=df) for df in dfs]
+
+
+# title = 'DeWhittle t-random field MLE distribution'
+# legend_labels = [rf'$\nu={nu}$' for nu in dfs]
+# plot_marginals(MLEs, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2), cmap='Spectral')
+

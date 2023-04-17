@@ -7,9 +7,10 @@ def plot_marginals(list_draws: list[ndarray,...],
                                truths:None|ndarray=None, 
                                title:None|str=None,
                                axis_labels:None|list=None,
-                               legend_labels:None|list=None,
+                               density_labels:None|list=None,
                                shape:None|tuple=None,
-                               figsize:tuple=(15,7), **plotargs):
+                               figsize:tuple=(15,7), 
+                               cmap:None|str=None, **plotargs):
     
     '''draws: list of arrays of samples to plot'''
     
@@ -17,7 +18,7 @@ def plot_marginals(list_draws: list[ndarray,...],
     nplots = max(dims)
     
     ndistributions = len(list_draws)
-    color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    # color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     if axis_labels is None:
         axis_labels = list(range(nplots))
@@ -26,6 +27,11 @@ def plot_marginals(list_draws: list[ndarray,...],
         shape = (1,nplots)
     else:
         assert prod(shape) >= nplots , 'shape not >= dim(theta)'
+    
+    if cmap is None:
+        cmap = 'viridis'
+    cm = plt.get_cmap(cmap)
+    
     fig,ax_list = plt.subplots(*shape, figsize=figsize)
     for i, ax in enumerate(ax_list.flatten()):
         
@@ -39,7 +45,7 @@ def plot_marginals(list_draws: list[ndarray,...],
         for j in range(ndistributions):
             if i>dims[j]-1:
                 continue
-            sns.kdeplot(list_draws[j][:,i], fill=False, ax=ax, legend=False, linewidth=3., color=color_cycle[j], **plotargs)
+            sns.kdeplot(list_draws[j][:,i], fill=False, ax=ax, legend=False, linewidth=3., color=cm(j/ndistributions), **plotargs)
                 
         
         ax.set_xlabel(axis_labels[i], fontsize=24)
@@ -55,11 +61,15 @@ def plot_marginals(list_draws: list[ndarray,...],
         title = 'Marginal densities'
     fig.suptitle(title, fontsize=26, y=1.10)
     
-    if legend_labels is None:
+    if density_labels is None:
         legend_labels = [f'density #{i}' for i in range(ndistributions)]
+    else:
+        legend_labels = density_labels.copy()
     if truths is not None:
-        legend_labels.insert(0, 'True Parameter')
-    fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.00,1.12))
+        legend_labels.insert(0, 'True parameter')
+    
+    # ax_list[0].set_xlim([-1.5,4])     # bounds
+    fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.05,1.12))
     fig.tight_layout()
     plt.show()
     return

@@ -82,8 +82,8 @@ class DeWhittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
-        return super().sim_MLEs(self, params, niter, const, **optargs)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:None|int=10, **optargs) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field, df, **optargs)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
@@ -183,8 +183,6 @@ class Whittle(Likelihood):
 class Gaussian(Likelihood):
 
 
-        
-        
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel):
         
         if grid.n_points>10000:
