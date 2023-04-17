@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from .backend import BackendManager
 
+from scipy.special import gamma, kv
 from typing import Tuple, List, Dict, Union
 
 np = BackendManager.get_backend()
@@ -340,6 +341,30 @@ class SquaredExponentialModel(CovarianceModel):
         d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
         return np.stack((d_rho, d_sigma), axis=-1)
+
+
+class MaternCovarianceModel(CovarianceModel):
+    def __init__(self):
+        sigma = Parameter('sigma', (0.01, 1000))
+        rho = Parameter('rho', (0.01, 1000))
+        nu = Parameter('nu', (0.5, 100))
+
+    def __call__(self, lags: np.ndarray):
+        lags = np.stack(lags, axis=0)
+        d = np.sqrt(np.sum(lags ** 2, axis=0))
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        if nu==1.5:
+            K = np.sqrt(3) * d / rho
+            return (1.0 + K) * np.exp(-K) * sigma**2
+        term1 = 2 ** (1 - nu) / gamma(nu)
+        term2 = (np.sqrt(2 * nu) * d / rho) ** nu
+        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
+        val = sigma ** 2 * term1 * term2 * term3
+        val[d == 0] = sigma ** 2
+        return val
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
 
 
 
