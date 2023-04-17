@@ -100,9 +100,12 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 
 
 #########NEW OOP version
-from .periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from .models import CovarianceModel, Parameters
 from typing import Callable
+
+from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
+from numpy.linalg import slogdet, inv
 
 
 def whittle_prime(per, e_per, e_per_prime):
@@ -115,10 +118,12 @@ def whittle_prime(per, e_per, e_per_prime):
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
 
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
-from numpy.linalg import slogdet, inv
-
 class MultivariateDebiasedWhittle:
+    """
+    Implements the Debiased Whittle Likelihood for multivariate data. This requires
+    the use of a multivariate periodogram.
+    Only implemented for bi-variate right now. Gradient not used currently.
+    """
     def __init__(self, periodogram: MultPeriodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
@@ -131,13 +136,10 @@ class MultivariateDebiasedWhittle:
         ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
         term2 = np.trace(np.matmul(ep_inv, p), axis1=-2, axis2=-1)
-        # temporary fix specific to a given transform
-        print(term1.shape)
-        print(term2.shape)
-        term2 = np.squeeze(term2)
         whittle = 1 / z.shape[0] / z.shape[1] * np.sum((term1 + term2))
         if not params_for_gradient:
             return whittle
+        raise NotImplementedError('Gradient not implemented for multivariate')
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
         return whittle, d_whittle

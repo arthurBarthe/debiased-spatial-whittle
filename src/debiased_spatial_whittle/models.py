@@ -378,11 +378,12 @@ class TransformedModel(CovarianceModel):
         self.input_model = input_model
         self.transform_func = transform_func
         transform_param = Parameter('logD', (1, 50))
-        parameters = ParametersUnion([Parameters([transform_param, ]), input_model.params])
+        eta_param = Parameter('eta', (-1, 1))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param]), input_model.params])
         super(TransformedModel, self).__init__(parameters)
 
     def transform_on_grid(self, ks):
-        return self.transform_func(self.logD_0.value, ks)
+        return self.transform_func(self.logD_0.value, self.eta_0.value, ks)
 
     def __call__(self):
         raise NotImplementedError()

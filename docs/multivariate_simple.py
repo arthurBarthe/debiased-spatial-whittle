@@ -12,11 +12,11 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerCorrelatedOnRectangularGrid
 
-corr = -0.5
+corr = 0.9
 
-g = RectangularGrid((512, 512))
-m = ExponentialModel()
-m.rho = 90
+g = RectangularGrid((256, 256))
+m = SquaredExponentialModel()
+m.rho = 45
 m.sigma = 1
 bvm = BivariateUniformCorrelation(m)
 print(bvm.free_param_bounds)

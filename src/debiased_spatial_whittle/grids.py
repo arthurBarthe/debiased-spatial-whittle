@@ -153,7 +153,26 @@ class RectangularGrid:
         return p
 
     @property
+    def extent(self):
+        return tuple([n_i * delta_i for n_i, delta_i in zip(self.n, self.delta)])
+
+    @property
+    def imshow_extent(self):
+        extent = self.extent
+        imshow_extent = []
+        for e in extent:
+            imshow_extent.extend((0, e))
+        return imshow_extent
+
+    @property
     def fourier_frequencies(self):
+        """
+        Grid of Fourier frequencies corresponding to the spatial grid.
+
+        Returns
+        -------
+
+        """
         mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
         return np.stack(mesh, axis=-1)
 
@@ -162,6 +181,10 @@ class RectangularGrid:
         shape = self.n
         delta = self.delta
         return np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+
+    @property
+    def grid_points(self):
+        return tuple([np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)])
 
     @property
     def lag_matrix(self):
@@ -173,7 +196,7 @@ class RectangularGrid:
         lags
             shape (n_points, n_points, n_dimensions).
         """
-        xs = [np.arange(s, dtype=np.int64) for s in self.n]
+        xs = [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
         grid = np.meshgrid(*xs, indexing='ij')
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
