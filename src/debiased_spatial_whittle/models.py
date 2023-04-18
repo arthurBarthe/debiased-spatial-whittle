@@ -398,6 +398,8 @@ class MaternCovarianceModel(CovarianceModel):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
         nu = Parameter('nu', (0.5, 100))
+        parameters = Parameters([rho, sigma, nu])
+        super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
         lags = np.stack(lags, axis=0)
