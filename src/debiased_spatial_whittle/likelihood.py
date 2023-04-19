@@ -179,7 +179,7 @@ class DebiasedWhittle:
                     s1 = covariance_fft.exact_summation1(model, self.expected_periodogram, d_epi / ep**2, d_epj / ep**2)
                 else:
                     mcmc = McmcDiags(model, self.expected_periodogram, d_epi / ep, d_epj / ep)
-                    mcmc.run(2000)
+                    mcmc.run(500)
                     s1 = mcmc.estimate()
                 #s2 = covariance_fft.exact_summation2(model, self.expected_periodogram, d_epi/ ep**2, d_epj / ep**2)
                 s2 = s1
@@ -206,6 +206,7 @@ class DebiasedWhittle:
         np.ndarray
             Sample covariance matrix of the gradient of the likelihood
         """
+        # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         gradients = []
         for i_sample in range(n_sims):

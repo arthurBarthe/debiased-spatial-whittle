@@ -9,8 +9,8 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
-n = (256, 256)
-rho, sigma = 1, 1
+n = (32, 32)
+rho, sigma = 2, 1
 
 grid = RectangularGrid(n)
 model = ExponentialModel()
