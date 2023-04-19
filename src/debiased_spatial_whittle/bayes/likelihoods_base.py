@@ -177,11 +177,10 @@ class Likelihood(ABC):
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
-        while niter>i: 
-            self.update_model_params(np.exp(params))            # list() because of autograd box error
-            sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        while niter>i:
             
-            _z = sampler()
+            _z = self.sim_z(np.exp(params))
+            # TODO: put t_random_field in sampler()
             if t_random_field:
                 if df == np.inf:
                     chi = np.ones(self.n_points)
@@ -228,6 +227,16 @@ class Likelihood(ABC):
         
         self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.MLE.x))
         return
+    
+    @abstractmethod
+    def sim_z(self,params:None|ndarray=None):
+        if params is None:
+            params = np.exp(self.res.x)
+            
+        self.update_model_params(params)            # list() because of autograd box error
+        sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        return sampler()
+    
     
     @abstractmethod
     def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):

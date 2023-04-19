@@ -74,6 +74,32 @@ title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle']
 plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
+
+sim_z = dw.sim_z(np.exp(dw.res.x))
+
+fig, ax = plt.subplots(1,2, figsize=(20,15))
+ax[0].set_title('Sea Temperature Data', fontsize=22)
+im1 = ax[0].imshow(z, cmap='Spectral', origin='lower', extent = [211.125, 230, 20 ,38.875])
+fig.colorbar(im1, shrink=.5, ax=ax[0])
+
+ax[1].set_title('simulated', fontsize=22)
+im2 = ax[1].imshow(sim_z, cmap='Spectral', origin='lower', extent = [211.125, 230, 20 ,38.875])
+fig.colorbar(im2, shrink=.5, ax=ax[1])
+
+for i in range(2):
+    ax[i].set_xlabel('Longitude', fontsize=16)
+    ax[i].set_ylabel('Latitude',  fontsize=16)
+    
+    ax[i].set_xticks(np.arange(215,235, 5))
+    ax[i].set_yticks(np.arange(20 ,38.875, 5))
+    
+fig.tight_layout()
+plt.show()
+
+
+
+
+
 # whittle = Whittle(z, grid, SquaredExponentialModel())
 # whittle.fit(None, False)
 # whittle_post, A = whittle.RW_MH(niter)

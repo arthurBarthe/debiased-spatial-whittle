@@ -82,6 +82,9 @@ class DeWhittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
+    def sim_z(self, params: None|ndarray):
+        return super().sim_z(params)
+    
     def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:None|int=10, **optargs) -> ndarray:
         return super().sim_MLEs(params, niter, t_random_field, df, **optargs)
     
@@ -162,6 +165,9 @@ class Whittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
+    def sim_z(self, params: None|ndarray):
+        return super().sim_z(params)
+    
     def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
         return super().sim_MLEs(self, params, niter, const, **optargs)
     
@@ -240,6 +246,9 @@ class Gaussian(Likelihood):
         
     def mymethod(self, x):
         super().mymethod(x)
+    
+    def sim_z(self, params: None|ndarray):
+        return super().sim_z(params)
     
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
                                                         niter:int = 100, 
