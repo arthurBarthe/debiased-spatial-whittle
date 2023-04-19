@@ -321,7 +321,7 @@ class SquaredExponentialModel(CovarianceModel):
 
     def __call__(self, lags: np.ndarray, time_domain:bool=False):
         
-        nugget = 0.1
+        nugget = 0.0033
         if time_domain:
             d2 = lags         # this is the full covariance matrix
             nugget_effect = nugget*np.eye(len(lags))
