@@ -137,6 +137,7 @@ class MultivariateDebiasedWhittle:
         term1 = slogdet(ep)[1]
         term2 = np.trace(np.matmul(ep_inv, p), axis1=-2, axis2=-1)
         whittle = 1 / z.shape[0] / z.shape[1] * np.sum((term1 + term2))
+        whittle = np.real(whittle)
         if not params_for_gradient:
             return whittle
         raise NotImplementedError('Gradient not implemented for multivariate')
