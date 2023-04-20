@@ -22,7 +22,7 @@ ifftshift = np.fft.ifftshift
 
 class Likelihood(ABC):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float=0.1, use_taper:None|ndarray=None):
         
         self._z = z
         self.grid = grid
@@ -32,6 +32,9 @@ class Likelihood(ABC):
         self._I = self.periodogram(z)
         
         self.model = model
+        # TODO: option to estimate nugget
+        self.model.nugget=nugget
+        # TODO: change this
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
         
@@ -173,31 +176,23 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:None|int=10, **optargs) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, **sim_kwargs) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
         while niter>i:
             
-            _z = self.sim_z(np.exp(params))
-            # TODO: put t_random_field in sampler()
-            if t_random_field:
-                if df == np.inf:
-                    chi = np.ones(self.n_points)
-                else:
-                    chi = np.random.chisquare(df, self.n_points)/df
+            _z = self.sim_z(np.exp(params), **sim_kwargs)
                 
-                _z /= np.sqrt(chi.reshape(self.grid.n))
-                
-                if False:
-                    import matplotlib.pyplot as plt
-                    plt.imshow(_z)
-                    plt.show()
+            if False:
+                import matplotlib.pyplot as plt
+                plt.imshow(_z)
+                plt.show()
                 
             _I = self.periodogram(_z)
             
-            def obj(x):     return -self(x, I=_I)    # TODO: likelihood_kwargs, e.g. const
-            _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B', **optargs)
+            def obj(x):     return -self(x, I=_I)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
+            _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B')
             if not _res['success']:
                 continue
             else:
@@ -229,13 +224,13 @@ class Likelihood(ABC):
         return
     
     @abstractmethod
-    def sim_z(self,params:None|ndarray=None):
+    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, df:int=10):
         if params is None:
             params = np.exp(self.res.x)
             
         self.update_model_params(params)            # list() because of autograd box error
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
-        return sampler()
+        return sampler(t_random_field, df)
     
     
     @abstractmethod

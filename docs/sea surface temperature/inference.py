@@ -20,16 +20,8 @@ fftn = np.fft.fftn
 # np.random.seed(1252147)
 
 n = (75, 75)
-rho, sigma = 5., 0.3
-
 grid = RectangularGrid(n)
 model = SquaredExponentialModel()
-model.rho = rho
-model.sigma = sigma
-
-per = Periodogram()
-ep = ExpectedPeriodogram(grid, per)
-db = DebiasedWhittle(per, ep)
 
 sampler = SamplerOnRectangularGrid(model, grid)
 # z = sampler()
@@ -40,26 +32,9 @@ ax = fig.add_subplot()
 ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
-# stop
 
-I = per(z)
-eI = fftshift(ep(model))
-# plt.imshow(fftshift(I))
-# plt.show()
 
-params = np.log([rho,sigma])
-
-dw = DeWhittle(z, grid, SquaredExponentialModel())
-eI = dw.expected_periodogram(np.exp(params))
-# plt.imshow(fftshift(eI))
-# plt.show()
-
-print(dw(params))
-print(dw.logpost(params))
-
-from autograd import grad, hessian
-ll = lambda x: dw(x)
-print(grad(ll)(params))
+dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.0033)
 
 niter=5000
 
@@ -111,15 +86,4 @@ plt.show()
 # gauss = Gaussian(z, grid, SquaredExponentialModel())
 # gauss.fit(None, prior=False, approx_grad=True)
 # print(gauss(params))
-
-
-
-
-# dfs = list(range(5,15+1)) + [9999]
-# MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, df=df) for df in dfs]
-
-
-# title = 'DeWhittle t-random field MLE distribution'
-# legend_labels = [rf'$\nu={nu}$' for nu in dfs]
-# plot_marginals(MLEs, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2), cmap='Spectral')
 

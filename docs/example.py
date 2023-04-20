@@ -20,12 +20,13 @@ fftn = np.fft.fftn
 np.random.seed(1252147)
 
 n = (64, 64)
-rho, sigma = 10, 1
+rho, sigma, nugget = 10, 1, 0.1
 
 grid = RectangularGrid(n)
 model = SquaredExponentialModel()
 model.rho = rho
 model.sigma = sigma
+model.nugget = nugget
 
 per = Periodogram()
 ep = ExpectedPeriodogram(grid, per)
@@ -44,10 +45,10 @@ ax = fig.add_subplot()
 ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
-
+# stop
 params = np.log([10.,1.])
 
-dw = DeWhittle(z, grid, SquaredExponentialModel())
+dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget)
 eI = dw.expected_periodogram(np.exp(params))
 # plt.imshow(fftshift(eI))
 # plt.show()
@@ -69,7 +70,7 @@ adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 
 
 
-whittle = Whittle(z, grid, SquaredExponentialModel())
+whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=nugget)
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
 # whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=500)
@@ -80,14 +81,14 @@ legend_labels = ['deWhittle', 'adj deWhittle', 'Whittle']
 plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
 
-gauss = Gaussian(z, grid, SquaredExponentialModel())
-gauss.fit(None, prior=False, approx_grad=True)
-print(gauss(params))
+# gauss = Gaussian(z, grid, SquaredExponentialModel())
+# gauss.fit(None, prior=False, approx_grad=True)
+# print(gauss(params))
 
 
 
 
-# dfs = list(range(5,15+1)) + [9999]
+# dfs = list(range(5,15+1)) + list(range(20,55,5)) + [9999]
 # MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, df=df) for df in dfs]
 
 

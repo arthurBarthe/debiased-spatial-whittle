@@ -1,7 +1,10 @@
 from math import prod
+import numpy as np
 from numpy import ndarray
 import seaborn as sns
+from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
+
 
 def plot_marginals(list_draws: list[ndarray,...],
                                truths:None|ndarray=None, 
@@ -73,4 +76,39 @@ def plot_marginals(list_draws: list[ndarray,...],
     fig.tight_layout()
     plt.show()
     return
+
+
+
+
+def ridgeline(data, overlap=0, fill=True, labels=None, n_points=150, figsize=(15,7)):
+    """
+    Creates a standard ridgeline plot.
+
+    data, list of lists.
+    overlap, overlap between distributions. 1 max overlap, 0 no overlap.
+    fill, matplotlib color to fill the distributions.
+    n_points, number of points to evaluate each distribution function.
+    labels, values to place on the y axis to describe the distributions.
+    """
+    if overlap > 1 or overlap < 0:
+        raise ValueError('overlap must be in [0 1]')
+    curves = []
+    ys = []
+    
+    # xx = np.linspace(np.min(np.concatenate(data)),
+                      # np.max(np.concatenate(data)), n_points)
+    for i, d in enumerate(data):
+        pdf = gaussian_kde(d)
+        y = i*(1.0-overlap)
+        ys.append(y)
+        
+        xx = np.linspace(np.min(data[i]),
+                          np.max(data[i]), n_points)
+        density = pdf(xx)
+        if fill:
+            plt.fill_between(xx, np.ones(n_points)*y, 
+                             density+y, zorder=len(data)-i+1, color=fill)
+        plt.plot(xx, density+y, c='k', zorder=len(data)-i+1, lw=1.)
+    if labels:
+        plt.yticks(ys, labels, fontsize=14)
     

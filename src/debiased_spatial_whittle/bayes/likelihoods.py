@@ -25,8 +25,8 @@ ifftshift = np.fft.ifftshift
 
 class DeWhittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
-        super().__init__(z, grid, model, use_taper)
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: None|ndarray=None):
+        super().__init__(z, grid, model, nugget, use_taper)
         
         
     def expected_periodogram(self, params: ndarray) -> ndarray:
@@ -52,7 +52,7 @@ class DeWhittle(Likelihood):
         return ll
         
     def __repr__(self):
-        return 'Debiased Whittle'
+        return 'Debiased Whittle likelihood'
     
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
@@ -82,11 +82,11 @@ class DeWhittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
-    def sim_z(self, params: None|ndarray):
-        return super().sim_z(params)
+    def sim_z(self, params: None|ndarray, t_random_field:bool=False, df:int=10):
+        return super().sim_z(params, t_random_field, df)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:None|int=10, **optargs) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field, df, **optargs)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:int=10) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field, df=df)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
@@ -105,8 +105,8 @@ class DeWhittle(Likelihood):
 
 class Whittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, use_taper:None|ndarray=None):
-        super().__init__(z, grid, model, use_taper)
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:None|ndarray=None):
+        super().__init__(z, grid, model, nugget, use_taper)
         self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
 
 
@@ -135,7 +135,7 @@ class Whittle(Likelihood):
         return ll
         
     def __repr__(self):
-        return 'Whittle'
+        return 'Whittle likelihood'
     
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
@@ -189,13 +189,13 @@ class Whittle(Likelihood):
 class Gaussian(Likelihood):
 
 
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float):
         
         if grid.n_points>10000:
             ValueError('Too many observations for Gaussian likelihood')
             
         self.norm2 = np.sum((lags**2 for lags in grid.lag_matrix))
-        super().__init__(z, grid, model, use_taper=None)
+        super().__init__(z, grid, model, nugget=nugget, use_taper=None)
 
     def __call__(self, params: ndarray, z:None|ndarray=None) -> float:
         '''Computes Gaussian likelihood in O(|n|^3) time'''
@@ -217,7 +217,7 @@ class Gaussian(Likelihood):
         return ll
         
     def __repr__(self):
-        return 'Gaussian'
+        return 'Gaussian likelihood'
     
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
