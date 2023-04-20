@@ -31,6 +31,8 @@ class Parameter:
     def value(self):
         if self.point_to is not None:
             return self.point_to.value
+        if self._value is None:
+            return None
         if self.log_scale:
             return np.exp(self._value)
         return self._value
