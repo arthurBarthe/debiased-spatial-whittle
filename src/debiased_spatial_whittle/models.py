@@ -21,6 +21,9 @@ class Parameter:
         self.bounds = bounds
         self.value = None
         self.init_guess = 0.9
+        # fixme log scale not expected to work with gradients right now
+        # might need a whole new class LogParameter
+        self.log_scale = False
 
     #TODO add property name and make it point to if adequate
 
@@ -28,6 +31,8 @@ class Parameter:
     def value(self):
         if self.point_to is not None:
             return self.point_to.value
+        if self.log_scale:
+            return np.exp(self._value)
         return self._value
 
     @value.setter
