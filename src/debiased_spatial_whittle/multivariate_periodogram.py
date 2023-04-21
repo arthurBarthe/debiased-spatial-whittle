@@ -40,3 +40,4 @@ class TransformedExpectedPeriodogram:
         transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         term1 = np.matmul(input_ep, transform_transpose)
         return np.matmul(transform, term1)
+

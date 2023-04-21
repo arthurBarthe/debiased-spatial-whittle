@@ -225,6 +225,8 @@ class CovarianceModel(ABC):
     def __getattr__(self, item):
         if item in self.param_names:
             return self.params[item]
+        else:
+            raise AttributeError()
 
     def __repr__(self):
         return self.name + '(\n' + self.params.__repr__() + '\n)'
@@ -400,6 +402,37 @@ class TransformedModel(CovarianceModel):
         raise NotImplementedError()
 
 
+class NewTransformedModel(CovarianceModel):
+    """
+    Similar to the above class, but uses circulant embedding to alleviate some of the approximations.
+    """
+    def __init__(self, input_model: CovarianceModel, transform):
+        self.input_model = input_model
+        self.transform = transform
+        transform_param = Parameter('logD', (1, 50))
+        eta_param = Parameter('eta', (-1, 1))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param]), input_model.params])
+        super(NewTransformedModel, self).__init__(parameters)
+
+    def transform_on_grid(self, ks):
+        return self.transform(self.logD_0.value, self.eta_0.value, ks)
+
+    def call_on_rectangular_grid(self, grid):
+        from numpy.fft import fftn, ifftn
+        acv = grid.autocov(self.input_model)
+        f = fftn(acv, axes=(0, 1))
+        transform = self.transform_on_grid(grid.fourier_frequencies2)
+        transform_transpose = np.transpose(transform, (0, 1, -1, -2))
+        term1 = np.matmul(f, transform_transpose)
+        return ifftn(np.matmul(transform, term1), axes=(0, 1))
+
+    def __call__(self, lags: np.ndarray):
+        raise NotImplementedError('The autocovariance of this model can only be evaluated in specific cases')
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
@@ -424,6 +457,10 @@ class MaternCovarianceModel(CovarianceModel):
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()
+
+
+
+
 
 
 def test_gradient_cov():

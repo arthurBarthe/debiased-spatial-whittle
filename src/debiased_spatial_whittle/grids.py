@@ -177,6 +177,18 @@ class RectangularGrid:
         return np.stack(mesh, axis=-1)
 
     @property
+    def fourier_frequencies2(self):
+        """
+        Grid of Fourier frequencies corresponding to the spatial grid.
+
+        Returns
+        -------
+
+        """
+        mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        return np.stack(mesh, axis=-1)
+
+    @property
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
@@ -225,6 +237,8 @@ class RectangularGrid:
         0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
         when computing the expecting periodogram"""
         #TODO check that the ifftshift "trick" works for odd sizes
+        if hasattr(model, 'call_on_rectangular_grid'):
+            return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique))
 
     def autocov_separable(self, model: SeparableModel):
