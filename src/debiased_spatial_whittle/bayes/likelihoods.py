@@ -29,12 +29,12 @@ class DeWhittle(Likelihood):
         super().__init__(z, grid, model, nugget, use_taper)
         
         
-    def expected_periodogram(self, params: ndarray) -> ndarray:
-        acf = self.cov_func(params, lags = None)
+    def expected_periodogram(self, params: ndarray, **cov_args) -> ndarray:
+        acf = self.cov_func(params, lags = None, **cov_args)
         return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
 
         
-    def __call__(self, params: ndarray, I:None|ndarray=None, const:str='whittle') -> float: 
+    def __call__(self, params: ndarray, I:None|ndarray=None, const:str='whittle', **cov_args) -> float: 
         params = np.exp(params)
         
         if I is None:
@@ -42,7 +42,7 @@ class DeWhittle(Likelihood):
             
         N = self.grid.n_points
         
-        e_I = self.expected_periodogram(params)
+        e_I = self.expected_periodogram(params, **cov_args)
         if const=='whittle':
             a=1/2
         else:
@@ -50,15 +50,19 @@ class DeWhittle(Likelihood):
             
         ll = -(a) * np.sum(np.log(e_I) + I / e_I)
         return ll
-        
+    
+    @property
+    def label(self):
+        return 'Debiased Whittle'
+    
     def __repr__(self):
-        return 'Debiased Whittle likelihood'
+        return f'{self.label} with {self.model.name} and {self.grid.n}'
     
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
     
-    def cov_func(self, params: ndarray, lags: None|ndarray=None) -> ndarray:
-        return super().cov_func(params, lags)
+    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...]=None, **cov_args) -> ndarray:
+        return super().cov_func(params, lags, **cov_args)
     
     def logprior(self, x: ndarray):
         return super().logprior(x)
@@ -82,11 +86,11 @@ class DeWhittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
-    def sim_z(self, params: None|ndarray, t_random_field:bool=False, df:int=10):
-        return super().sim_z(params, t_random_field, df)
+    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
+        return super().sim_z(params, t_random_field, nu)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, df:int=10) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field=t_random_field, df=df)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
@@ -110,38 +114,41 @@ class Whittle(Likelihood):
         self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
 
 
-    def aliased_f(self, params: ndarray) -> ndarray:
+    @property
+    def label(self):
+        return 'Whittle'
+    
+    def __repr__(self):
+        return f'{self.label} with {self.model.name} and {self.grid.n}'
+
+    def aliased_f(self, params: ndarray, **cov_args) -> ndarray:
         '''
         Computes the aliased spectral density in O(|n|log|n|) time for the given covariance model
         For small grids may need to upsample
         '''
-        # TODO: ask Arthur why ifftshift
         
-        acf = ifftshift(self.cov_func(params, self.g))  # ifftshift again?
+        acf = ifftshift(self.cov_func(params, self.g, **cov_args))  # undoing ifftshift
         f = np.real(fftn(fftshift(acf)))
         assert np.all(f>0)
         return f
 
-    def __call__(self, params: ndarray, I:None|ndarray=None) -> float:
+    def __call__(self, params: ndarray, I:None|ndarray=None, **cov_args) -> float:
         '''Computes 2d Whittle likelihood in O(|n|log|n|) time'''
         params = np.exp(params)
         
         if I is None:
             I = self.I
             
-        f = self.aliased_f(params)           # this may be unstable for small grids/nugget
+        f = self.aliased_f(params, **cov_args)           # this may be unstable for small grids/nugget
         
         ll = -(1/2) * np.sum(np.log(f) + I / f)
         return ll
-        
-    def __repr__(self):
-        return 'Whittle likelihood'
-    
+
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
     
-    def cov_func(self, params: ndarray, lags: None|ndarray=None) -> ndarray:
-        return super().cov_func(params, lags)
+    def cov_func(self, params: ndarray, lags: None|ndarray=None, **cov_args) -> ndarray:
+        return super().cov_func(params, lags, **cov_args)
     
     def logprior(self, x: ndarray):
         return super().logprior(x)
@@ -164,13 +171,14 @@ class Whittle(Likelihood):
                                                        **optargs):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
+
+
+    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
+        return super().sim_z(params, t_random_field, nu)
     
-    def sim_z(self, params: None|ndarray):
-        return super().sim_z(params)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
-        return super().sim_MLEs(self, params, niter, const, **optargs)
-    
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu)
+      
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
     
@@ -216,8 +224,13 @@ class Gaussian(Likelihood):
               -0.5*N*np.log(2*np.pi)
         return ll
         
+    @property
+    def label(self):
+        return 'Gaussian model'
+    
     def __repr__(self):
-        return 'Gaussian likelihood'
+        return f'{self.label} with {self.model.name} and {self.grid.n}'
+
     
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)

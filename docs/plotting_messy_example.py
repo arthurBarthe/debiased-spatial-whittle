@@ -39,7 +39,7 @@ def ridgeline(data, overlap=0, fill=True, labels=None, n_points=150, figsize=(15
 
 
 plt.figure(figsize=(15,7))
-plt.title('deWhittle MLEs $t$-random field', loc='center', fontsize=20, color='gray')
+plt.title('deWhittle MLEs $t$-random field, Sq.Exp. kernel, n=(64,64)', loc='center', fontsize=20, color='gray')
 dists = [mles[:,0] for mles in MLEs]
 ridgeline(dists[::-1], overlap=0., fill='red', labels=dfs[::-1])
 dists = [mles[:,1] for mles in MLEs]

@@ -20,13 +20,14 @@ fftn = np.fft.fftn
 np.random.seed(1252147)
 
 n = (64, 64)
-rho, sigma, nugget = 10, 1, 0.1
+rho, sigma, nugget = 10., np.sqrt(1.), 0.1
 
 grid = RectangularGrid(n)
 model = SquaredExponentialModel()
 model.rho = rho
 model.sigma = sigma
 model.nugget = nugget
+
 
 per = Periodogram()
 ep = ExpectedPeriodogram(grid, per)
@@ -46,19 +47,21 @@ ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
 # stop
-params = np.log([10.,1.])
+params = np.log([rho,sigma])
 
 dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget)
-eI = dw.expected_periodogram(np.exp(params))
+# stop
+
+# eI = dw.expected_periodogram(np.exp(params))
 # plt.imshow(fftshift(eI))
 # plt.show()
 
-print(dw(params))
-print(dw.logpost(params))
+# print(dw(params))
+# print(dw.logpost(params))
 
 from autograd import grad, hessian
 ll = lambda x: dw(x)
-print(grad(ll)(params))
+# print(grad(ll)(params))
 
 niter=5000
 
@@ -80,6 +83,7 @@ title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle', 'Whittle']
 plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
+# stop
 
 # gauss = Gaussian(z, grid, SquaredExponentialModel())
 # gauss.fit(None, prior=False, approx_grad=True)
@@ -88,11 +92,12 @@ plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], params, title
 
 
 
-# dfs = list(range(5,15+1)) + list(range(20,55,5)) + [9999]
-# MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, df=df) for df in dfs]
+dfs = list(range(5,15+1)) + list(range(20,55,5)) + [9999]
+# dfs = [5,6]
+MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, nu=df) for df in dfs]
 
 
-# title = 'DeWhittle t-random field MLE distribution'
-# legend_labels = [rf'$\nu={nu}$' for nu in dfs]
-# plot_marginals(MLEs, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2), cmap='Spectral')
+title = 'DeWhittle t-random field MLE distribution'
+legend_labels = [rf'$\nu={nu}$' for nu in dfs]
+plot_marginals(MLEs, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2), cmap='Spectral')
 

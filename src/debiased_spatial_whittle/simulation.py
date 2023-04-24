@@ -72,7 +72,7 @@ class SamplerOnRectangularGrid:
         return self._f
 
     # TODO make this work for 1-d and 3-d
-    def __call__(self, t_random_field:bool=False, df:int=10):
+    def __call__(self, t_random_field:bool=False, nu:int|None=None):
         f = self.f
         e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
         z = np.sqrt(np.maximum(f, 0)) * e
@@ -83,12 +83,12 @@ class SamplerOnRectangularGrid:
         z = z_inv * self.grid.mask
         
         if t_random_field:
-            if df == np.inf:
-                chi = np.ones(self.grid.n_points)
+            if nu == np.inf or nu is None:
+                chi = np.ones(self.grid.n)
             else:
-                chi = np.random.chisquare(df, self.grid.n_points)/df
+                chi = np.random.chisquare(nu, self.grid.n)/nu
             
-            z /= np.sqrt(chi.reshape(self.grid.n))
+            z /= np.sqrt(chi)
         return z
 
 

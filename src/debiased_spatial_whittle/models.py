@@ -317,12 +317,12 @@ class SquaredExponentialModel(CovarianceModel):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
         nugget = Parameter('nugget', (1e-6, 1000))
+        
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False):
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
         
-        # nugget = 0.1
         if time_domain:
             d2 = lags         # this is the full covariance matrix
             nugget_effect = self.nugget.value*np.eye(len(lags))
@@ -331,6 +331,9 @@ class SquaredExponentialModel(CovarianceModel):
             nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
             
         acf = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
+        
+        if nu is not None:
+            acf *= nu/(nu-2)    # t-density covariance
         return acf
 
     def _gradient(self, lags: np.ndarray):

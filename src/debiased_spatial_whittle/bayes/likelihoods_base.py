@@ -80,7 +80,7 @@ class Likelihood(ABC):
         pass
     
     @abstractmethod
-    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...] = None) -> list[ndarray, ...]:
+    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...]=None, **cov_args) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
         
         # TODO: only for dewhittle and whittle
@@ -88,8 +88,7 @@ class Likelihood(ABC):
             lags = self.grid.lags_unique
 
         self.update_model_params(params)
-        # TODO: ask why ifftshift
-        return ifftshift(self.model(np.stack(lags)))
+        return ifftshift(self.model(np.stack(lags), **cov_args))
     
     
     @abstractmethod
@@ -161,7 +160,7 @@ class Likelihood(ABC):
             self.BIC = self.n_params*np.log(self.grid.n_points) - 2*self(self.res.x)         # negative logpost
         
         if print_res:
-            print(f'{self.__repr__()} {attribute}:  {np.round(np.exp(self.res.x),3)}')
+            print(f'{self.label} {attribute}:  {np.round(np.exp(self.res.x),3)}')
         
         if approx_grad:
             self.propcov = self.res.hess_inv.todense()
@@ -176,13 +175,22 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, **sim_kwargs) -> ndarray:
+    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
+        if params is None:
+            params = np.exp(self.res.x)
+            
+        self.update_model_params(params)            # list() because of autograd box error
+        sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        return sampler(t_random_field, nu)
+    
+    @abstractmethod
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
         while niter>i:
             
-            _z = self.sim_z(np.exp(params), **sim_kwargs)
+            _z = self.sim_z(np.exp(params), t_random_field, nu)
                 
             if False:
                 import matplotlib.pyplot as plt
@@ -191,7 +199,7 @@ class Likelihood(ABC):
                 
             _I = self.periodogram(_z)
             
-            def obj(x):     return -self(x, I=_I)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
+            def obj(x):     return -self(x, I=_I, nu=nu)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
             _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B')
             if not _res['success']:
                 continue
@@ -224,16 +232,6 @@ class Likelihood(ABC):
         return
     
     @abstractmethod
-    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, df:int=10):
-        if params is None:
-            params = np.exp(self.res.x)
-            
-        self.update_model_params(params)            # list() because of autograd box error
-        sampler = SamplerOnRectangularGrid(self.model, self.grid)
-        return sampler(t_random_field, df)
-    
-    
-    @abstractmethod
     def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
         '''Random walk Metropolis-Hastings: samples the specified posterior'''
         
@@ -242,12 +240,12 @@ class Likelihood(ABC):
         if adjusted:
             posterior = self.adj_logpost
             propcov   = self.adj_propcov
-            label = 'adjusted ' + self.__repr__()
+            label = 'adjusted ' + self.label
             
         else:
             posterior = self.logpost
             propcov   = self.propcov
-            label = self.__repr__()
+            label = self.label
     
         A     = np.zeros(niter, dtype=np.float64)
         U     = np.random.rand(niter)
