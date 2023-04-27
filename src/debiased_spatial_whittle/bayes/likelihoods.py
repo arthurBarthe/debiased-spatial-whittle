@@ -89,22 +89,22 @@ class DeWhittle(Likelihood):
     def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
         return super().sim_z(params, t_random_field, nu)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu, print_res=print_res)
     
     
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
+    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
     
         if monte_carlo:
-            return super().sim_MLEs(params, niter)
+            return super().sim_MLEs(params, niter, **sim_kwargs)
         else:
             pass
     
     def prepare_curvature_adjustment(self):           # maybe not abstract method
         return super().prepare_curvature_adjustment()
     
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
-        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, **postargs)
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **postargs):
+        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, print_res=print_res, **postargs)
 
 
 class Whittle(Likelihood):
@@ -176,22 +176,22 @@ class Whittle(Likelihood):
     def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
         return super().sim_z(params, t_random_field, nu)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None,  print_res:bool=True) -> ndarray:
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu, print_res=print_res)
       
     
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
+    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
     
         if monte_carlo:
-            return super().sim_MLEs(params, niter)
+            return super().sim_MLEs(params, niter, **sim_kwargs)
         else:
             pass   # Theorem 3 from paper
     
     def prepare_curvature_adjustment(self):           # maybe not abstract method
         return super().prepare_curvature_adjustment()
     
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
-        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, **postargs)
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **postargs):
+        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, print_res=print_res, **postargs)
 
 
 class Gaussian(Likelihood):
@@ -270,8 +270,8 @@ class Gaussian(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, const:str='whittle', **optargs) -> ndarray:
-        return super().sim_MLEs(self, params, niter, const, **optargs)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, **optargs) -> ndarray:
+        return super().sim_MLEs(self, params, niter, print_res=print_res **optargs)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
@@ -279,11 +279,11 @@ class Gaussian(Likelihood):
         if monte_carlo:
             return super().sim_MLEs(params, niter)
         else:
-            pass   # https://en.wikipedia.org/wiki/Fisher_information#Multivariate_normal_distribution
+            raise NotImplementedError   # https://en.wikipedia.org/wiki/Fisher_information#Multivariate_normal_distribution
     
     def prepare_curvature_adjustment(self):           # maybe not abstract method
         return super().prepare_curvature_adjustment()
     
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
-        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, **postargs)
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **postargs):
+        return super().RW_MH(niter, adjusted=adjusted, acceptance_lag=acceptance_lag, print_res=print_res, **postargs)
 

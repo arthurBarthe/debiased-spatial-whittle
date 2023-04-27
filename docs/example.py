@@ -76,14 +76,16 @@ adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=nugget)
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
-# whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=500)
+whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=500)
+whittle.prepare_curvature_adjustment()
+adj_whittle_post, A = whittle.RW_MH(niter, adjusted=True)
 
 
 title = 'posterior comparisons'
-legend_labels = ['deWhittle', 'adj deWhittle', 'Whittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+legend_labels = ['deWhittle', 'adj deWhittle', 'Whittle', 'adj Whittle']
+plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post, adj_whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
-# stop
+stop
 
 # gauss = Gaussian(z, grid, SquaredExponentialModel())
 # gauss.fit(None, prior=False, approx_grad=True)

@@ -184,7 +184,7 @@ class Likelihood(ABC):
         return sampler(t_random_field, nu)
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -204,7 +204,8 @@ class Likelihood(ABC):
             if not _res['success']:
                 continue
             else:
-                print(f'{i+1})   MLE:  {np.round(np.exp(_res.x),3)}')
+                if print_res:
+                    print(f'{i+1})   MLE:  {np.round(np.exp(_res.x),3)}')
                 self.MLEs[i] = _res.x
                 i+=1
             
@@ -232,7 +233,7 @@ class Likelihood(ABC):
         return
     
     @abstractmethod
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, **postargs):
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **postargs):
         '''Random walk Metropolis-Hastings: samples the specified posterior'''
         
         # TODO: mcmc diagnostics
@@ -259,7 +260,8 @@ class Likelihood(ABC):
         bottom    = posterior(crnt_step)
         # print(bottom)
         
-        print(f'{f"{label} MCMC":-^50}')
+        if print_res:
+            print(f'{f"{label} MCMC":-^50}')
         t0 = time()
         for i in range(1, niter):
             
