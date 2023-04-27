@@ -22,7 +22,7 @@ ifftshift = np.fft.ifftshift
 
 class Likelihood(ABC):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float=0.1, use_taper:None|ndarray=None):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: None|float=0.1, use_taper:None|ndarray=None):
         
         self._z = z
         self.grid = grid
@@ -32,9 +32,8 @@ class Likelihood(ABC):
         self._I = self.periodogram(z)
         
         self.model = model
-        # TODO: option to estimate nugget
         self.model.nugget=nugget
-        # TODO: change this
+        
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
         

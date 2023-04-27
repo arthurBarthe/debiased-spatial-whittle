@@ -134,6 +134,7 @@ class Whittle(Likelihood):
 
     def __call__(self, params: ndarray, I:None|ndarray=None, **cov_args) -> float:
         '''Computes 2d Whittle likelihood in O(|n|log|n|) time'''
+        # TODO: add spectral density
         params = np.exp(params)
         
         if I is None:

@@ -34,11 +34,11 @@ plt.show()
 
 
 
-dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.0033)
+dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.00432244)
+dw.fit(None, prior=False)
 
 niter=5000
 
-dw.fit(None, prior=False)
 dewhittle_post, A = dw.RW_MH(niter)
 MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=500)
 dw.prepare_curvature_adjustment()

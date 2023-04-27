@@ -29,92 +29,70 @@ sampler = SamplerOnRectangularGrid(model, grid)
 
 params = np.log([rho, sigma])
 
-
-
-
-
 # stop
 
 
-ndatasets=500
-mcmc_niter=1000
-mle_niter= 100
+n_datasets=10
+mcmc_niter=10000
+mle_niter= 2000
 acceptance_lag = mcmc_niter+1
 d=len(params)
-deWhittle_post_q5   = np.zeros((ndatasets,d,2))
-deWhittle_post_q10  = np.zeros((ndatasets,d,2))
-adj_deWhittle_post_q5   = np.zeros((ndatasets,d,2))
-adj_deWhittle_post_q10  = np.zeros((ndatasets,d,2))
-Whittle_post_q5   = np.zeros((ndatasets,d,2))
-Whittle_post_q10  = np.zeros((ndatasets,d,2))
-adj_Whittle_post_q5   = np.zeros((ndatasets,d,2))
-adj_Whittle_post_q10  = np.zeros((ndatasets,d,2))
+
+quantiles = [0.025, 0.975, 0.05, 0.95]
+n_q = len(quantiles)
+
+dewhittle_post_quantiles     = np.zeros((n_datasets,d*n_q))
+adj_dewhittle_post_quantiles = np.zeros((n_datasets,d*n_q))
+whittle_post_quantiles       = np.zeros((n_datasets,d*n_q))
+adj_whittle_post_quantiles   = np.zeros((n_datasets,d*n_q))
+
 print(f'True Params:  {np.round(np.exp(params),3)}')
-for i in range(ndatasets):
-    print(i+1, end=': ')
+for i in range(n_datasets):
+    print(i+1, end=':\n')
     
     z = sampler()
     
-    dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget)
+    for likelihood in [DeWhittle]: # ,Whittle
+            
+        ll = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget)
+        ll.fit(None, prior=False, print_res=False)
+        post, A = ll.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
+        MLEs = ll.estimate_standard_errors_MLE(ll.res.x, monte_carlo=True, niter=mle_niter, print_res=False)
+        ll.prepare_curvature_adjustment()
+        adj_post, A = ll.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
+    
+        q     = np.quantile(post, quantiles, axis=0).T.flatten()
+        q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
+        if ll.label =='Debiased Whittle':
+            dewhittle_post_quantiles[i] = q
+            adj_dewhittle_post_quantiles[i] = q_adj
+        else:
+            whittle_post_quantiles[i] = q
+            adj_whittle_post_quantiles[i] = q_adj
+            
+        print(q, q_adj, sep='\n')
+        print('')
 
-    dw.fit(None, prior=False, print_res=False)
-    dewhittle_post, A = dw.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=mle_niter, print_res=False)
-    dw.prepare_curvature_adjustment()
-    adj_dewhittle_post, A = dw.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
+            
     
-    
-    q5, q10 = np.quantile(dewhittle_post, [[0.025, 0.975],[0.05, 0.95]], axis=0)
-    deWhittle_post_q5[i]  = q5.T
-    deWhittle_post_q10[i] = q10.T
-    
-    adj_q5, adj_q10 = np.quantile(adj_dewhittle_post, [[0.025, 0.975],[0.05, 0.95]], axis=0)
-    adj_deWhittle_post_q5[i]  = adj_q5.T
-    adj_deWhittle_post_q10[i] = adj_q10.T
-    print(q5.T, adj_q5.T, sep='\n')
-    
-    whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=nugget)
-    whittle.fit(None, False)
-    whittle_post, A = whittle.RW_MH(mcmc_niter)
-    whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=mle_niter, print_res=False)
-    whittle.prepare_curvature_adjustment()
-    adj_whittle_post, A = whittle.RW_MH(mcmc_niter, adjusted=True)
-    
-    q5, q10 = np.quantile(whittle_post, [[0.025, 0.975],[0.05, 0.95]], axis=0)
-    Whittle_post_q5[i]  = q5.T
-    Whittle_post_q10[i] = q10.T
-    
-    adj_q5, adj_q10 = np.quantile(adj_whittle_post, [[0.025, 0.975],[0.05, 0.95]], axis=0)
-    adj_Whittle_post_q5[i]  = adj_q5.T
-    adj_Whittle_post_q10[i] = adj_q10.T
-    print(q5.T, adj_q5.T, sep='\n')
-    
-    print('')
-    
-    
-
+# stop
     
 import pandas as pd    
 post_list = ['dewhittle', 'adj_dewhittle', 'whittle', 'adj_whittle']
 param_list = ['rho', 'sigma']
-index  = pd.MultiIndex.from_product([post_list, param_list, [2.5, 97.5, 5, 95]], 
+index  = pd.MultiIndex.from_product([post_list, param_list, quantiles], 
                                     names=["posterior", "parameter", "quantile"])
 
-k = 4*d*len(post_list)
-quantiles = np.hstack((deWhittle_post_q5, deWhittle_post_q10,
-                       adj_deWhittle_post_q5, adj_deWhittle_post_q10,
-                       Whittle_post_q5, Whittle_post_q10,
-                       adj_Whittle_post_q5, adj_Whittle_post_q10
-                       )).reshape(500,k)
+k = d*n_q*len(post_list)
+posterior_quantiles = np.hstack((
+                       dewhittle_post_quantiles, adj_dewhittle_post_quantiles,
+                       whittle_post_quantiles, adj_whittle_post_quantiles,
+                       )).reshape(n_datasets,k)
 
-# messed up the column order
-idx = np.array([0,1,4,5,2,3,6,7])
-columns = np.r_[idx,idx+8,idx+16, idx+32]
-posterior_quantiles = quantiles[:,columns]
 
 df = pd.DataFrame(posterior_quantiles, columns=index)
 
-for i in range(32//2):
+for i in range(k//2):
     cols = df.iloc[:, i*2:(i+1)*2]
     ll, param, q = cols.columns[0]
     interval = pd.arrays.IntervalArray.from_arrays(*cols.to_numpy().T, closed='both')
@@ -123,4 +101,4 @@ for i in range(32//2):
     else:
         count = interval.contains(params[1]).sum()
         
-    print(f'{ll} coverage, for parameter {param}, at q{100-2*q} = {count/ndatasets}')
+    print(f'{ll} coverage for parameter {param} at alpha={1-2*q}:   {count/n_datasets}')
