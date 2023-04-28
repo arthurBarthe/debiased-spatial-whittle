@@ -21,6 +21,7 @@ npl = np.linalg
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
+fftfreq = np.fft.fftfreq
 
 
 class DeWhittle(Likelihood):
@@ -109,9 +110,14 @@ class DeWhittle(Likelihood):
 
 class Whittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:None|ndarray=None):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:None|ndarray=None, infsum_shape:tuple = (3,3)):
         super().__init__(z, grid, model, nugget, use_taper)
         self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
+        
+        self.freq_grid    = np.meshgrid(*(2*np.pi*fftfreq(_n) for _n in self.n), indexing='ij')         # / (delta*n1)?
+        
+        self.infsum_shape = infsum_shape   # aliasing
+        self.infsum_grid  = np.meshgrid(*(2*np.pi*np.arange(-(n//2), n//2+1)/self.grid.delta[i] for i,n in enumerate(infsum_shape)), indexing='ij')    # np.arange(0,1) for non-aliased version 
 
 
     @property
@@ -120,8 +126,17 @@ class Whittle(Likelihood):
     
     def __repr__(self):
         return f'{self.label} with {self.model.name} and {self.grid.n}'
+    
+    def f(self, params: ndarray) -> ndarray:
+        '''
+        Computes the aliased spectral density for given model
+        '''
+        
+        self.update_model_params(params)        
+        f = self.model.f(self.freq_grid, self.infsum_grid)
+        return f
 
-    def aliased_f(self, params: ndarray, **cov_args) -> ndarray:
+    def aliased_f_fft(self, params: ndarray, **cov_args) -> ndarray:
         '''
         Computes the aliased spectral density in O(|n|log|n|) time for the given covariance model
         For small grids may need to upsample
@@ -132,15 +147,15 @@ class Whittle(Likelihood):
         assert np.all(f>0)
         return f
 
-    def __call__(self, params: ndarray, I:None|ndarray=None, **cov_args) -> float:
-        '''Computes 2d Whittle likelihood in O(|n|log|n|) time'''
+    def __call__(self, params: ndarray, I:None|ndarray=None, **kwargs) -> float:
+        '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
         params = np.exp(params)
         
         if I is None:
             I = self.I
             
-        f = self.aliased_f(params, **cov_args)           # this may be unstable for small grids/nugget
+        f = self.f(params)           # this may be unstable for small grids/nugget
         
         ll = -(1/2) * np.sum(np.log(f) + I / f)
         return ll

@@ -52,7 +52,7 @@ for i in range(n_datasets):
     
     z = sampler()
     
-    for likelihood in [DeWhittle]: # ,Whittle
+    for likelihood in [DeWhittle,Whittle]: # ,Whittle
             
         ll = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget)
         ll.fit(None, prior=False, print_res=False)

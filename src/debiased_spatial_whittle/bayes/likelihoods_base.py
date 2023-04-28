@@ -26,6 +26,8 @@ class Likelihood(ABC):
         
         self._z = z
         self.grid = grid
+        # TODO: make this property
+        self.n = self.grid.n
         
         self.use_taper = use_taper
         self.periodogram = Periodogram(taper=use_taper)
@@ -125,7 +127,6 @@ class Likelihood(ABC):
         
         if x0 is None:
             x0 = np.zeros(self.n_params)
-            
         
         if prior:                                         # for large samples, the prior is negligible
             attribute = 'MAP'

@@ -330,11 +330,25 @@ class SquaredExponentialModel(CovarianceModel):
             d2 = sum((lag**2 for lag in lags))
             nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
             
-        acf = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
+        acf = self.sigma.value ** 2 * np.exp(- 0.5*d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
         
         if nu is not None:
             acf *= nu/(nu-2)    # t-density covariance
         return acf
+    
+    def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
+        '''aliased spectral density, should match with the acf'''
+        
+        shape  = freq_grid[0].shape
+        N = np.prod(shape)
+        
+        args   = (np.tile(infsum_grid[i], (N,1,1)) + freq_grid[i].reshape(N,1,1) for i in range(d))
+        omega2 = np.sum((arg**2 for arg in args))
+        
+        # f = sigma2*(2*np.pi*rho**2)**(d/2)*np.exp(-2*(np.pi*rho)**2 * omega2) #+ nugget/(2*np.pi)**2
+        f = self.sigma.value**2*self.rho.value**2*(2*np.pi)**(d/2)*np.exp(-.5*(self.rho.value**2*omega2))#/(2*np.pi)**2
+        return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
+
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to

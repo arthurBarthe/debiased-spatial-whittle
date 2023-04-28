@@ -40,14 +40,19 @@ def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray, fold:bool=T
     # now we need to "fold"
     if fold:
         # TODO: make this autograd compatible for any d with any n's
-        # result = np.zeros_like(grid, dtype=np.float64)
+        result = np.zeros(shape, dtype=np.complex128)
         if n_dim == 2:
-            result = cbar[0:n1,0:n1] + np.pad(cbar[0:n1,n1:(n1*2)], (1,0), 'constant')[1:,:] \
-                   + np.pad(cbar[n1:(n1*2),0:n1],(1,0), 'constant')[:,1:] + np.pad(cbar[n1:(n1*2),n1:(n1*2)], (1,0), 'constant')
+            
+            # old solution with n1=n2
+            # result = cbar[0:n1,0:n1] + np.pad(cbar[0:n1,n1:(n1*2)], (1,0), 'constant')[1:,:] \
+                   # + np.pad(cbar[n1:(n1*2),0:n1],(1,0), 'constant')[:,1:] + np.pad(cbar[n1:(n1*2),n1:(n1*2)], (1,0), 'constant')
             # print(result.dtype)
-        #     for i in range(2):
-        #         for j in range(2):
-                    # result += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+            
+            for i in range(2):
+                for j in range(2):
+                    res = cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+                    result += np.pad(res, ((i,0), (j,0)), mode='constant')  # autograd solution
+                    
         else:
             raise NotImplementedError('only 2d grids with n1=n2')
     else:

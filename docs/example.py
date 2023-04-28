@@ -30,14 +30,14 @@ model.nugget = nugget
 
 
 per = Periodogram()
-ep = ExpectedPeriodogram(grid, per)
-db = DebiasedWhittle(per, ep)
+# ep = ExpectedPeriodogram(grid, per)
+# db = DebiasedWhittle(per, ep)
 
 sampler = SamplerOnRectangularGrid(model, grid)
 z = sampler()
 
 I = per(z)
-eI = fftshift(ep(model))
+# eI = fftshift(ep(model))
 # plt.imshow(fftshift(I))
 # plt.show()
 
@@ -63,20 +63,24 @@ from autograd import grad, hessian
 ll = lambda x: dw(x)
 # print(grad(ll)(params))
 
-niter=5000
+niter=1000
 
 dw.fit(None, prior=False)
 dewhittle_post, A = dw.RW_MH(niter)
-MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=500)
+MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=200)
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 
+# title = 'posterior comparisons'
+# legend_labels = ['deWhittle', 'adj deWhittle']
+# plot_marginals([dewhittle_post, adj_dewhittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
+# stop
 
 whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=nugget)
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
-whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=500)
+whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=200)
 whittle.prepare_curvature_adjustment()
 adj_whittle_post, A = whittle.RW_MH(niter, adjusted=True)
 
