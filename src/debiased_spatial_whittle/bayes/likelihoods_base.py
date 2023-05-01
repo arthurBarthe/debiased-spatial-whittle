@@ -180,8 +180,14 @@ class Likelihood(ABC):
             params = np.exp(self.res.x)
             
         self.update_model_params(params)            # list() because of autograd box error
+        
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
-        return sampler(t_random_field, nu)
+        if t_random_field:
+            z = sampler.sample_t_randomfield(nu)
+        else:
+            z = sampler()
+            
+        return z
     
     @abstractmethod
     def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True) -> ndarray:

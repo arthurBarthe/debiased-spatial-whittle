@@ -72,7 +72,7 @@ class SamplerOnRectangularGrid:
         return self._f
 
     # TODO make this work for 1-d and 3-d
-    def __call__(self, t_random_field:bool=False, nu:int|None=None):
+    def __call__(self):
         f = self.f
         e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
         z = np.sqrt(np.maximum(f, 0)) * e
@@ -81,15 +81,18 @@ class SamplerOnRectangularGrid:
             z_inv = np.take(z_inv, np.arange(n), i)
         z_inv = np.reshape(z_inv, self.grid.n)
         z = z_inv * self.grid.mask
-        
-        if t_random_field:
-            if nu == np.inf or nu is None:
-                chi = np.ones(self.grid.n)
-            else:
-                chi = np.random.chisquare(nu, self.grid.n)/nu
-            
-            z /= np.sqrt(chi)
         return z
+    
+    def sample_t_randomfield(self, nu:int|None=None):
+        z = self()
+        if nu is None or nu == np.inf:
+            chi = np.ones(self.grid.n)
+        else:
+            chi = np.random.chisquare(nu, self.grid.n)/nu
+        
+        z /= np.sqrt(chi)
+        return z
+    
 
 
 class SamplerSeparable:
