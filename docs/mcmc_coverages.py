@@ -50,6 +50,7 @@ def make_quantiles(alphas:list|ndarray):
 
 
 alphas = np.arange(5,100,5)
+alphas_list = [alpha for alpha in alphas for _ in (0, 1)]*8
 quantiles = make_quantiles(alphas)
 n_q = len(quantiles)
 
@@ -95,6 +96,12 @@ param_list = ['rho', 'sigma']
 index  = pd.MultiIndex.from_product([post_list, param_list, quantiles], 
                           names=["posterior", "parameter", "quantile"])
 
+new_index = []
+for i,idx in enumerate(index):
+    *post_params,q = idx
+    new_index.append((*post_params,alphas_list[i],q))
+
+
 k = d*n_q*len(post_list)
 posterior_quantiles = np.hstack((
                        dewhittle_post_quantiles, adj_dewhittle_post_quantiles,
@@ -102,23 +109,23 @@ posterior_quantiles = np.hstack((
                        )).reshape(n_datasets,k)
 
 
-df = pd.DataFrame(posterior_quantiles, columns=index)
+df = pd.DataFrame(posterior_quantiles, columns=tuple(new_index))
+df.columns.names = ["posterior", "parameter", "alpha", "quantile"]
 
 
 
 # not a great solution
 coverages={}
-for idx in zip(index[::2], index[1::2]):
+for idx in zip(new_index[::2], new_index[1::2]):
     
     cols = df[list(idx)]
-    ll, param, q = cols.columns[0]
+    ll, param, alpha, q = cols.columns[0]
     interval = pd.arrays.IntervalArray.from_arrays(*cols.to_numpy().T, closed='both')
     if 'rho' == param:        
         count = interval.contains(params[0]).sum()
     else:
         count = interval.contains(params[1]).sum()
         
-    alpha = round(1-2*q,2)
     print(f'{ll} coverage for parameter {param} at alpha={alpha}:   {count/n_datasets}')
     
     coverages[(ll,param,alpha)] = count/n_datasets
