@@ -123,7 +123,7 @@ class DebiasedWhittle:
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
-        p = self.periodogram(z)
+        p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
         whittle = 1 / z.shape[0] / z.shape[1] * np.sum(np.log(ep) + p / ep)
         if not params_for_gradient:

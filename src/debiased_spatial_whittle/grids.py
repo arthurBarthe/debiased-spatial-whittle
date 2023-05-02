@@ -1,7 +1,9 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple
-import numpy as np
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
@@ -155,7 +157,8 @@ class RectangularGrid:
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
-        return np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        return np.stack(lags)
 
     @property
     def lag_matrix(self):

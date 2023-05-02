@@ -1,11 +1,11 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
 # In this file we define covariance models
 from abc import ABC, abstractmethod
-from .backend import BackendManager
 
 from scipy.special import gamma, kv
 from typing import Tuple, List, Dict, Union
-
-np = BackendManager.get_backend()
 
 class Parameter:
     """
@@ -325,18 +325,44 @@ class SquaredExponentialModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        parameters = Parameters([rho, sigma])
+        nugget = Parameter('nugget', (1e-6, 1000))
+        
+        parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray):
-        d2 = sum((lag**2 for lag in lags))
-        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2)
-        result[np.all(lags == 0, axis=0)] += 0.0001
-        return result
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+        
+        if time_domain:
+            d2 = lags         # this is the full covariance matrix
+            nugget_effect = self.nugget.value*np.eye(len(lags))
+        else:
+            d2 = sum((lag**2 for lag in lags))
+            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+            
+        acf = self.sigma.value ** 2 * np.exp(- 0.5*d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
+        
+        if nu is not None:
+            acf *= nu/(nu-2)    # t-density covariance
+        return acf
+    
+    def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
+        '''aliased spectral density, should match with the acf'''
+        
+        shape  = freq_grid[0].shape
+        N = np.prod(shape)
+        
+        args   = (np.tile(infsum_grid[i], (N,1,1)) + freq_grid[i].reshape(N,1,1) for i in range(d))
+        omega2 = np.sum((arg**2 for arg in args))
+        
+        # f = sigma2*(2*np.pi*rho**2)**(d/2)*np.exp(-2*(np.pi*rho)**2 * omega2) #+ nugget/(2*np.pi)**2
+        f = self.sigma.value**2*self.rho.value**2*(2*np.pi)**(d/2)*np.exp(-.5*(self.rho.value**2*omega2))#/(2*np.pi)**2
+        return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
+
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
         the model's parameters"""
+        # TODO: include nugget
         d2 = sum((lag ** 2 for lag in lags))
         d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)

@@ -1,7 +1,9 @@
+from .backend import BackendManager
+BackendManager.set_backend('autograd')
+np = BackendManager.get_backend()
+
 from itertools import product
 from typing import Tuple
-
-import numpy as np
 
 from .spatial_kernel import spatial_kernel
 from .models import Parameters
@@ -10,6 +12,7 @@ from .utils import prod_list
 fft = np.fft.fft
 fftn = np.fft.fftn
 ifftshift = np.fft.ifftshift
+ndarray = np.ndarray
 
 def autocov(cov_func, shape):
     """Compute the covariance function on a grid of lags determined by the passed shape.
@@ -20,7 +23,7 @@ def autocov(cov_func, shape):
     return ifftshift(cov_func(xs))
 
 
-def compute_ep(cov_func, grid, fold=True):
+def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray, fold:bool=True) -> ndarray:
     """Computes the expected periodogram, for the passed covariance function and grid. The grid is an array, in
     the simplest case just an array of ones
     :param cov_func: covariance function
@@ -29,28 +32,35 @@ def compute_ep(cov_func, grid, fold=True):
     frequency grid with twice higher resolution
     :return: """
     shape = grid.shape
+    n1,n2 = grid.shape
     n_dim = grid.ndim
-    # In the case of a complete grid, cg takes a closed form.
-    cg = spatial_kernel(grid)
-    acv = autocov(cov_func, shape)
-    cbar = cg * acv
+    # In the case of a complete grid, spatial_kernel takes a closed form.
+    cbar = spatial_kernel * acf
+    
     # now we need to "fold"
     if fold:
-        result = np.zeros_like(grid, dtype=np.complex128)
+        result = np.zeros(shape, dtype=np.complex128)
         if n_dim == 1:
             for i in range(2):
-                result[i:] += cbar[i * shape[0]: (i + 1) * shape[0]]
+                res = cbar[i*shape[0]: (i+1)*shape[0]]
+                result += np.pad(res, (i,0), mode='constant')
+                
         elif n_dim == 2:
             for i in range(2):
                 for j in range(2):
-                    result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+                    res = cbar[i*shape[0]: (i+1)*shape[0], 
+                               j*shape[1]: (j+1)*shape[1]]
+                    result += np.pad(res, ((i,0), (j,0)), mode='constant')   # autograd solution
+                    
         elif n_dim == 3:
             for i in range(2):
                 for j in range(2):
                     for k in range(2):
-                        result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-                                              j * shape[1]: (j + 1) * shape[1],
-                                              k * shape[2]: (k + 1) * shape[2]]
+                        res = cbar[i*shape[0]: (i+1)*shape[0],
+                                   j*shape[1]: (j+1)*shape[1],
+                                   k*shape[2]: (k+1)*shape[2]]    
+                        result += np.pad(res, ((i,0), (j,0), (k,0)), mode='constant')
+        
     else:
         m, n = shape
         result = np.zeros((2 * m, 2 * n))
@@ -58,7 +68,7 @@ def compute_ep(cov_func, grid, fold=True):
         result[m+1:, :n] = cbar[m:, :n]
         result[m+1:, n+1:] = cbar[m:, n:]
         result[:m, n+1:] = cbar[:m, n:]
-    # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
+    # We take the real part of the fft only due to numerical precision, in theory this should be real
     result = np.real(fftn(result))
     return result
 
@@ -122,6 +132,81 @@ class ExpectedPeriodogram:
         """
         acv = self.grid.autocov(model)
         return self.compute_ep(acv, self.periodogram.fold)
+    
+    
+    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
+        """
+        Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
+        Fourier Transform identitied by the two-dimensional offset d. The standard expected periodogram corresponds to
+        the default d = (0, 0).
+
+        Parameters
+        ----------
+        acv
+            Autocovariance evaluated on the grid
+        fold
+            Whether to apply folding of the expected periodogram
+        d
+            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
+
+        Returns
+        -------
+        np.ndarray
+            Expectation of the periodogram
+        """
+        grid = self.grid
+        shape = grid.n
+        n_dim = grid.ndim
+        # In the case of a complete grid, cg takes a closed form given by the triangle kernel
+        if d == (0, 0):
+            cg = grid.spatial_kernel
+        else:
+            cg = spatial_kernel(self.grid.mask, d)
+        # TODO add tapering
+        cbar = cg * acv
+        # now we need to "fold"
+        if fold:
+            # TODO: check if working
+            result = np.zeros(shape, dtype=np.complex128)
+            if n_dim == 1:
+                for i in range(2):
+                    res = cbar[i*shape[0]: (i+1)*shape[0]]
+                    result += np.pad(res, (i,0), mode='constant')
+                    
+            elif n_dim == 2:
+                for i in range(2):
+                    for j in range(2):
+                        res = cbar[i*shape[0]: (i+1)*shape[0], 
+                                   j*shape[1]: (j+1)*shape[1]]
+                        result += np.pad(res, ((i,0), (j,0)), mode='constant')   # autograd solution
+                        
+            elif n_dim == 3:
+                for i in range(2):
+                    for j in range(2):
+                        for k in range(2):
+                            res = cbar[i*shape[0]: (i+1)*shape[0],
+                                       j*shape[1]: (j+1)*shape[1],
+                                       k*shape[2]: (k+1)*shape[2]]    
+                            result += np.pad(res, ((i,0), (j,0), (k,0)), mode='constant')
+        
+
+            # else:
+            #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
+            #     for ijk in indexes:
+            #         result[tuple([slice(i, None) for i in ijk])] += \
+            #             cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
+        else:
+            m, n = shape
+            result = np.zeros((2 * m, 2 * n))
+            result[:m, :n] = cbar[:m, :n]
+            result[m + 1:, :n] = cbar[m:, :n]
+            result[m + 1:, n + 1:] = cbar[m:, n:]
+            result[:m, n + 1:] = cbar[:m, n:]
+
+        if d == (0, 0):
+            # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
+            return np.real(fftn(result))
+        return fftn(result)
 
     def gradient(self, model: CovarianceModel, params: Parameters) -> np.ndarray:
         """Provides the gradient of the expected periodogram with respect to the parameters of the model
@@ -259,72 +344,6 @@ class ExpectedPeriodogram:
         """
         return np.abs(self.cov_dft_antidiagonals(model, m)) ** 2
 
-    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
-        """
-        Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
-        Fourier Transform identitied by the two-dimensional offset d. The standard expected periodogram corresponds to
-        the default d = (0, 0).
-
-        Parameters
-        ----------
-        acv
-            Autocovariance evaluated on the grid
-        fold
-            Whether to apply folding of the expected periodogram
-        d
-            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
-
-        Returns
-        -------
-        np.ndarray
-            Expectation of the periodogram
-        """
-        grid = self.grid
-        shape = grid.n
-        n_dim = grid.ndim
-        # In the case of a complete grid, cg takes a closed form given by the triangle kernel
-        if d == (0, 0):
-            cg = grid.spatial_kernel
-        else:
-            cg = spatial_kernel(self.grid.mask, d)
-        # TODO add tapering
-        cbar = cg * acv
-        # now we need to "fold"
-        if fold:
-            #TODO can we go back to complex64?
-            result = np.zeros(grid.n, dtype=np.complex128)
-            if n_dim == 2:
-                # we could actually always use the general version below but we leave the 2d case as it is easier to
-                #read
-                for i in range(2):
-                    for j in range(2):
-                        result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
-            elif n_dim == 3:
-                # we could actually always use the general version below but we leave the 2d case as it is easier to
-                #read
-                for i in range(2):
-                    for j in range(2):
-                        for k in range(2):
-                            result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-                                                  j * shape[1]: (j + 1) * shape[1],
-                                                  k * shape[2]: (k + 1) * shape[2]]
-            else:
-                indexes = product(*[(0, 1) for i_dim in range(n_dim)])
-                for ijk in indexes:
-                    result[tuple([slice(i, None) for i in ijk])] += \
-                        cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
-        else:
-            m, n = shape
-            result = np.zeros((2 * m, 2 * n))
-            result[:m, :n] = cbar[:m, :n]
-            result[m + 1:, :n] = cbar[m:, :n]
-            result[m + 1:, n + 1:] = cbar[m:, n:]
-            result[:m, n + 1:] = cbar[:m, n:]
-
-        if d == (0, 0):
-            # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-            return np.real(fftn(result))
-        return fftn(result)
 
 
 class SeparableExpectedPeriodogram(ExpectedPeriodogram):

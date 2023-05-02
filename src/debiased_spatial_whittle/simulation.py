@@ -80,7 +80,19 @@ class SamplerOnRectangularGrid:
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
         z_inv = np.reshape(z_inv, self.grid.n)
-        return z_inv * self.grid.mask
+        z = z_inv * self.grid.mask
+        return z
+    
+    def sample_t_randomfield(self, nu:int|None=None):
+        z = self()
+        if nu is None or nu == np.inf:
+            chi = np.ones(self.grid.n)
+        else:
+            chi = np.random.chisquare(nu, self.grid.n)/nu
+        
+        z /= np.sqrt(chi)
+        return z
+    
 
 
 class SamplerSeparable:
