@@ -3,6 +3,7 @@ from autograd import grad
 from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
 from scipy.linalg import inv
+from autograd.numpy import ndarray
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
@@ -33,12 +34,23 @@ params = np.log([rho, sigma])
 
 
 n_datasets=10
-mcmc_niter=10000
-mle_niter= 2000
+mcmc_niter=1000
+mle_niter= 200
 acceptance_lag = mcmc_niter+1
 d=len(params)
 
-quantiles = [0.025, 0.975, 0.05, 0.95]
+def make_quantiles(alphas:list|ndarray):
+    quant_list = []
+    for alpha in alphas:
+        if alpha>1:
+            alpha/=100
+        quant_list.append(alpha/2)
+        quant_list.append(1-(alpha/2))
+    return quant_list
+
+
+alphas = np.arange(5,100,5)
+quantiles = make_quantiles(alphas)
 n_q = len(quantiles)
 
 dewhittle_post_quantiles     = np.zeros((n_datasets,d*n_q))
@@ -81,7 +93,7 @@ import pandas as pd
 post_list = ['dewhittle', 'adj_dewhittle', 'whittle', 'adj_whittle']
 param_list = ['rho', 'sigma']
 index  = pd.MultiIndex.from_product([post_list, param_list, quantiles], 
-                                    names=["posterior", "parameter", "quantile"])
+                          names=["posterior", "parameter", "quantile"])
 
 k = d*n_q*len(post_list)
 posterior_quantiles = np.hstack((
@@ -92,8 +104,13 @@ posterior_quantiles = np.hstack((
 
 df = pd.DataFrame(posterior_quantiles, columns=index)
 
-for i in range(k//2):
-    cols = df.iloc[:, i*2:(i+1)*2]
+
+
+# not a great solution
+coverages={}
+for idx in zip(index[::2], index[1::2]):
+    
+    cols = df[list(idx)]
     ll, param, q = cols.columns[0]
     interval = pd.arrays.IntervalArray.from_arrays(*cols.to_numpy().T, closed='both')
     if 'rho' == param:        
@@ -101,4 +118,14 @@ for i in range(k//2):
     else:
         count = interval.contains(params[1]).sum()
         
-    print(f'{ll} coverage for parameter {param} at alpha={1-2*q}:   {count/n_datasets}')
+    alpha = round(1-2*q,2)
+    print(f'{ll} coverage for parameter {param} at alpha={alpha}:   {count/n_datasets}')
+    
+    coverages[(ll,param,alpha)] = count/n_datasets
+    # coverages.append(count/n_datasets)
+
+coverages_arr = np.fromiter(coverages.values(), dtype=float)[None]
+df_coverages = pd.DataFrame(coverages_arr,  columns=coverages.keys())
+
+plt.plot(alphas, df_coverages['adj_dewhittle', 'rho'].to_numpy()[0], '.')
+plt.show()
