@@ -9,7 +9,7 @@ import pickle
 def rmse(y: ndarray, y_tilde: ndarray) -> float:
     return np.sqrt(np.mean((y-y_tilde)**2))
 
-with open('MLEs.pkl', 'rb') as f:
+with open('MLEs_t_Exp_kernel.pkl', 'rb') as f:
     mles = pickle.load(f)
     
 MLEs= list(mles.values())
@@ -54,7 +54,7 @@ sigmas_bias = abs(df['sigma'].mean()-params[1]).unstack()
 sigmas_rmse = df['sigma'].apply(rmse, y_tilde=params[1]).unstack()
 
 fig, ax = plt.subplots(2,3, figsize=(17,10))
-fig.suptitle(f'deWhittle MLEs $t$-random field, Sq.Exp. kernel, {axis_labels[0]}={round(params[0],2)}, ' \
+fig.suptitle(f'deWhittle MLEs $t$-random field, Exp. kernel, {axis_labels[0]}={round(params[0],2)}, ' \
              f'{axis_labels[1]}={round(params[1],2)}, ' \
              r'$\sigma^2_{\epsilon}$=0.1'    , fontsize=26, color='gray', y=1.02)
 ax[0,0].plot(rho_bias.to_numpy().T, 'o-', )

@@ -20,7 +20,7 @@ np.random.seed(1252147)
 
 rho, sigma, nugget = 10., np.sqrt(1.), 0.1
 
-model = SquaredExponentialModel()
+model = ExponentialModel()
 model.rho = rho
 model.sigma = sigma
 model.nugget = nugget
@@ -40,7 +40,7 @@ for i, n in enumerate(grid_sizes):
     grid = RectangularGrid(n)
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
-    dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget)
+    dw = DeWhittle(z, grid, ExponentialModel(), nugget=nugget)
     MLEs[f'{n}'] = [dw.sim_MLEs(params, niter=2000, t_random_field=True, nu=df) for df in dfs]
 
 

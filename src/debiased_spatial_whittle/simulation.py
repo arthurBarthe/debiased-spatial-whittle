@@ -66,8 +66,10 @@ class SamplerOnRectangularGrid:
             f = prod_list(self.grid.n) * ifftn(cov)
             min_ = np.min(f)
             if min_ <= -1e-5:
-                sys.exit(0)
-                warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                # TODO: better warnings/error handling
+                # warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                # sys.exit(0)
+                raise ValueError(f'Embedding is not positive definite, min value {min_}.')
             self._f = np.maximum(f, 0)
         return self._f
 

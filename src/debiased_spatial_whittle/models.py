@@ -273,13 +273,28 @@ class ExponentialModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        parameters = Parameters([rho, sigma])
+        nugget = Parameter('nugget', (1e-6, 1000))
+        
+        parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
-        d = np.sqrt(np.sum(lags**2, axis=0))
-        return self.sigma.value**2 * np.exp(- d / self.rho.value)
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+        # TODO: time domain
+        
+        
+        if time_domain:
+            d = np.sqrt(lags)         # this is the full covariance matrix
+            nugget_effect = self.nugget.value*np.eye(len(lags))
+        else:
+            lags = np.stack(lags, axis=0)
+            d = np.sqrt(np.sum(lags**2, axis=0))
+            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+        
+        acf = self.sigma.value**2 * np.exp(- d / self.rho.value) + nugget_effect
+    
+        if nu is not None:
+            acf *= nu/(nu-2)    # t-density covariance
+        return acf
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
