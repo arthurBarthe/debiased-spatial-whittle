@@ -34,27 +34,27 @@ plt.show()
 
 
 
-dw = DeWhittle(z, grid, ExponentialModel(), nugget=None)
+dw = DeWhittle(z, grid, ExponentialModel(), nugget=1e-10)
 dw.fit(None, prior=False)
 # stop
 niter=5000
 
 # TODO: cannot simulate z based on these params!
 
-# dewhittle_post, A = dw.RW_MH(niter)
-# MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=500)
-# dw.prepare_curvature_adjustment()
-# adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
+dewhittle_post, A = dw.RW_MH(niter)
+MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=2000)
+dw.prepare_curvature_adjustment()
+adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 
 
-# title = 'posterior comparisons'
-# legend_labels = ['deWhittle', 'adj deWhittle']
-# plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+title = 'posterior comparisons'
+legend_labels = ['deWhittle', 'adj deWhittle']
+plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
 
-dw2 = DeWhittle(np.ones((150,150)), RectangularGrid((150,150)), ExponentialModel(), nugget=np.exp(dw.res.x[-1]))
+# dw2 = DeWhittle(np.ones((150,150)), RectangularGrid((150,150)), ExponentialModel(), nugget=np.exp(dw.res.x[-1]))
 
-sim_z = dw2.sim_z(np.exp(dw.res.x[:-1]))
+sim_z = dw.sim_z(np.exp(dw.res.x))
 
 fig, ax = plt.subplots(1,2, figsize=(20,15))
 ax[0].set_title('Sea Temperature Data', fontsize=22)

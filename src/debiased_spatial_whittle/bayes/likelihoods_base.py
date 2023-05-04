@@ -182,11 +182,20 @@ class Likelihood(ABC):
         self.update_model_params(params)            # list() because of autograd box error
         
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        try:
+            sampler.f
+        except:
+            n = np.array(self.n)*2
+            sampler = SamplerOnRectangularGrid(self.model, RectangularGrid(n))
+
         if t_random_field:
             z = sampler.sample_t_randomfield(nu)
         else:
             z = sampler()
-            
+        
+        if z.shape != self.n:
+            # TODO: fix this
+            return z[slice(self.n[0]), slice(self.n[1])]
         return z
     
     @abstractmethod

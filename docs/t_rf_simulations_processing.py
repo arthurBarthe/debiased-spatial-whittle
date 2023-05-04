@@ -80,6 +80,6 @@ for i, plot in enumerate(ax.flatten()):
     if i==0 or i==3:
         plot.set_ylabel(axis_labels[i//2],fontsize=22)
     
-ax[0,2].legend(fontsize=16)
+ax[0,2].legend(fontsize=16, bbox_to_anchor=(0.7,0.7))
 fig.tight_layout()
 plt.show()

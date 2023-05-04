@@ -88,9 +88,10 @@ class SamplerOnRectangularGrid:
     def sample_t_randomfield(self, nu:int|None=None):
         z = self()
         if nu is None or nu == np.inf:
-            chi = np.ones(self.grid.n)
+            chi = np.ones(1)
         else:
-            chi = np.random.chisquare(nu, self.grid.n)/nu
+            chi = np.random.chisquare(nu)/nu
+            # chi = np.random.chisquare(nu, self.grid.n)/nu    # this is a different model
         
         z /= np.sqrt(chi)
         return z
