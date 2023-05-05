@@ -185,7 +185,7 @@ class Likelihood(ABC):
         try:
             sampler.f
         except:
-            n = np.array(self.n)*2
+            n = np.array(self.grid.n)*2
             sampler = SamplerOnRectangularGrid(self.model, RectangularGrid(n))
 
         if t_random_field:
@@ -193,9 +193,10 @@ class Likelihood(ABC):
         else:
             z = sampler()
         
-        if z.shape != self.n:
-            # TODO: fix this
-            return z[slice(self.n[0]), slice(self.n[1])]
+        if z.shape != self.grid.n:
+            for i, n in enumerate(self.grid.n):
+                z = np.take(z, np.arange(n), axis=i)
+            return z
         return z
     
     @abstractmethod
