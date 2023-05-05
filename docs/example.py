@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
@@ -17,14 +17,17 @@ from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 
 fftn = np.fft.fftn
 
-np.random.seed(1252147)
+# np.random.seed(1252147)
 
 n = (64, 64)
 rho, sigma, nugget = 10., np.sqrt(1.), 0.1
 
+nu = 5
+
 grid = RectangularGrid(n)
-model = ExponentialModel()
+model = MaternModel()
 model.rho = rho
+model.nu = nu
 model.sigma = sigma
 model.nugget = nugget
 
@@ -45,11 +48,13 @@ fig = plt.figure()
 ax = fig.add_subplot()
 ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
-
 # stop
+
 params = np.log([rho,sigma])
 
-dw = DeWhittle(z, grid, ExponentialModel(), nugget=nugget)
+model = MaternModel()                   # cant optimize with nu
+model.nu = nu
+dw = DeWhittle(z, grid, model, nugget=nugget)
 # stop
 
 # eI = dw.expected_periodogram(np.exp(params))
@@ -77,7 +82,10 @@ plot_marginals([dewhittle_post, adj_dewhittle_post], params, title, [r'log$\rho$
 
 stop
 
-whittle = Whittle(z, grid, ExponentialModel(), nugget=nugget)
+model = MaternModel()                   # cant optimize with nu
+model.nu = nu
+
+whittle = Whittle(z, grid, model, nugget=nugget, infsum_shape=(3,3))
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
 whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=200)

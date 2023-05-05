@@ -24,6 +24,7 @@ class Likelihood(ABC):
     
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: None|float=0.1, use_taper:None|ndarray=None):
         
+        #  TODO: add model args
         self._z = z
         self.grid = grid
         # TODO: make this property
