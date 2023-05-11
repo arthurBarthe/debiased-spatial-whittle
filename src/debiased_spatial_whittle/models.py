@@ -282,13 +282,28 @@ class ExponentialModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        parameters = Parameters([rho, sigma])
+        nugget = Parameter('nugget', (1e-6, 1000))
+        
+        parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
-        d = np.sqrt(np.sum(lags**2, axis=0))
-        return self.sigma.value**2 * np.exp(- d / self.rho.value)
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+        # TODO: time domain
+        
+        
+        if time_domain:
+            d = np.sqrt(lags)         # this is the full covariance matrix
+            nugget_effect = self.nugget.value*np.eye(len(lags))
+        else:
+            lags = np.stack(lags, axis=0)
+            d = np.sqrt(np.sum(lags**2, axis=0))
+            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+        
+        acf = self.sigma.value**2 * np.exp(- d / self.rho.value) + nugget_effect
+    
+        if nu is not None:
+            acf *= nu/(nu-2)    # t-density covariance
+        return acf
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
@@ -320,11 +335,95 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         return np.stack((d_rho, d_sigma), axis=-1)
 
+import scipy
+from autograd.scipy.special import gamma
+from autograd.extend import primitive, defvjp, defjvp
+kv = primitive(scipy.special.kv)
+defvjp(kv, None, lambda ans, n, x: lambda g: -g * (kv(n - 1, x) + kv(n + 1, x)) / 2.0)
+
+
+
+# def matern(lags, rho, nu, sigma=1.):
+#     d = np.sqrt(sum((lag**2 for lag in lags)))
+#     const = 2 ** (1 - nu) / gamma(nu)
+#     args = np.sqrt(2 * nu) * d / rho
+#     term2 = (args) ** nu
+#     term3 = kv(nu, args)
+#     val = sigma ** 2 * const * term2 * term3
+#     val[d == 0] = sigma ** 2 + 0.1
+#     return val
+
+# def matern2(lags, rho, nu, sigma=1.):
+#     d = np.sqrt(sum((lag**2 for lag in lags)))
+#     mask = (d==0)
+#     const = 2 ** (1 - nu) / gamma(nu)
+#     args = np.sqrt(2 * nu) * d/rho
+#     term2 = (args) ** nu
+#     term3 = kv(nu, args + 9e99*mask)          # TODO: bad solution
+#     val = sigma ** 2 * const * term2 * term3
+#     val +=  (sigma**2+0.1)*mask
+#     return val
+
+
+
+class MaternModel(CovarianceModel):
+    #  TODO: needs more testing!
+    def __init__(self):
+        rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
+        nu = Parameter('nu', (0.01, 1000))
+        nugget = Parameter('nugget', (1e-6, 1000))
+        
+        parameters = Parameters([rho, sigma, nu, nugget])
+        super(MaternModel, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+        
+        if time_domain:
+            d = np.sqrt(lags)         # this is the full covariance matrix
+            nugget_effect = self.nugget.value*np.eye(len(lags))
+        else:
+            d = np.sqrt(sum((lag**2 for lag in lags)))
+            mask = (d==0)
+            nugget_effect = (self.sigma.value**2 + self.nugget.value)*mask
+        
+        # TODO: add specific cases for nu=1/2, 3/2, 5/2, inf
+        const = 2 ** (1 - self.nu.value) / gamma(self.nu.value)
+        args = np.sqrt(2 * self.nu.value) * d/self.rho.value
+        term2 = (args) ** self.nu.value
+        term3 = kv(self.nu.value, args + 9e99*mask)          # TODO: bad solution
+        acf = self.sigma.value**2 * const * term2 * term3 + nugget_effect
+        
+        if nu is not None:
+            acf *= nu/(nu-2)    # TODO: name collision with t-acf
+        return acf
+    
+    def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
+        '''aliased spectral density, should match with the acf'''
+        
+        shape  = freq_grid[0].shape
+        d = len(shape)
+        N = np.prod(shape)
+        
+        # TODO: wrong spectral density?
+        args   = (np.tile(infsum_grid[i], (N,1,1)) + freq_grid[i].reshape(N,1,1) for i in range(d))
+        omega2 = np.sum((arg**2 for arg in args))
+        
+        term1 = 2**(d) * np.pi**(d/2) * gamma(self.nu.value + d/2) * (2*self.nu.value)**self.nu.value
+        term2 = 1 / (gamma(self.nu.value) * self.rho.value**(2*self.nu.value))
+        term3 = ( 2*self.nu.value/self.rho.value**2 + 4*np.pi**2 * omega2 )**(-self.nu.value - d/2)      
+        f = self.sigma.value**2 * term1 * term2 * term3
+            
+        return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
+
+    def _gradient(self):
+        pass
+
 
 class SquaredExponentialModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
         nugget = Parameter('nugget', (1e-6, 1000))
         
         parameters = Parameters([rho, sigma, nugget])

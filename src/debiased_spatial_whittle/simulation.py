@@ -65,8 +65,10 @@ class SamplerOnRectangularGrid:
             f = prod_list(self.grid.n) * ifftn(cov)
             min_ = np.min(f)
             if min_ <= -1e-5:
-                sys.exit(0)
-                warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                # TODO: better warnings/error handling
+                # warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                # sys.exit(0)
+                raise ValueError(f'Embedding is not positive definite, min value {min_}.')
             self._f = np.maximum(f, 0)
         return self._f
 
@@ -85,9 +87,10 @@ class SamplerOnRectangularGrid:
     def sample_t_randomfield(self, nu:Union[int, None]=None):
         z = self()
         if nu is None or nu == np.inf:
-            chi = np.ones(self.grid.n)
+            chi = np.ones(1)
         else:
-            chi = np.random.chisquare(nu, self.grid.n)/nu
+            chi = np.random.chisquare(nu)/nu
+            # chi = np.random.chisquare(nu, self.grid.n)/nu    # this is a different model
         
         z /= np.sqrt(chi)
         return z

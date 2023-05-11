@@ -72,7 +72,7 @@ def plot_marginals(list_draws: list[ndarray,...],
     if truths is not None:
         legend_labels.insert(0, 'True parameter')
     
-    ax_list[1].set_xlim([-1,1])     # bounds
+    # ax_list[1].set_xlim([-1,1])     # bounds
     fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.25,1.12))
     fig.tight_layout()
     plt.show()

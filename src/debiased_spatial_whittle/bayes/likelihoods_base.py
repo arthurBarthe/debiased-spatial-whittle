@@ -24,6 +24,7 @@ class Likelihood(ABC):
     
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: None|float=0.1, use_taper:None|ndarray=None):
         
+        #  TODO: add model args
         self._z = z
         self.grid = grid
         # TODO: make this property
@@ -182,11 +183,21 @@ class Likelihood(ABC):
         self.update_model_params(params)            # list() because of autograd box error
         
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        try:
+            sampler.f
+        except:
+            n = np.array(self.grid.n)*2
+            sampler = SamplerOnRectangularGrid(self.model, RectangularGrid(n))
+
         if t_random_field:
             z = sampler.sample_t_randomfield(nu)
         else:
             z = sampler()
-            
+        
+        if z.shape != self.grid.n:
+            for i, n in enumerate(self.grid.n):
+                z = np.take(z, np.arange(n), axis=i)
+            return z
         return z
     
     @abstractmethod
