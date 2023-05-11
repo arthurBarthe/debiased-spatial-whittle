@@ -1,9 +1,7 @@
-from .backend import BackendManager
-np = BackendManager.get_backend()
-
 # In this file we define covariance models
 from abc import ABC, abstractmethod
 
+import numpy as np
 from scipy.special import gamma, kv
 from typing import Tuple, List, Dict, Union
 
@@ -218,6 +216,8 @@ class CovarianceModel(ABC):
     def __getattr__(self, item):
         if item in self.param_names:
             return self.params[item]
+        else:
+            raise AttributeError()
 
     def __repr__(self):
         return self.name + '(\n' + self.params.__repr__() + '\n)'
@@ -330,7 +330,7 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:Union[int, None]=None):
         
         if time_domain:
             d2 = lags         # this is the full covariance matrix
@@ -345,7 +345,7 @@ class SquaredExponentialModel(CovarianceModel):
             acf *= nu/(nu-2)    # t-density covariance
         return acf
     
-    def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
+    def f(self, freq_grid:Union[list, np.ndarray], infsum_grid:Union[list, np.ndarray], d:int=2):
         '''aliased spectral density, should match with the acf'''
         
         shape  = freq_grid[0].shape
@@ -369,11 +369,89 @@ class SquaredExponentialModel(CovarianceModel):
         return np.stack((d_rho, d_sigma), axis=-1)
 
 
+# TODO this should not be just a covariance model. Create more general class for model with parameters
+class TMultivariateModel(CovarianceModel):
+    """
+    Model corresponding to a t-multivariate distribution.
+    """
+    def __init__(self, covariance_model: CovarianceModel):
+        self.covariance_model = covariance_model
+        nu = Parameter('nu', (1, 1000))
+        parameters = ParametersUnion([covariance_model.params, Parameters([nu, ])])
+        super(TMultivariateModel, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        acv_gaussian = self.covariance_model(lags)
+        return acv_gaussian * self.nu_1.value / (self.nu_1.value - 2)
+
+    def _gradient(self, lags: np.ndarray):
+        return self.covariance_model._gradient(lags) * self.nu.value / (self.nu.value - 2)
+
+
+class SquaredModel(CovarianceModel):
+    """
+    Covariance model for a process defined pointwise as the square of a Gaussian process
+    """
+    def __init__(self, latent_model: CovarianceModel):
+        self.latent_model = latent_model
+        super(SquaredModel, self).__init__(self.latent_model.params)
+
+    def __call__(self, lags: np.ndarray):
+        return 2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+class ChiSquaredModel(CovarianceModel):
+    """
+    Covariance model for a Chi-Squared random field
+    """
+    def __init__(self, latent_model: CovarianceModel):
+        self.latent_model = latent_model
+        dof = Parameter('dof', (1, 1000))
+        super(ChiSquaredModel, self).__init__(ParametersUnion([self.latent_model.params, Parameters([dof, ])]))
+
+    def __call__(self, lags: np.ndarray):
+        return (self.dof_1.value * (2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2)
+        + self.dof_1.value * (self.dof_1.value - 1) * self.latent_model.sigma ** 2)
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+class PolynomialModel(CovarianceModel):
+    """
+    Covariance model for a process defined pointwise via a polynomial function
+    applied to a latent Gaussian process.
+    Currently limited to order 2.
+    """
+
+    def __init__(self, latent_model: CovarianceModel):
+        self.latent_model = latent_model
+        a = Parameter('a', (-1, 1))
+        b = Parameter('b', (-1, 1))
+        pol_parameters = Parameters([a, b])
+        super(PolynomialModel, self).__init__(ParametersUnion([self.latent_model.params, pol_parameters]))
+
+    def __call__(self, lags: np.ndarray):
+        a = self.a_1.value
+        b = self.b_1.value
+        term1 = 2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2
+        term2 = self.latent_model(lags)
+        return a**2 * term1 + b**2 * term2
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
         nu = Parameter('nu', (0.5, 100))
+        parameters = Parameters([sigma, nu, rho])
+        super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
         lags = np.stack(lags, axis=0)

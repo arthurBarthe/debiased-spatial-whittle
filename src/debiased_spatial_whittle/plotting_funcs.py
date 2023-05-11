@@ -4,16 +4,17 @@ from numpy import ndarray
 import seaborn as sns
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
+from typing import Union, List
 
 # TODO: make 1d work
 def plot_marginals(list_draws: list[ndarray,...],
-                               truths:None|ndarray=None, 
-                               title:None|str=None,
-                               axis_labels:None|list=None,
-                               density_labels:None|list=None,
-                               shape:None|tuple=None,
+                               truths:Union[ndarray, None]=None,
+                               title:Union[str, None]=None,
+                               axis_labels:Union[List, None]=None,
+                               density_labels:Union[List, None]=None,
+                               shape:Union[tuple, None]=None,
                                figsize:tuple=(15,7), 
-                               cmap:None|str=None, **plotargs):
+                               cmap:Union[str, None]=None, **plotargs):
     
     '''draws: list of arrays of samples to plot'''
     
