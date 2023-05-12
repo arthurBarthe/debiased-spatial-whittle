@@ -68,8 +68,8 @@ class DeWhittle(Likelihood):
     def logprior(self, x: ndarray):
         return super().logprior(x)
         
-    def logpost(self, x: ndarray):
-        return super().logpost(x)
+    def logpost(self, x: ndarray, **loglik_kwargs):
+        return super().logpost(x, **loglik_kwargs)
         
     def adj_loglik(self, x: ndarray):
         return super().adj_loglik(x)
@@ -83,19 +83,29 @@ class DeWhittle(Likelihood):
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
                                                        niter:int = 100, 
                                                        print_res:bool = True,
+                                                       save_res:bool = True,
+                                                       loglik_kwargs:None|dict=None,
                                                        **optargs):
         
-        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
+        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
+                           print_res=print_res, save_res=save_res, 
+                           loglik_kwargs=loglik_kwargs, **optargs)
     
     def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
         return super().sim_z(params, t_random_field, nu)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu, print_res=print_res)
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, 
+                                                         nu:int|None=None, 
+                                                         print_res:bool=True, 
+                                                         **fit_kwargs) -> ndarray:
+        
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field,
+                                                nu=nu, print_res=print_res,
+                                                **fit_kwargs)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
-    
+        # TODO: update this with sim_MLEs
         if monte_carlo:
             return super().sim_MLEs(params, niter, **sim_kwargs)
         else:
@@ -168,9 +178,9 @@ class Whittle(Likelihood):
     
     def logprior(self, x: ndarray):
         return super().logprior(x)
-        
-    def logpost(self, x: ndarray):
-        return super().logpost(x)
+    
+    def logpost(self, x: ndarray, **loglik_kwargs):
+        return super().logpost(x, **loglik_kwargs)
         
     def adj_loglik(self, x: ndarray):
         return super().adj_loglik(x)
@@ -184,17 +194,27 @@ class Whittle(Likelihood):
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
                                                        niter:int = 100, 
                                                        print_res:bool = True,
+                                                       save_res:bool = True,
+                                                       loglik_kwargs:None|dict=None,
                                                        **optargs):
         
-        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
-
-
+        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
+                           print_res=print_res, save_res=save_res, 
+                           loglik_kwargs=loglik_kwargs, **optargs)
+ 
     def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
         return super().sim_z(params, t_random_field, nu)
     
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None,  print_res:bool=True) -> ndarray:
-        return super().sim_MLEs(params, niter, t_random_field=t_random_field, nu=nu, print_res=print_res)
-      
+
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, 
+                                                         nu:int|None=None, 
+                                                         print_res:bool=True, 
+                                                         **fit_kwargs) -> ndarray:
+        
+        return super().sim_MLEs(params, niter, t_random_field=t_random_field,
+                                                nu=nu, print_res=print_res,
+                                                **fit_kwargs)
+     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
     
@@ -263,8 +283,8 @@ class Gaussian(Likelihood):
     def logprior(self, x: ndarray):
         return super().logprior(x)
         
-    def logpost(self, x: ndarray):
-        return super().logpost(x)
+    def logpost(self, x: ndarray, **loglik_kwargs):
+        return super().logpost(x, **loglik_kwargs)
         
     def adj_loglik(self, x: ndarray):
         raise ValueError('too ')
@@ -280,14 +300,18 @@ class Gaussian(Likelihood):
         return super().sim_z(params)
     
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
-                                                        niter:int = 100, 
-                                                        print_res:bool = True,
-                                                        **optargs):
+                                                       niter:int = 100, 
+                                                       print_res:bool = True,
+                                                       save_res:bool = True,
+                                                       loglik_kwargs:None|dict=None,
+                                                       **optargs):
         
-        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, print_res=print_res, **optargs)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, **optargs) -> ndarray:
-        return super().sim_MLEs(self, params, niter, print_res=print_res **optargs)
+        return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
+                           print_res=print_res, save_res=save_res, 
+                           loglik_kwargs=loglik_kwargs, **optargs)
+     
+    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, **fit_kwargs) -> ndarray:
+        return super().sim_MLEs(self, params, niter, print_res=print_res, **fit_kwargs)
     
     
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method

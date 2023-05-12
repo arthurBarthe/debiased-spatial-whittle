@@ -22,7 +22,7 @@ fftn = np.fft.fftn
 n = (64, 64)
 rho, sigma, nugget = 10., np.sqrt(1.), 0.1
 
-nu = 5
+nu = 5/2
 
 grid = RectangularGrid(n)
 model = MaternModel()
@@ -55,6 +55,9 @@ params = np.log([rho,sigma])
 model = MaternModel()                   # cant optimize with nu
 model.nu = nu
 dw = DeWhittle(z, grid, model, nugget=nugget)
+dw.fit(None, prior=False)
+dw.fit(None, prior=False, approx_grad=True)
+
 # stop
 
 # eI = dw.expected_periodogram(np.exp(params))

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
@@ -21,7 +21,7 @@ fftn = np.fft.fftn
 
 n = (75, 75)
 grid = RectangularGrid(n)
-model = ExponentialModel()
+model = MaternModel()
 
 sampler = SamplerOnRectangularGrid(model, grid)
 # z = sampler()
@@ -33,26 +33,26 @@ ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
 
+params = np.log([10,1])
 
-dw = DeWhittle(z, grid, ExponentialModel(), nugget=1e-10)
-dw.fit(None, prior=False)
+model.nu = 0.733
+
+dw = DeWhittle(z, grid, model, nugget=1e-10)
+dw.fit(params, prior=False, approx_grad=True)
+niter=1000
+dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
+
 # stop
-niter=5000
 
-# TODO: cannot simulate z based on these params!
-
-dewhittle_post, A = dw.RW_MH(niter)
-MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=2000)
+MLEs = dw.sim_MLEs(dw.res.x, niter=500, approx_grad=True)
 dw.prepare_curvature_adjustment()
-adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
+adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
 
 title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle']
 plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
-
-# dw2 = DeWhittle(np.ones((150,150)), RectangularGrid((150,150)), ExponentialModel(), nugget=np.exp(dw.res.x[-1]))
 
 sim_z = dw.sim_z(np.exp(dw.res.x))
 

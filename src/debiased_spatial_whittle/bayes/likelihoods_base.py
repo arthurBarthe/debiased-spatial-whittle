@@ -107,13 +107,13 @@ class Likelihood(ABC):
 
 
     @abstractmethod
-    def logpost(self, x: ndarray) -> float:
-        return self(x) + self.logprior(x)
+    def logpost(self, x: ndarray, **loglik_kwargs) -> float:
+        return self(x, **loglik_kwargs) + self.logprior(x)
 
     
     @abstractmethod
     def adj_loglik(self, x: ndarray, **loglikargs) -> float: 
-        return self(self.MLE.x + self.C @ (x - self.MLE.x), **loglikargs)
+        return self(self.res.x + self.C @ (x - self.res.x), **loglikargs)
 
     @abstractmethod
     def adj_logpost(self, x: ndarray) -> float:
@@ -123,19 +123,26 @@ class Likelihood(ABC):
     @abstractmethod
     def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
                                                        niter:int = 100, approx_grad:bool=False,
-                                                       print_res:bool = True, **optargs):
-        '''fit the model to data - includes optional global optimizer'''
+                                                       print_res:bool = True, save_res:bool=True,
+                                                       loglik_kwargs:None|dict=None, **optargs):
+        '''
+        optimize the log-likelihood function given the data
+        includes optional global optimizer
+        '''
         
+        # TODO: separate class?
         if x0 is None:
             x0 = np.zeros(self.n_params)
         
+        if loglik_kwargs is None:
+            loglik_kwargs = dict()
+            
         if prior:                                         # for large samples, the prior is negligible
             attribute = 'MAP'
-            def obj(x):     return -self.logpost(x)
-            
+            def obj(x):     return -self.logpost(x, **loglik_kwargs)
         else:
             attribute = 'MLE'
-            def obj(x):     return -self(x)
+            def obj(x):     return -self(x, **loglik_kwargs)
             
         if not approx_grad:
             gradient = grad(obj)
@@ -144,35 +151,38 @@ class Likelihood(ABC):
             
         if basin_hopping:          # for global optimization
             minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
-            self.res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
-            success = self.res.lowest_optimization_result['success']
+            res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
+            success = res.lowest_optimization_result['success']
         else:            
-            self.res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
-            success = self.res['success']
+            res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
+            success = res['success']
             
         if not success:
             print('Optimizer failed!')
             # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
             
-        self.res['type'] = attribute
-        setattr(self,attribute, self.res)
+        res['type'] = attribute
+        # setattr(self, attribute, res)
         
         if attribute=='MLE':
-            self.BIC = self.n_params*np.log(self.grid.n_points) - 2*self(self.res.x)         # negative logpost
+            res['BIC'] = self.n_params*np.log(self.grid.n_points) - 2*self(res.x)         # negative logpost
         
         if print_res:
-            print(f'{self.label} {attribute}:  {np.round(np.exp(self.res.x),3)}')
+            print(f'{self.label} {attribute}:  {np.round(np.exp(res.x),3)}')
+            
+        if save_res:
+            setattr(self, 'res', res)
         
-        if approx_grad:
-            self.propcov = self.res.hess_inv.todense()
-        else:    
-            try:
-                self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
-            except np.linalg.LinAlgError:
-                print('Singular propcov')
-                self.propcov = False
-                
-        return self.res, self.propcov
+            if approx_grad:
+                self.propcov = self.res.hess_inv.todense()
+            else:    
+                try:
+                    self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
+                except np.linalg.LinAlgError:
+                    print('Singular propcov')
+                    self.propcov = False
+                    
+        return res
     
     
     @abstractmethod
@@ -183,6 +193,8 @@ class Likelihood(ABC):
         self.update_model_params(params)            # list() because of autograd box error
         
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
+        
+        # TODO: t-models should be moved to models.py
         try:
             sampler.f
         except:
@@ -194,14 +206,14 @@ class Likelihood(ABC):
         else:
             z = sampler()
         
+        # TODO: move this to simulation.py
         if z.shape != self.grid.n:
             for i, n in enumerate(self.grid.n):
                 z = np.take(z, np.arange(n), axis=i)
-            return z
         return z
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True, **fit_kwargs) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -216,14 +228,21 @@ class Likelihood(ABC):
                 
             _I = self.periodogram(_z)
             
-            def obj(x):     return -self(x, I=_I, nu=nu)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
-            _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B')
-            if not _res['success']:
+            loglik_kwargs = {'I':_I, 'nu':nu}
+            res = self.fit(x0=params, prior=False, print_res=False, 
+                                                   save_res=False,
+                                                   loglik_kwargs=loglik_kwargs,
+                                                   **fit_kwargs)
+            
+            # def obj(x):     return -self(x, I=_I, nu=nu)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
+            # _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B')
+            
+            if not res['success']:
                 continue
             else:
                 if print_res:
-                    print(f'{i+1})   MLE:  {np.round(np.exp(_res.x),3)}')
-                self.MLEs[i] = _res.x
+                    print(f'{i+1})   MLE:  {np.round(np.exp(res.x),3)}')
+                self.MLEs[i] = res.x
                 i+=1
             
         self.MLEs_cov = np.cov(self.MLEs.T)
@@ -238,7 +257,7 @@ class Likelihood(ABC):
     def prepare_curvature_adjustment(self):
         # TODO: singular value decomp
         
-        if not hasattr(self, 'MLE'):
+        if not self.res.type=='MLE':
             raise TypeError('must optimize log-likelihood first')
             
         B = np.linalg.cholesky(self.MLEs_cov)
@@ -246,7 +265,8 @@ class Likelihood(ABC):
         L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
         self.C = np.linalg.inv(B@L_inv)
         
-        self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.MLE.x))
+        # TODO: for when have to approx grad
+        self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.res.x))
         return
     
     @abstractmethod
