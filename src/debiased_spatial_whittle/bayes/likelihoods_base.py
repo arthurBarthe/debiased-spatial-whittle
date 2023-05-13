@@ -195,21 +195,11 @@ class Likelihood(ABC):
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
         
         # TODO: t-models should be moved to models.py
-        try:
-            sampler.f
-        except:
-            n = np.array(self.grid.n)*2
-            sampler = SamplerOnRectangularGrid(self.model, RectangularGrid(n))
-
         if t_random_field:
             z = sampler.sample_t_randomfield(nu)
         else:
             z = sampler()
         
-        # TODO: move this to simulation.py
-        if z.shape != self.grid.n:
-            for i, n in enumerate(self.grid.n):
-                z = np.take(z, np.arange(n), axis=i)
         return z
     
     @abstractmethod

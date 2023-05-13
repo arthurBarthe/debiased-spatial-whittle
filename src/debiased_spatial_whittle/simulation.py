@@ -56,19 +56,25 @@ class SamplerOnRectangularGrid:
     def __init__(self, model: CovarianceModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
+        self.sampling_grid = grid
         self._f = None
+        try:
+            self.f
+
+        except:
+            print('up-sampling')
+            n = tuple(2*n for n in self.grid.n)
+            self.sampling_grid = RectangularGrid(n)    # may cause bugs?
 
     @property
     def f(self):
         if self._f is None:
-            cov = self.grid.autocov(self.model)
-            f = prod_list(self.grid.n) * ifftn(cov)
+            cov = self.sampling_grid.autocov(self.model)
+            f = prod_list(self.sampling_grid.n) * ifftn(cov)
             min_ = np.min(f)
             if min_ <= -1e-5:
-                # TODO: better warnings/error handling
-                # warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-                # sys.exit(0)
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
+                
             self._f = np.maximum(f, 0)
         return self._f
 
@@ -77,13 +83,15 @@ class SamplerOnRectangularGrid:
         f = self.f
         e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
         z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(prod_list(self.grid.n)) * np.real(fftn(z))
+        z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z))
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
+        # print(z_inv.shape)
         z_inv = np.reshape(z_inv, self.grid.n)
         z = z_inv * self.grid.mask
         return z
-    
+
+    # TODO: move to Tclass
     def sample_t_randomfield(self, nu:Union[int, None]=None):
         z = self()
         if nu is None or nu == np.inf:
@@ -218,3 +226,32 @@ def test_simulation_1d():
     plt.plot(z2, '*')
     plt.show()
     assert True
+
+
+def test_upsampling():
+    from numpy.random import seed
+    import matplotlib.pyplot as plt
+    from debiased_spatial_whittle.grids import RectangularGrid
+    from debiased_spatial_whittle.models import ExponentialModel
+    from debiased_spatial_whittle.plotting_funcs import plot_marginals
+    from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
+
+    model = ExponentialModel()
+    model.rho = 40
+    model.sigma = 1
+    model.nugget=0.1
+    grid = RectangularGrid((128,128))
+    sampler = SamplerOnRectangularGrid(model, grid)
+    z = sampler()
+    plt.figure()
+    plt.imshow(z, cmap='Spectral')
+    plt.show()
+    
+    params = np.log([40,1])
+    
+    dw = DeWhittle(z, grid, ExponentialModel(), nugget=0.1)
+    dw.fit(None, prior=False)
+    # stop
+    MLEs = dw.sim_MLEs(params, niter=500)
+    plot_marginals([MLEs], params)
+        
