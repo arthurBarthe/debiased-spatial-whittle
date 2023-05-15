@@ -11,7 +11,7 @@ from autograd.numpy import ndarray
 from scipy.optimize import minimize, basinhopping
 
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
 
@@ -24,7 +24,6 @@ class Likelihood(ABC):
     
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: None|float=0.1, use_taper:None|ndarray=None):
         
-        #  TODO: add model args
         self._z = z
         self.grid = grid
         # TODO: make this property
@@ -35,7 +34,18 @@ class Likelihood(ABC):
         self._I = self.periodogram(z)
         
         self.model = model
-        self.model.nugget=nugget
+        if self.model.name == 'TMultivariateModel':   # TODO: better way to do this?
+            self.sampler_model = TSamplerOnRectangularGrid
+            
+        elif self.model.name == 'SquaredSamplerOnRectangularGrid': # TODO: this is not name of model
+            self.sampler_model = SquaredSamplerOnRectangularGrid
+            
+        else:
+            self.sampler_model = SamplerOnRectangularGrid
+        
+        # TODO: fix nugget
+        # TODO: add model args    
+        # self.model.nugget=nugget
         
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
@@ -186,31 +196,24 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
+    def sim_z(self, params:None|ndarray=None):
         if params is None:
             params = np.exp(self.res.x)
             
-        self.update_model_params(params)            # list() because of autograd box error
-        
-        sampler = SamplerOnRectangularGrid(self.model, self.grid)
-        
-        # TODO: t-models should be moved to models.py
-        if t_random_field:
-            z = sampler.sample_t_randomfield(nu)
-        else:
-            z = sampler()
-        
-        return z
+        self.update_model_params(params)
+        sampler = self.sampler_model(self.model, self.grid)
+        # print(sampler.gaussian_sampler.sampling_grid.n)
+        return sampler()
     
     @abstractmethod
-    def sim_MLEs(self, params: ndarray, niter:int=5000, t_random_field:bool=False, nu:int|None=None, print_res:bool=True, **fit_kwargs) -> ndarray:
+    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, **fit_kwargs) -> ndarray:
         
         i = 0
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
         while niter>i:
             
-            _z = self.sim_z(np.exp(params), t_random_field, nu)
-                
+            _z = self.sim_z(params)
+
             if False:
                 import matplotlib.pyplot as plt
                 plt.imshow(_z)
@@ -218,14 +221,11 @@ class Likelihood(ABC):
                 
             _I = self.periodogram(_z)
             
-            loglik_kwargs = {'I':_I, 'nu':nu}
+            loglik_kwargs = {'I':_I}
             res = self.fit(x0=params, prior=False, print_res=False, 
                                                    save_res=False,
                                                    loglik_kwargs=loglik_kwargs,
                                                    **fit_kwargs)
-            
-            # def obj(x):     return -self(x, I=_I, nu=nu)    # TODO: likelihood_kwargs, e.g. const, minimizer_kwargs
-            # _res = minimize(x0=params, fun=obj, jac=grad(obj), method='L-BFGS-B')
             
             if not res['success']:
                 continue

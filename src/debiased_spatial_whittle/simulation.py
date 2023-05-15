@@ -8,7 +8,6 @@ from typing import List
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
 
-
 def prod_list(l: List[int]):
     l = list(l)
     if l == []:
@@ -91,18 +90,6 @@ class SamplerOnRectangularGrid:
         z = z_inv * self.grid.mask
         return z
 
-    # TODO: move to Tclass
-    def sample_t_randomfield(self, nu:Union[int, None]=None):
-        z = self()
-        if nu is None or nu == np.inf:
-            chi = np.ones(1)
-        else:
-            chi = np.random.chisquare(nu)/nu
-            # chi = np.random.chisquare(nu, self.grid.n)/nu    # this is a different model
-        
-        z /= np.sqrt(chi)
-        return z
-
 
 class TSamplerOnRectangularGrid:
     """
@@ -115,7 +102,8 @@ class TSamplerOnRectangularGrid:
 
     def __call__(self):
         nu = self.model.nu_1.value
-        chi = np.random.chisquare(nu, self.grid.n) / nu
+        chi = np.random.chisquare(nu) / nu
+        # chi = np.random.chisquare(nu, self.grid.n) / nu  # this is a different model
         z = self.gaussian_sampler()
         return z / np.sqrt(chi)
 
@@ -254,4 +242,27 @@ def test_upsampling():
     # stop
     MLEs = dw.sim_MLEs(params, niter=500)
     plot_marginals([MLEs], params)
+    
+def t_rf_test():
+    from debiased_spatial_whittle.models import ExponentialModel
+    from debiased_spatial_whittle.bayes import DeWhittle
+    from debiased_spatial_whittle.plotting_funcs import plot_marginals
+    np.random.seed(18979125)
+    n=(64,64)
+    grid = RectangularGrid(n)
+    t_model = TMultivariateModel(ExponentialModel())
+    t_model.nugget_0 = 0.1
+    t_model.nu_1 = 5.
+    print(t_model)
+    params = np.log([10.,1.])
+    dw = DeWhittle(np.ones(n), grid, t_model, nugget=0.)   # TODO: wrong nugget name
+    MLEs_t = dw.sim_MLEs(np.exp(params), niter=1000)
+
+    model = ExponentialModel()
+    model.nugget = 0.1
+    dw_gauss = DeWhittle(np.ones(n), grid, model, nugget=0.)   # TODO: wrong nugget name
+    MLEs_g = dw_gauss.sim_MLEs(np.exp(params), niter=1000)
+    
+    plot_marginals([MLEs_t, MLEs_g], params, density_labels=['t', 'gauss'])
+   
         
