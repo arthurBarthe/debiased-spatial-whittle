@@ -33,19 +33,19 @@ class Likelihood(ABC):
         self.periodogram = Periodogram(taper=use_taper)
         self._I = self.periodogram(z)
         
+        # TODO: add model args
         self.model = model
         if self.model.name == 'TMultivariateModel':   # TODO: better way to do this?
             self.sampler_model = TSamplerOnRectangularGrid
+            self.model.nugget_0 = nugget
             
         elif self.model.name == 'SquaredSamplerOnRectangularGrid': # TODO: this is not name of model
             self.sampler_model = SquaredSamplerOnRectangularGrid
+            self.model.nugget_0 = nugget
             
         else:
             self.sampler_model = SamplerOnRectangularGrid
-        
-        # TODO: fix nugget
-        # TODO: add model args    
-        # self.model.nugget=nugget
+            self.model.nugget = nugget
         
         self._free_params = model.free_params
         self._n_params = len(self._free_params)

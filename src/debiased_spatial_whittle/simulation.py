@@ -251,16 +251,14 @@ def t_rf_test():
     n=(64,64)
     grid = RectangularGrid(n)
     t_model = TMultivariateModel(ExponentialModel())
-    t_model.nugget_0 = 0.1
     t_model.nu_1 = 5.
     print(t_model)
     params = np.log([10.,1.])
-    dw = DeWhittle(np.ones(n), grid, t_model, nugget=0.)   # TODO: wrong nugget name
+    dw = DeWhittle(np.ones(n), grid, t_model, nugget=0.1)
     MLEs_t = dw.sim_MLEs(np.exp(params), niter=1000)
 
     model = ExponentialModel()
-    model.nugget = 0.1
-    dw_gauss = DeWhittle(np.ones(n), grid, model, nugget=0.)   # TODO: wrong nugget name
+    dw_gauss = DeWhittle(np.ones(n), grid, model, nugget=0.1)
     MLEs_g = dw_gauss.sim_MLEs(np.exp(params), niter=1000)
     
     plot_marginals([MLEs_t, MLEs_g], params, density_labels=['t', 'gauss'])
