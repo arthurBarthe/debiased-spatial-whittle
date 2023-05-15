@@ -41,7 +41,7 @@ class Likelihood(ABC):
             
         elif self.model.name == 'SquaredSamplerOnRectangularGrid': # TODO: this is not name of model
             self.sampler_model = SquaredSamplerOnRectangularGrid
-            self.model.nugget_0 = nugget
+            self.model.nugget = nugget
             
         else:
             self.sampler_model = SamplerOnRectangularGrid
