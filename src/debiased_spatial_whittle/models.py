@@ -287,17 +287,11 @@ class ExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+    def __call__(self, lags: np.ndarray, time_domain:bool=False):
         # TODO: time domain
-        
-        
-        if time_domain:
-            d = np.sqrt(lags)         # this is the full covariance matrix
-            nugget_effect = self.nugget.value*np.eye(len(lags))
-        else:
-            lags = np.stack(lags, axis=0)
-            d = np.sqrt(np.sum(lags**2, axis=0))
-            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+        lags = np.stack(lags, axis=0)
+        d = np.sqrt(np.sum(lags**2, axis=0))
+        nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
         
         acf = self.sigma.value**2 * np.exp(- d / self.rho.value) + nugget_effect
     
