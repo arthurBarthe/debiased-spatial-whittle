@@ -50,13 +50,13 @@ ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 # stop
 
-params = np.log([rho,sigma])
+params = np.log([rho,sigma, nu])
 
 model = MaternModel()                   # cant optimize with nu
-model.nu = nu
+# model.nu = nu
 dw = DeWhittle(z, grid, model, nugget=nugget)
-dw.fit(None, prior=False)
-dw.fit(None, prior=False, approx_grad=True)
+dw.fit(params, prior=False)
+dw.fit(params, prior=False, approx_grad=True)
 
 # stop
 
@@ -75,7 +75,7 @@ niter=10000
 
 dw.fit(None, prior=False)
 dewhittle_post, A = dw.RW_MH(niter)
-MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=2000)
+MLEs = dw.estimate_standard_errors_MLE(np.exp(dw.res.x), monte_carlo=True, niter=2000)
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 
@@ -91,7 +91,7 @@ model.nu = nu
 whittle = Whittle(z, grid, model, nugget=nugget, infsum_shape=(3,3))
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
-whittle.estimate_standard_errors_MLE(whittle.res.x, monte_carlo=True, niter=200)
+whittle.estimate_standard_errors_MLE(np.exp(whittle.res.x), monte_carlo=True, niter=200)
 whittle.prepare_curvature_adjustment()
 adj_whittle_post, A = whittle.RW_MH(niter, adjusted=True)
 

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 from time import time
 from autograd import grad, hessian
+from numdifftools import Hessian
 from autograd.scipy import stats
 from autograd.numpy import ndarray
 from scipy.optimize import minimize, basinhopping
@@ -188,6 +189,11 @@ class Likelihood(ABC):
             else:    
                 try:
                     self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
+                    
+                    if not np.all(np.isfinite(self.propcov)):       # use numerical diff
+                        hess = Hessian(self.logpost)(self.res.x)
+                        self.propcov = -np.linalg.inv(hess)
+                        
                 except np.linalg.LinAlgError:
                     print('Singular propcov')
                     self.propcov = False
@@ -222,7 +228,7 @@ class Likelihood(ABC):
             _I = self.periodogram(_z)
             
             loglik_kwargs = {'I':_I}
-            res = self.fit(x0=params, prior=False, print_res=False, 
+            res = self.fit(x0=np.log(params), prior=False, print_res=False, 
                                                    save_res=False,
                                                    loglik_kwargs=loglik_kwargs,
                                                    **fit_kwargs)
@@ -257,6 +263,11 @@ class Likelihood(ABC):
         
         # TODO: for when have to approx grad
         self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.res.x))
+        
+        if not np.all(np.isfinite(self.adj_propcov)):       # use numerical diff
+            hess = Hessian(self.adj_logpost)(self.res.x)
+            self.adj_propcov = -np.linalg.inv(hess)
+        
         return
     
     @abstractmethod
