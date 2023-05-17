@@ -261,7 +261,6 @@ class Likelihood(ABC):
         L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
         self.C = np.linalg.inv(B@L_inv)
         
-        # TODO: for when have to approx grad
         self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.res.x))
         
         if not np.all(np.isfinite(self.adj_propcov)):       # use numerical diff
