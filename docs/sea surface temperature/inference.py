@@ -16,15 +16,14 @@ from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 
 
 fftn = np.fft.fftn
+fftfreq = np.fft.fftfreq
+fftshift = np.fft.fftshift
 
 # np.random.seed(1252147)
 
 n = (75, 75)
 grid = RectangularGrid(n)
 model = MaternModel()
-
-sampler = SamplerOnRectangularGrid(model, grid)
-# z = sampler()
 z = np.loadtxt('sst_data.txt')
 
 fig = plt.figure()
@@ -44,7 +43,7 @@ dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
 
 # stop
 
-MLEs = dw.sim_MLEs(dw.res.x, niter=500, approx_grad=True)
+MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=500, approx_grad=True)
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
@@ -75,8 +74,39 @@ for i in range(2):
 fig.tight_layout()
 plt.show()
 
+model = MaternModel()
+model.nu = 0.733
+N = (500,500)
+dw_ = DeWhittle(z,RectangularGrid(N), model=model, nugget=1e-10)
 
 
+q05, q95 = np.quantile(adj_dewhittle_post, q=[0.05,0.95], axis=0)
+post_mean = np.mean(adj_dewhittle_post, axis=0)
+
+f_q05 = fftshift(dw_.expected_periodogram(np.exp(q05)))
+f_q95 = fftshift(dw_.expected_periodogram(np.exp(q95)))
+f_mean = fftshift(dw_.expected_periodogram(np.exp(post_mean)))
+
+freq_grid = np.meshgrid(*(fftshift(2*np.pi*fftfreq(_n)) for _n in N), indexing='ij')         # / (delta*n1)?
+omegas_grid = np.sqrt(sum(grid**2 for grid in freq_grid))
+omegas = np.diag(omegas_grid)[:N[0]//2]
+fig = plt.figure(figsize=(10,7))
+plt.plot(omegas, np.diag(f_q05)[:N[0]//2], '--', c='#1f77b4')
+plt.plot(omegas, np.diag(f_mean)[:N[0]//2], c= '#1f77b4')
+plt.plot(omegas, np.diag(f_q95)[:N[0]//2], '--', c= '#1f77b4')
+plt.fill_between(omegas, np.diag(f_q05)[:N[0]//2], np.diag(f_q95)[:N[0]//2], color='#1f77b4', alpha=0.25)
+# plt.xlim([-0.1,1.])
+plt.show()
+
+from debiased_spatial_whittle.diagnostics import DiagnosticTest
+test = DiagnosticTest(dw.I, dw.expected_periodogram(np.exp(post_mean)))
+test()
+
+fig, ax = plt.subplots(figsize=(15,7))
+im = plt.imshow(fftshift(test.residuals), cmap='Spectral', origin='lower', extent=[-np.pi,np.pi]*2)
+plt.title('residuals', fontsize=22)
+plt.colorbar(im, ax=ax, pad=0.01)
+plt.show()
 
 
 # whittle = Whittle(z, grid, SquaredExponentialModel())

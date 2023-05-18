@@ -196,11 +196,7 @@ class Whittle(Likelihood):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
                            print_res=print_res, save_res=save_res, 
-                           loglik_kwargs=loglik_kwargs, **optargs)
- 
-    def sim_z(self,params:None|ndarray=None, t_random_field:bool=False, nu:int|None=None):
-        return super().sim_z(params, t_random_field, nu)
-    
+                           loglik_kwargs=loglik_kwargs, **optargs)    
 
     def sim_z(self, params:None|ndarray=None):
         return super().sim_z(params)
