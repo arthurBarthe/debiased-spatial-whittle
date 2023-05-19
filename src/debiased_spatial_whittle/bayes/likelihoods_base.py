@@ -225,9 +225,7 @@ class Likelihood(ABC):
                 plt.imshow(_z)
                 plt.show()
                 
-            _I = self.periodogram(_z)
-            
-            loglik_kwargs = {'I':_I}
+            loglik_kwargs = {'z':_z}
             res = self.fit(x0=np.log(params), prior=False, print_res=False, 
                                                    save_res=False,
                                                    loglik_kwargs=loglik_kwargs,

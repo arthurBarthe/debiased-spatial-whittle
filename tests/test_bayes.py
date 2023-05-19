@@ -7,7 +7,7 @@ from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
 
 
-np.random.seed(1523485)
+np.random.seed(1523483)
 
 def dewhittle_test():
     model = SquaredExponentialModel()
@@ -153,6 +153,35 @@ def dewhittle_squaredmodel_full_bayes():
     legend_labels = ['deWhittle', 'adj deWhittle']
     plot_marginals([dewhittle_post, adj_dewhittle_post], np.log(params), title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
+def gauss_posterior_test():
+    model = SquaredExponentialModel()
+    model.rho = 8
+    model.sigma = 1
+    model.nugget=0.1
+    grid = RectangularGrid((32,32))
+    
+    params = np.array([8.,1.])
+    sampler = SamplerOnRectangularGrid(model, grid)
+    z = sampler()
+    
+    niter = 1000
+    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1)
+    gauss.fit(None, prior=False, approx_grad=False)
+    gauss_post, A = gauss.RW_MH(niter)
+    # MLEs = gauss.sim_MLEs(params, niter=10)
+    
+    dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
+    dw.fit(None, prior=False)
+    dewhittle_post, A = dw.RW_MH(niter)
+    
+    whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=0.1)
+    whittle.fit(None, prior=False)
+    whittle_post, A = whittle.RW_MH(niter)
+    
+    title = 'posterior comparisons'
+    legend_labels = ['gaussian', 'deWhittle', 'whittle']
+    plot_marginals([gauss_post, dewhittle_post, whittle_post], np.log(params), title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+
 
 def main():
     dewhittle_full_bayes()
@@ -162,6 +191,7 @@ def main():
     dewhittle_matern_conditional_nu_test()
     whittle_test()
     dewhittle_squaredmodel_full_bayes()
+    gauss_posterior_test()
 
 if __name__ == "__main__":
     main()

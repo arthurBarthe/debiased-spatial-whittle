@@ -35,11 +35,13 @@ class DeWhittle(Likelihood):
         return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
 
         
-    def __call__(self, params: ndarray, I:None|ndarray=None, const:str='whittle', **cov_args) -> float: 
+    def __call__(self, params: ndarray, z:None|ndarray=None, const:str='whittle', **cov_args) -> float: 
         params = np.exp(params)
         
-        if I is None:
+        if z is None:
             I = self.I
+        else:
+            I = self.periodogram(z)
             
         N = self.grid.n_points
         
@@ -153,13 +155,15 @@ class Whittle(Likelihood):
         assert np.all(f>0)
         return f
 
-    def __call__(self, params: ndarray, I:None|ndarray=None, **kwargs) -> float:
+    def __call__(self, params: ndarray, z:None|ndarray=None, **kwargs) -> float:
         '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
         params = np.exp(params)
         
-        if I is None:
+        if z is None:
             I = self.I
+        else:
+            I = self.periodogram(z)
             
         f = self.f(params)           # this may be unstable for small grids/nugget
         
