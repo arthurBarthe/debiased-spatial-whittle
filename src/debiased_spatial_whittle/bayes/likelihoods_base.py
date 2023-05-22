@@ -221,8 +221,9 @@ class Likelihood(ABC):
             _z = self.sim_z(params)
 
             if False:
+                # print(_z[4,11])
                 import matplotlib.pyplot as plt
-                plt.imshow(_z)
+                plt.imshow(_z, origin='lower')
                 plt.show()
                 
             loglik_kwargs = {'z':_z}
