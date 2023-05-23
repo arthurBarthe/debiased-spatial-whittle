@@ -174,7 +174,7 @@ class RectangularGrid:
         grid = np.meshgrid(*xs, indexing='ij')
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
-        return lags
+        return np.array(lags)
 
     @property
     def spatial_kernel(self):

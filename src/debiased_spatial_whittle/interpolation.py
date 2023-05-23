@@ -29,14 +29,15 @@ mask[tuple(missing_idxs.T)] = 0.
 plt.imshow(mask, cmap='Greys', origin='lower')
 plt.show()
 
-grid = RectangularGrid(n, mask=mask)
+grid = RectangularGrid(n)
 
 model = SquaredExponentialModel()
 model.rho = 10
 model.sigma = 1
 model.nugget=0.1
 sampler = SamplerOnRectangularGrid(model, grid)
-z = sampler()
+z_ = sampler()
+z = z_ * mask
 
 plt.imshow(z, origin='lower')
 plt.show()
@@ -50,7 +51,44 @@ plot_marginals([MLEs], np.log(params))
 
 
 missing_point = missing_idxs[0]
-lags = np.meshgrid(*(np.arange(0, _n) for _n in n), indexing='ij') # TODO: deltas
+
+lags = grid.lag_matrix
+covMat = model(lags)
+# lags = np.meshgrid(*(np.arange(0, _n) for _n in n), indexing='ij') # TODO: deltas
+
+xs = np.meshgrid(*(np.arange(0, m) for m in n), indexing='ij')
+X  = np.array(xs).reshape(2,np.prod(n)).T
+
+d2 = np.sum((X - missing_point)**2, axis=1)
+nugget_effect = model.nugget.value*np.all(d2 == 0, axis=0)
+acf = model.sigma.value ** 2 * np.exp(- 0.5*d2 / model.rho.value ** 2) + nugget_effect
+
+
+# acf @ inv_covMat @ z.flatten()
+# z.flatten() @ inv_covMat @ acf
+
+# np.dot(z[mask], weights[mask.flatten()])
+# var = 1.1 - acf@ inv_covMat @ acf
+
+inv_covMat = np.linalg.inv(covMat)
+weights  = inv_covMat @ acf
+
+plt.imshow(covMat)
+plt.show()
+
+plt.plot(acf)
+plt.show()
+stop
+
+ndim = len(n)
+
+lags_ = lags - missing_point.reshape(-1, *[1]*ndim)
+
+acf = model(lags_)
+plt.imshow(acf, origin='lower')
+plt.show()
+
+stop
 
 d = np.sqrt(sum(((lag-lag[(*missing_point,)])**2 for i,lag in enumerate(lags))))
 
