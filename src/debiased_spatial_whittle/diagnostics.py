@@ -82,7 +82,6 @@ class ModelDiagnostic:
         """
         fig = plt.figure()
         ax = fig.add_subplot()
-        ax.
 
 
 
