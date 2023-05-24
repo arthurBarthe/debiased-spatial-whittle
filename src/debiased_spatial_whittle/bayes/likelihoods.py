@@ -253,7 +253,7 @@ class Gaussian(Likelihood):
        
         ll = -np.sum(np.log(np.diag(L)))         \
               -0.5*np.dot(z.flatten(),S2)        \
-              -0.5*N*np.log(2*np.pi)
+              -0.5*N*np.log(2*np.pi) # TODO: wrong constant
         return ll
         
     @property

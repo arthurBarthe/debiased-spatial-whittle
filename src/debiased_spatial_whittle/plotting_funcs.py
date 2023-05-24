@@ -18,8 +18,10 @@ def plot_marginals(list_draws: list[ndarray,...],
     
     '''draws: list of arrays of samples to plot'''
     
-    dims   = [draws.shape[1] for draws in list_draws]
+    dims   = [draws.shape[1] if draws.ndim>1 else 1 for draws in list_draws]
     nplots = max(dims)
+    if nplots==1:
+        nplots = sum(dims)
     
     ndistributions = len(list_draws)
     # color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -44,36 +46,43 @@ def plot_marginals(list_draws: list[ndarray,...],
             continue
         
         if truths is not None:
-            ax.axvline(truths[i], c='k', linewidth=3., linestyle = '--',zorder=3)
-                 
-        for j in range(ndistributions):
-            if i>dims[j]-1:
-                continue
-            sns.kdeplot(list_draws[j][:,i], fill=False, ax=ax, legend=False, linewidth=3., color=cm(j/ndistributions), **plotargs)
-                
+            ax.axvline(truths[i], c='k', linewidth=3., linestyle = '--',zorder=3, label='True value')
+        
+        if max(dims)==1:   # for 1-d case
+            sns.kdeplot(list_draws[i], fill=False, ax=ax, legend=False, label='density', linewidth=5., color=cm(1/ndistributions), **plotargs)            
+        else:
+            for j in range(ndistributions):
+                if i>dims[j]-1:
+                    continue
+                sns.kdeplot(list_draws[j][:,i], fill=False, ax=ax, legend=False, linewidth=3., color=cm(j/ndistributions), **plotargs)
+                    
         
         ax.set_xlabel(axis_labels[i], fontsize=24)
         ax.tick_params(axis='x', labelsize=18)
             
         ax.set_yticks([])
-        ax.set_ylabel(' ')             # .axes.get_yaxis().set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.set_ylabel('')             # .axes.get_yaxis().set_visible(False)
+        ax.spines[['top', 'left', 'right']].set_visible(False)
     
     if title is None:
         title = 'Marginal densities'
     fig.suptitle(title, fontsize=26, y=1.10)
     
     if density_labels is None:
-        legend_labels = [f'density #{i}' for i in range(ndistributions)]
+        if max(dims)==1:
+            legend_labels = ['density']
+        else:
+            legend_labels = [f'density #{i}' for i in range(ndistributions)]
     else:
         legend_labels = density_labels.copy()
     if truths is not None:
-        legend_labels.insert(0, 'True parameter')
+        legend_labels.insert(0, 'True value')
     
     # ax_list[1].set_xlim([-1,1])     # bounds
-    fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.25,1.12))
+    # if max(dims)==1:
+        # print(ax.get_legend_handles_labels())
+        # fig.legend(*ax.get_legend_handles_labels(), fontsize=20)
+    fig.legend(legend_labels, fontsize=20, bbox_to_anchor=(1.10,1.12))
     fig.tight_layout()
     plt.show()
     return
