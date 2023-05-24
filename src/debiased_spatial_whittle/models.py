@@ -411,11 +411,12 @@ class NewTransformedModel(CovarianceModel):
         self.transform = transform
         transform_param = Parameter('logD', (1, 50))
         eta_param = Parameter('eta', (-1, 1))
-        parameters = ParametersUnion([Parameters([transform_param, eta_param]), input_model.params])
+        nu_param = Parameter('nu', (-np.pi / 2, np.pi / 2))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param, nu_param]), input_model.params])
         super(NewTransformedModel, self).__init__(parameters)
 
     def transform_on_grid(self, ks):
-        return self.transform(self.logD_0.value, self.eta_0.value, ks)
+        return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, ks)
 
     def call_on_rectangular_grid(self, grid):
         from numpy.fft import fftn, ifftn
@@ -445,6 +446,8 @@ class MaternCovarianceModel(CovarianceModel):
         lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        if nu == 0.5:
+            return sigma ** 2 * np.exp(- d / rho)
         if nu==1.5:
             K = np.sqrt(3) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
