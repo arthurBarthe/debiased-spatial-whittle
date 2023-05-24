@@ -7,7 +7,7 @@ import numpy as np
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
-from .periodogram import compute_ep
+from .periodogram import compute_ep_old
 from .confidence import CovarianceFFT, McmcDiags
 from scipy.linalg import inv
 
@@ -72,8 +72,8 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 
     if cov_func_prime is not None:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
-            e_per_prime = compute_ep(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per_prime = compute_ep_old(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
             return whittle(per, e_per), whittle_prime(per, e_per, e_per_prime)
 
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
@@ -83,7 +83,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
                                          callback=opt_callback)
     else:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
             return whittle(per, e_per)
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
                                          init_guess,
@@ -131,6 +131,27 @@ class DebiasedWhittle:
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
         return whittle, d_whittle
+
+    def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
+        """
+        Evaluate the expectation of the Debiased Whittle likelihood estimator for a given
+        parameter.
+
+        Parameters
+        ----------
+        true_model
+            Covariance model of the process
+        eval_model
+            Covariance model for which we evaluate the likelihood
+
+        Returns
+        -------
+            Expectation of the Debiased Whittle likelihood under true_model, evaluated at
+            eval_model
+        """
+        ep_true = self.expected_periodogram(true_model)
+        ep_eval = self.expected_periodogram(eval_model)
+        return np.sum(np.log(ep_eval) + ep_true / ep_eval)
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
         """Provides the expectation of the hessian matrix"""

@@ -288,6 +288,8 @@ class ExponentialModel(CovarianceModel):
         
         parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
+        # set a default value to zero for the nugget
+        self.nugget = 0.
 
     def __call__(self, lags: np.ndarray, time_domain:bool=False, nu=None):
         # TODO: time domain
@@ -307,7 +309,8 @@ class ExponentialModel(CovarianceModel):
         d = np.sqrt(sum((lag ** 2 for lag in lags)))
         d_rho = (self.sigma.value / self.rho.value) ** 2 * d * np.exp(- d / self.rho.value)
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
-        return np.stack((d_rho, d_sigma), axis=-1)
+        d_nugget = 1. * (d == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 
 
 class ExponentialModelUniDirectional(CovarianceModel):
@@ -354,7 +357,7 @@ class MaternModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nu, nugget])
         super(MaternModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:Union[int, None]=None):
         
         rho, sigma, v = self.rho.value, self.sigma.value, self.nu.value
         
@@ -377,7 +380,7 @@ class MaternModel(CovarianceModel):
             acf *= nu/(nu-2)    # TODO: name collision with t-acf
         return acf
     
-    def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
+    def f(self, freq_grid:Union[List, np.ndarray], infsum_grid:Union[List, np.ndarray], d:int=2):
         '''aliased spectral density, should match with the acf'''
         
         rho, sigma, v = self.rho.value, self.sigma.value, self.nu.value
@@ -409,6 +412,8 @@ class SquaredExponentialModel(CovarianceModel):
         
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
+        # set a default value to zero for the nugget
+        self.nugget = 0.
 
     def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:Union[int, None]=None):
         
@@ -446,7 +451,8 @@ class SquaredExponentialModel(CovarianceModel):
         d2 = sum((lag ** 2 for lag in lags))
         d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
-        return np.stack((d_rho, d_sigma), axis=-1)
+        d_nugget = 1 * (d2 == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 
 
 # TODO this should not be just a covariance model. Create more general class for model with parameters

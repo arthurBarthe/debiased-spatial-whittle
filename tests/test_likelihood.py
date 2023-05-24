@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.testing import assert_allclose
 
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep, periodogram
+from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle, Estimator
@@ -31,7 +31,7 @@ def test_oop():
     # old version
     g = np.ones((512, 512))
     cov_func = lambda x: exp_cov(x, rho_lkh)
-    e_per = compute_ep(cov_func, g)
+    e_per = compute_ep_old(cov_func, g)
     lkh_old = whittle(periodogram(z, g), e_per)
     assert lkh_old == lkh_oop
 

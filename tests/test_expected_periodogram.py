@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep, periodogram
+from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
@@ -15,7 +15,7 @@ def test_non_negative():
     m, n = 128, 64
     cov_func = lambda lags: exp_cov(lags, rho=10.)
     z = sim_circ_embedding(cov_func, (m, n))[0]
-    e_per = compute_ep(cov_func, np.ones_like(z))
+    e_per = compute_ep_old(cov_func, np.ones_like(z))
     assert np.all(e_per >= 0)
 
 def test_autocov_1():
@@ -50,7 +50,7 @@ def test_compare_to_mean():
         z, _ = sim_circ_embedding(cov_func, (m, n))
         per = periodogram(z, grid)
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
-    e_per = compute_ep(cov_func, grid)
+    e_per = compute_ep_old(cov_func, grid)
     assert_allclose(mean_per, e_per, rtol=1)
 
 
@@ -64,7 +64,7 @@ def test_compare_to_mean2():
         z, _ = sim_circ_embedding(cov_func, (m, n))
         per = periodogram(z, grid)
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
-    e_per = compute_ep(cov_func, grid)
+    e_per = compute_ep_old(cov_func, grid)
     print(mean_per / e_per)
     assert_allclose(mean_per, e_per, rtol=0.1)
 
@@ -122,7 +122,7 @@ def test_expected_periodogram_oop():
     ep_oop = ep_op(model)
     # old version
     cov_func = lambda x: exp_cov(x, 10)
-    ep_old = compute_ep(cov_func, np.ones((64, 64)))
+    ep_old = compute_ep_old(cov_func, np.ones((64, 64)))
     assert_allclose(ep_old, ep_oop, rtol=1e-2)
 
 

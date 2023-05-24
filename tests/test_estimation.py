@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.testing import assert_almost_equal
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep, periodogram
+from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram

@@ -23,7 +23,7 @@ def autocov(cov_func, shape):
     return ifftshift(cov_func(xs))
 
 
-def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray, fold:bool=True) -> ndarray:
+def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray = None, fold:bool=True) -> ndarray:
     """Computes the expected periodogram, for the passed covariance function and grid. The grid is an array, in
     the simplest case just an array of ones
     :param cov_func: covariance function
@@ -71,6 +71,50 @@ def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray, fold:bool=T
         result[m+1:, n+1:] = cbar[m:, n:]
         result[:m, n+1:] = cbar[:m, n:]
     # We take the real part of the fft only due to numerical precision, in theory this should be real
+    result = np.real(fftn(result))
+    return result
+
+
+def compute_ep_old(cov_func, grid, fold=True):
+    """Computes the expected periodogram, for the passed covariance function and grid. The grid is an array, in
+    the simplest case just an array of ones
+    :param cov_func: covariance function
+    :param grid: array
+    :param fold: True if we compute the expected periodogram on the natural Fourier grid, False if we compute it on a
+    frequency grid with twice higher resolution
+    :return: """
+    shape = grid.shape
+    n_dim = grid.ndim
+    # In the case of a complete grid, cg takes a closed form.
+    cg = spatial_kernel(grid)
+    acv = autocov(cov_func, shape)
+    cbar = cg * acv
+    # now we need to "fold"
+    if fold:
+        result = np.zeros_like(grid)
+        result = np.zeros_like(grid, dtype=np.complex128)
+        if n_dim == 1:
+            for i in range(2):
+                result[i:] += cbar[i * shape[0]: (i + 1) * shape[0]]
+        elif n_dim == 2:
+            for i in range(2):
+                for j in range(2):
+                    result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+        elif n_dim == 3:
+            for i in range(2):
+                for j in range(2):
+                    for k in range(2):
+                        result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
+                                              j * shape[1]: (j + 1) * shape[1],
+                                              k * shape[2]: (k + 1) * shape[2]]
+    else:
+        m, n = shape
+        result = np.zeros((2 * m, 2 * n))
+        result[:m, :n] = cbar[:m, :n]
+        result[m+1:, :n] = cbar[m:, :n]
+        result[m+1:, n+1:] = cbar[m:, n:]
+        result[:m, n+1:] = cbar[:m, n:]
+    # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
     result = np.real(fftn(result))
     return result
 
@@ -133,10 +177,10 @@ class ExpectedPeriodogram:
             The expected periodogram on the grid of Fourier frequencies
         """
         acv = self.grid.autocov(model)
-        return self.compute_ep(acv, self.periodogram.fold)
+        return self.compute_ep_old(acv, self.periodogram.fold)
     
     
-    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
+    def compute_ep_old(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
         """
         Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
         Fourier Transform identitied by the two-dimensional offset d. The standard expected periodogram corresponds to
@@ -232,7 +276,7 @@ class ExpectedPeriodogram:
         d_ep = []
         for p_name in params.names:
             aux = ifftshift(d_acv[p_name])
-            d_ep.append(self.compute_ep(aux, self.periodogram.fold))
+            d_ep.append(self.compute_ep_old(aux, self.periodogram.fold))
         return np.stack(d_ep, axis=-1)
 
     def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
@@ -256,7 +300,7 @@ class ExpectedPeriodogram:
         m1, m2 = m
         n1, n2 = self.grid.n
         acv = self.grid.autocov(model)
-        ep = self.compute_ep(acv, d=m)
+        ep = self.compute_ep_old(acv, d=m)
         return ep[max(0, m1): n1 + m1, max(0, m2): m2 + n2]
 
     def cov_dft_matrix(self, model: CovarianceModel):
@@ -333,7 +377,7 @@ class ExpectedPeriodogram:
         m1, m2 = m
         n1, n2 = self.grid.n
         acv = self.grid.autocov(model)
-        ep = self.compute_ep(acv, d=m)
+        ep = self.compute_ep_old(acv, d=m)
         return ep[max(m1 - n1 + 1, 0): m1 + 1, max(m2 - n2 + 1, 0): m2 + 1]
 
     def cov_antidiagonals(self, model: CovarianceModel, m: Tuple[int, int]):
@@ -379,7 +423,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         d_ep2 = 2 * np.real(fft(gradient_seq2, axis=0)).reshape((1, -1)) - gradient_seq2[0, :]
         return d_ep1 * d_ep2
 
-    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)) \
+    def compute_ep_old(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)) \
             -> np.ndarray:
         """
         Computes the expected periodogram for the passed finite autocovariance function, in the case where...

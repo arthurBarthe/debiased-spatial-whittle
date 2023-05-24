@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Union, List
 
 # TODO: make 1d work
-def plot_marginals(list_draws: list[ndarray,...],
+def plot_marginals(list_draws: List[ndarray],
                                truths:Union[ndarray, None]=None,
                                title:Union[str, None]=None,
                                axis_labels:Union[List, None]=None,
