@@ -46,7 +46,7 @@ plt.show()
 
 params = np.array([10.,1.])
 
-grid = RectangularGrid(n, mask=mask)
+grid = RectangularGrid(n, mask=m)
 dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
 dw.fit(None, prior=False)
 MLEs = dw.sim_MLEs(params, niter=10)
@@ -67,17 +67,19 @@ lags = [g - g.T for g in grid_vec]
 
 d2_1 = sum(lag**2 for lag in lags)
 
-def get_lags(n: tuple, mask: np.ndarray):
-    mask = mask.astype(bool)
-    flat_idxs = np.where(mask.flatten())
-    xs = [np.arange(s, dtype=np.int64) for s in n]
-    grid = np.meshgrid(*xs, indexing='ij')
-    grid_vec = [g.reshape((-1, 1))[flat_idxs] for g in grid]
-    lags = [g - g.T for g in grid_vec]
-    return np.array(lags)
+def get_lags(mask: np.ndarray):
+    # mask = mask.astype(bool)
+    # flat_idxs = np.where(mask.flatten())
+    # xs = [np.arange(s, dtype=np.int64) for s in n]
+    # grid = np.meshgrid(*xs, indexing='ij')
+    # grid_vec = [g.reshape((-1, 1))[flat_idxs] for g in grid]
+    grid_vec = np.argwhere(mask)[None].T
+    lags = grid_vec - np.transpose(grid_vec, axes=(0,2,1))   # still general for n-dimensions
+    # lags = [g - g.T for g in grid_vec]
+    return lags
 
 
-lags = get_lags(n, mask)
+lags = get_lags(mask)
 
 covMat2 = model(lags)
     
@@ -103,9 +105,12 @@ covMat_inv = np.linalg.inv(covMat)
 # lags = grid.lag_matrix
 # covMat = model(lags)
 
-d2 = np.sum((X - missing_point)**2, axis=1)
-nugget_effect = model.nugget.value*np.all(d2 == 0, axis=0)
-acf = model.sigma.value ** 2 * np.exp(- 0.5*d2 / model.rho.value ** 2) + nugget_effect
+lags2 =  X-missing_point
+acf = model(lags2.T)
+
+# d2 = np.sum((X - missing_point)**2, axis=1)
+# nugget_effect = model.nugget.value*np.all(d2 == 0, axis=0)
+# acf = model.sigma.value ** 2 * np.exp(- 0.5*d2 / model.rho.value ** 2) + nugget_effect
 
 
 # TODO: TRY WITH FULL COVMAT AND FULL OBSERVATIONS
