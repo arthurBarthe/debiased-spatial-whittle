@@ -289,7 +289,7 @@ class ExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False):
+    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu=None):
         # TODO: time domain
         lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags**2, axis=0))
