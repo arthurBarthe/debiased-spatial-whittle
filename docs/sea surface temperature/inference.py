@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
@@ -16,15 +16,14 @@ from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 
 
 fftn = np.fft.fftn
+fftfreq = np.fft.fftfreq
+fftshift = np.fft.fftshift
 
 # np.random.seed(1252147)
 
 n = (75, 75)
 grid = RectangularGrid(n)
-model = ExponentialModel()
-
-sampler = SamplerOnRectangularGrid(model, grid)
-# z = sampler()
+model = MaternModel()
 z = np.loadtxt('sst_data.txt')
 
 fig = plt.figure()
@@ -33,26 +32,26 @@ ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
 
+params = np.log([10,1])
 
-dw = DeWhittle(z, grid, ExponentialModel(), nugget=1e-10)
-dw.fit(None, prior=False)
+model.nu = 0.733
+
+dw = DeWhittle(z, grid, model, nugget=1e-10)
+dw.fit(params, prior=False, approx_grad=True)
+niter=1000
+dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
+
 # stop
-niter=5000
 
-# TODO: cannot simulate z based on these params!
-
-dewhittle_post, A = dw.RW_MH(niter)
-MLEs = dw.estimate_standard_errors_MLE(dw.res.x, monte_carlo=True, niter=2000)
+MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=500, approx_grad=True)
 dw.prepare_curvature_adjustment()
-adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
+adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
 
 title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle']
 plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
-
-# dw2 = DeWhittle(np.ones((150,150)), RectangularGrid((150,150)), ExponentialModel(), nugget=np.exp(dw.res.x[-1]))
 
 sim_z = dw.sim_z(np.exp(dw.res.x))
 
@@ -75,8 +74,39 @@ for i in range(2):
 fig.tight_layout()
 plt.show()
 
+model = MaternModel()
+model.nu = 0.733
+N = (500,500)
+dw_ = DeWhittle(z,RectangularGrid(N), model=model, nugget=1e-10)
 
 
+q05, q95 = np.quantile(adj_dewhittle_post, q=[0.05,0.95], axis=0)
+post_mean = np.mean(adj_dewhittle_post, axis=0)
+
+f_q05 = fftshift(dw_.expected_periodogram(np.exp(q05)))
+f_q95 = fftshift(dw_.expected_periodogram(np.exp(q95)))
+f_mean = fftshift(dw_.expected_periodogram(np.exp(post_mean)))
+
+freq_grid = np.meshgrid(*(fftshift(2*np.pi*fftfreq(_n)) for _n in N), indexing='ij')         # / (delta*n1)?
+omegas_grid = np.sqrt(sum(grid**2 for grid in freq_grid))
+omegas = np.diag(omegas_grid)[:N[0]//2]
+fig = plt.figure(figsize=(10,7))
+plt.plot(omegas, np.diag(f_q05)[:N[0]//2], '--', c='#1f77b4')
+plt.plot(omegas, np.diag(f_mean)[:N[0]//2], c= '#1f77b4')
+plt.plot(omegas, np.diag(f_q95)[:N[0]//2], '--', c= '#1f77b4')
+plt.fill_between(omegas, np.diag(f_q05)[:N[0]//2], np.diag(f_q95)[:N[0]//2], color='#1f77b4', alpha=0.25)
+# plt.xlim([-0.1,1.])
+plt.show()
+
+from debiased_spatial_whittle.diagnostics import DiagnosticTest
+test = DiagnosticTest(dw.I, dw.expected_periodogram(np.exp(post_mean)))
+test()
+
+fig, ax = plt.subplots(figsize=(15,7))
+im = plt.imshow(fftshift(test.residuals), cmap='Spectral', origin='lower', extent=[-np.pi,np.pi]*2)
+plt.title('residuals', fontsize=22)
+plt.colorbar(im, ax=ax, pad=0.01)
+plt.show()
 
 
 # whittle = Whittle(z, grid, SquaredExponentialModel())

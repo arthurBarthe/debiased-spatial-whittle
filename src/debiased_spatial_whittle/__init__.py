@@ -5,3 +5,4 @@ from .cov_funcs import exp_cov, sq_exp_cov, matern15_cov_func, exp_cov_anisotrop
 from .periodogram import compute_ep
 from .simulation import sim_circ_embedding
 
+from .diagnostics import DiagnosticTest

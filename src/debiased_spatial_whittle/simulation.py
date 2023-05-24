@@ -8,7 +8,6 @@ from typing import List
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
 
-
 def prod_list(l: List[int]):
     l = list(l)
     if l == []:
@@ -56,19 +55,25 @@ class SamplerOnRectangularGrid:
     def __init__(self, model: CovarianceModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
+        self.sampling_grid = grid
         self._f = None
+        try:
+            self.f
+
+        except:
+            print('up-sampling')
+            n = tuple(2*n for n in self.grid.n)
+            self.sampling_grid = RectangularGrid(n)    # may cause bugs?
 
     @property
     def f(self):
         if self._f is None:
-            cov = self.grid.autocov(self.model)
-            f = prod_list(self.grid.n) * ifftn(cov)
+            cov = self.sampling_grid.autocov(self.model)
+            f = prod_list(self.sampling_grid.n) * ifftn(cov)
             min_ = np.min(f)
             if min_ <= -1e-5:
-                # TODO: better warnings/error handling
-                # warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-                # sys.exit(0)
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
+                
             self._f = np.maximum(f, 0)
         return self._f
 
@@ -77,22 +82,12 @@ class SamplerOnRectangularGrid:
         f = self.f
         e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
         z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(prod_list(self.grid.n)) * np.real(fftn(z))
+        z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z))
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
+        # print(z_inv.shape)
         z_inv = np.reshape(z_inv, self.grid.n)
         z = z_inv * self.grid.mask
-        return z
-    
-    def sample_t_randomfield(self, nu:Union[int, None]=None):
-        z = self()
-        if nu is None or nu == np.inf:
-            chi = np.ones(1)
-        else:
-            chi = np.random.chisquare(nu)/nu
-            # chi = np.random.chisquare(nu, self.grid.n)/nu    # this is a different model
-        
-        z /= np.sqrt(chi)
         return z
 
 
@@ -107,7 +102,8 @@ class TSamplerOnRectangularGrid:
 
     def __call__(self):
         nu = self.model.nu_1.value
-        chi = np.random.chisquare(nu, self.grid.n) / nu
+        chi = np.random.chisquare(nu) / nu
+        # chi = np.random.chisquare(nu, self.grid.n) / nu  # this is a different model
         z = self.gaussian_sampler()
         return z / np.sqrt(chi)
 
@@ -218,3 +214,53 @@ def test_simulation_1d():
     plt.plot(z2, '*')
     plt.show()
     assert True
+
+
+def test_upsampling():
+    from numpy.random import seed
+    import matplotlib.pyplot as plt
+    from debiased_spatial_whittle.grids import RectangularGrid
+    from debiased_spatial_whittle.models import ExponentialModel
+    from debiased_spatial_whittle.plotting_funcs import plot_marginals
+    from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
+
+    model = ExponentialModel()
+    model.rho = 40
+    model.sigma = 1
+    model.nugget=0.1
+    grid = RectangularGrid((128,128))
+    sampler = SamplerOnRectangularGrid(model, grid)
+    z = sampler()
+    plt.figure()
+    plt.imshow(z, cmap='Spectral')
+    plt.show()
+    
+    params = np.log([40,1])
+    
+    dw = DeWhittle(z, grid, ExponentialModel(), nugget=0.1)
+    dw.fit(None, prior=False)
+    # stop
+    MLEs = dw.sim_MLEs(params, niter=500)
+    plot_marginals([MLEs], params)
+    
+def t_rf_test():
+    from debiased_spatial_whittle.models import ExponentialModel
+    from debiased_spatial_whittle.bayes import DeWhittle
+    from debiased_spatial_whittle.plotting_funcs import plot_marginals
+    np.random.seed(18979125)
+    n=(64,64)
+    grid = RectangularGrid(n)
+    t_model = TMultivariateModel(ExponentialModel())
+    t_model.nu_1 = 5.
+    print(t_model)
+    params = np.log([10.,1.])
+    dw = DeWhittle(np.ones(n), grid, t_model, nugget=0.1)
+    MLEs_t = dw.sim_MLEs(np.exp(params), niter=1000)
+
+    model = ExponentialModel()
+    dw_gauss = DeWhittle(np.ones(n), grid, model, nugget=0.1)
+    MLEs_g = dw_gauss.sim_MLEs(np.exp(params), niter=1000)
+    
+    plot_marginals([MLEs_t, MLEs_g], params, density_labels=['t', 'gauss'])
+   
+        

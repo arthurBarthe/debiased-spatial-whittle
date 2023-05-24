@@ -23,7 +23,7 @@ def autocov(cov_func, shape):
     return ifftshift(cov_func(xs))
 
 
-def compute_ep(cov_func, grid, fold=True):
+def compute_ep(acf: ndarray, spatial_kernel: ndarray, grid: ndarray, fold:bool=True) -> ndarray:
     """Computes the expected periodogram, for the passed covariance function and grid. The grid is an array, in
     the simplest case just an array of ones
     :param cov_func: covariance function
@@ -32,29 +32,37 @@ def compute_ep(cov_func, grid, fold=True):
     frequency grid with twice higher resolution
     :return: """
     shape = grid.shape
+    n1,n2 = grid.shape
     n_dim = grid.ndim
-    # In the case of a complete grid, cg takes a closed form.
-    cg = spatial_kernel(grid)
-    acv = autocov(cov_func, shape)
-    cbar = cg * acv
+    # In the case of a complete grid, spatial_kernel takes a closed form.
+    cbar = spatial_kernel * acf
+
     # now we need to "fold"
     if fold:
-        result = np.zeros_like(grid)
-        result = np.zeros_like(grid, dtype=np.complex128)
+        # TODO: make this autograd compatible for any d with any n's
+        result = np.zeros(shape, dtype=np.complex128)
+
         if n_dim == 1:
             for i in range(2):
-                result[i:] += cbar[i * shape[0]: (i + 1) * shape[0]]
+                res = cbar[i*shape[0]: (i+1)*shape[0]]
+                result += np.pad(res, (i,0), mode='constant')
+
         elif n_dim == 2:
             for i in range(2):
                 for j in range(2):
-                    result[i:, j:] += cbar[i * shape[0]: (i + 1) * shape[0], j * shape[1]: (j + 1) * shape[1]]
+                    res = cbar[i*shape[0]: (i+1)*shape[0], 
+                               j*shape[1]: (j+1)*shape[1]]
+                    result += np.pad(res, ((i,0), (j,0)), mode='constant')   # autograd solution
+
         elif n_dim == 3:
             for i in range(2):
                 for j in range(2):
                     for k in range(2):
-                        result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-                                              j * shape[1]: (j + 1) * shape[1],
-                                              k * shape[2]: (k + 1) * shape[2]]
+                        res = cbar[i*shape[0]: (i+1)*shape[0],
+                                   j*shape[1]: (j+1)*shape[1],
+                                   k*shape[2]: (k+1)*shape[2]]    
+                        result += np.pad(res, ((i,0), (j,0), (k,0)), mode='constant')
+
     else:
         m, n = shape
         result = np.zeros((2 * m, 2 * n))
@@ -62,7 +70,7 @@ def compute_ep(cov_func, grid, fold=True):
         result[m+1:, :n] = cbar[m:, :n]
         result[m+1:, n+1:] = cbar[m:, n:]
         result[:m, n+1:] = cbar[:m, n:]
-    # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
+    # We take the real part of the fft only due to numerical precision, in theory this should be real
     result = np.real(fftn(result))
     return result
 
