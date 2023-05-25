@@ -185,7 +185,8 @@ class Likelihood(ABC):
             setattr(self, 'res', res)
         
             if approx_grad:
-                self.propcov = self.res.hess_inv.todense()
+                hess = Hessian(self.logpost)(self.res.x)
+                self.propcov = -np.linalg.inv(hess)
             else:    
                 try:
                     self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
@@ -197,7 +198,7 @@ class Likelihood(ABC):
                 except np.linalg.LinAlgError:
                     print('Singular propcov')
                     self.propcov = False
-                    
+                        
         return res
     
     
@@ -265,7 +266,6 @@ class Likelihood(ABC):
         if not np.all(np.isfinite(self.adj_propcov)):       # use numerical diff
             hess = Hessian(self.adj_logpost)(self.res.x)
             self.adj_propcov = -np.linalg.inv(hess)
-        
         return
     
     @abstractmethod
