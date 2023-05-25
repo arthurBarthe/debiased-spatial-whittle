@@ -13,13 +13,13 @@ from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 # from debiased_spatial_whittle.bayes_old import DeWhittle2
-
-
 ndarray = np.ndarray
+
+
 
 class SimpleKriging:
     '''Interpolation via simple Kriging'''    
-    
+    # TODO: approximate for larger grids
     def __init__(self, z: np.ndarray, grid: RectangularGrid, model: CovarianceModel):
         
         self.z = z    # TODO: change to property
@@ -107,55 +107,55 @@ class SimpleKriging:
             
 
 
-# TODO: make test
+def interpolation_test():
+    np.random.seed(1252149)
+    n = (64, 64)
+    mask = np.ones(n)
+    
+    n_missing = 10
+    missing_idxs = np.random.randint(n[0], size=(n_missing,2))
+    mask[tuple(missing_idxs.T)] = 0.
+    m = mask.astype(bool)
+    
+    plt.imshow(mask, cmap='Greys', origin='lower')
+    plt.show()
+    
+    grid = RectangularGrid(n)
+    model = SquaredExponentialModel()
+    model.rho    = 10
+    model.sigma  = 1
+    model.nugget = 1e-5
+    sampler = SamplerOnRectangularGrid(model, grid)
+    z_ = sampler()
+    z = z_ * mask
+    
+    params = np.log([10.,1.])
+    
+    grid = RectangularGrid(n, mask=m)
+    dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=1e-5)
+    dw.fit(None, prior=False)
+    
+    interp = SimpleKriging(z, RectangularGrid(n, mask=m), model)
+    pred_means, pred_vars = interp(interp.missing_xs, params=np.exp(dw.res.x))
+    
+    print(z_[~m].round(3), pred_means.round(3), sep='\n')
+    z[~m] = pred_means
+    
+    fig, ax = plt.subplots(1,2, figsize=(20,15))
+    ax[0].set_title('original', fontsize=22)
+    im1 = ax[0].imshow(z_, cmap='Spectral', origin='lower')
+    fig.colorbar(im1, shrink=.5, ax=ax[0])
+    
+    ax[1].set_title('interpolated', fontsize=22)
+    im2 = ax[1].imshow(z, cmap='Spectral', origin='lower')
+    fig.colorbar(im2, shrink=.5, ax=ax[1])
+    fig.tight_layout()
+    plt.show()
+    # stop
+    
+    dewhittle_post, A = dw.RW_MH(200)  # unadjusted
+    preds = interp.bayesian_prediction(interp.missing_xs, dewhittle_post)
+    plot_marginals(preds.T, shape=(2,5), truths=z_[~m], title='posterior predictive densities')
 
-np.random.seed(1252147)
 
-n = (64, 64)
-
-mask = np.ones(n)
-
-n_missing = 10
-missing_idxs = np.random.randint(n[0], size=(n_missing,2))
-mask[tuple(missing_idxs.T)] = 0.
-m = mask.astype(bool)
-
-plt.imshow(mask, cmap='Greys', origin='lower')
-plt.show()
-
-grid = RectangularGrid(n)
-
-model = SquaredExponentialModel()
-model.rho    = 10
-model.sigma  = 1
-model.nugget = 1e-5
-sampler = SamplerOnRectangularGrid(model, grid)
-z_ = sampler()
-z = z_ * mask
-
-params = np.log([10.,1.])
-
-grid = RectangularGrid(n, mask=m)
-dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
-dw.fit(None, prior=False)
-
-interp = SimpleKriging(z, RectangularGrid(n, mask=m), model)
-pred_means, pred_vars = interp(interp.missing_xs, params=np.exp(dw.res.x))
-
-print(z_[~m].round(3), pred_means.round(3), sep='\n')
-
-z[~m] = pred_means
-
-fig, ax = plt.subplots(1,2, figsize=(20,15))
-ax[0].set_title('original', fontsize=22)
-im1 = ax[0].imshow(z_, cmap='Spectral', origin='lower')
-fig.colorbar(im1, shrink=.5, ax=ax[0])
-
-ax[1].set_title('interpolated', fontsize=22)
-im2 = ax[1].imshow(z, cmap='Spectral', origin='lower')
-fig.colorbar(im2, shrink=.5, ax=ax[1])
-fig.tight_layout()
-
-dewhittle_post, A = dw.RW_MH(200)  # unadjusted
-preds = interp.bayesian_prediction(interp.missing_xs, dewhittle_post)
-plot_marginals(preds.T, shape=(2,5), truths=z_[~m], title='posterior predictive densities')
+interpolation_test()
