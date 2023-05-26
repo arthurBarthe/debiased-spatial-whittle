@@ -3,6 +3,7 @@ from autograd import grad
 from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
 from scipy.linalg import inv
+from functools import cached_property
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import CovarianceModel, ExponentialModel, SquaredExponentialModel, MaternModel
@@ -26,16 +27,16 @@ class SimpleKriging:
         grid.mask = grid.mask.astype(bool)
         self.grid = grid
         self.model = model
-
-        self.xs = np.argwhere(self.grid.mask)
-        self.missing_xs = np.argwhere(~self.grid.mask)
         
-        self._lags_wo_missing = self.lags_without_missing()
-        
-    @property
-    def lags_wo_missing(self):
-        return self._lags_wo_missing 
-        
+    @cached_property
+    def xs(self):
+        return np.argwhere(self.grid.mask)
+    
+    @cached_property
+    def missing_xs(self):
+        return np.argwhere(~self.grid.mask)
+    
+    @cached_property
     def lags_without_missing(self):
         grid_vec = np.argwhere(self.grid.mask)[None].T
         lags = grid_vec - np.transpose(grid_vec, axes=(0,2,1))   # still general for n-dimensions
@@ -50,7 +51,7 @@ class SimpleKriging:
     def compute_inv_covmat(self, params: ndarray):
         self.update_model_params(params)
         
-        covMat = self.model(self.lags_wo_missing)   # Sigma_22
+        covMat = self.model(self.lags_without_missing)   # Sigma_22
         covMat_inv = np.linalg.inv(covMat)          # TODO: bring outside function with update params
         return covMat_inv
     

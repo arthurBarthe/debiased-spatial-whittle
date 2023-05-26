@@ -289,22 +289,11 @@ class ExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
-        # TODO: time domain
-        
-        
-        if time_domain:
-            d = np.sqrt(lags)         # this is the full covariance matrix
-            nugget_effect = self.nugget.value*np.eye(len(lags))
-        else:
-            lags = np.stack(lags, axis=0)
-            d = np.sqrt(np.sum(lags**2, axis=0))
-            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+    def __call__(self, lags: np.ndarray):
+        d = np.sqrt(sum((lag**2 for lag in lags)))
+        nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
         
         acf = self.sigma.value**2 * np.exp(- d / self.rho.value) + nugget_effect
-    
-        if nu is not None:
-            acf *= nu/(nu-2)    # t-density covariance
         return acf
 
     def _gradient(self, lags: np.ndarray):
@@ -360,17 +349,13 @@ class MaternModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nu, nugget])
         super(MaternModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:int|None=None):
+    def __call__(self, lags: np.ndarray):
         
         rho, sigma, v = self.rho.value, self.sigma.value, self.nu.value
         
-        if time_domain:
-            d = np.sqrt(lags)         # this is the full covariance matrix
-            nugget_effect = self.nugget.value*np.eye(len(lags))
-        else:
-            d = np.sqrt(sum((lag**2 for lag in lags)))
-            mask = (d==0)
-            nugget_effect = (sigma**2 + self.nugget.value)
+        d = np.sqrt(sum((lag**2 for lag in lags)))
+        mask = (d==0)
+        nugget_effect = (sigma**2 + self.nugget.value)
         
         # TODO: add specific cases for nu=1/2, 3/2, 5/2, inf
         const = 2 ** (1 - v) / gamma(v)
@@ -379,8 +364,6 @@ class MaternModel(CovarianceModel):
         term3 = kv_(v, args + mask)          # TODO: bad solution
         acf = sigma**2 * const * term2 * term3
         acf += (nugget_effect-acf)*mask
-        if nu is not None:
-            acf *= nu/(nu-2)    # TODO: name collision with t-acf
         return acf
     
     def f(self, freq_grid:list|np.ndarray, infsum_grid:list|np.ndarray, d:int=2):
@@ -416,19 +399,12 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
 
-    def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:Union[int, None]=None):
+    def __call__(self, lags: np.ndarray):
         
-        if time_domain:
-            d2 = lags         # this is the full covariance matrix
-            nugget_effect = self.nugget.value*np.eye(len(lags))
-        else:
-            d2 = sum((lag**2 for lag in lags))
-            nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
+        d2 = sum((lag**2 for lag in lags))
+        nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
             
         acf = self.sigma.value ** 2 * np.exp(- 0.5*d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
-        
-        if nu is not None:
-            acf *= nu/(nu-2)    # t-density covariance
         return acf
     
     def f(self, freq_grid:Union[list, np.ndarray], infsum_grid:Union[list, np.ndarray], d:int=2):

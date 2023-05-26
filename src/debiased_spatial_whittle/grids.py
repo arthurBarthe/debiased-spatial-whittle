@@ -1,6 +1,7 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
 
+from functools import cached_property
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple
@@ -153,14 +154,14 @@ class RectangularGrid:
             p *= ni
         return p
 
-    @property
+    @cached_property
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
         lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags)
 
-    @property
+    @cached_property
     def lag_matrix(self):
         """
         Matrix of lags between the points of the grids ordered according to their coordinates.
