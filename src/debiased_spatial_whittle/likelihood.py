@@ -119,13 +119,52 @@ class DebiasedWhittle:
     def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
+        self.frequency_mask = None
+
+    @property
+    def frequency_mask(self):
+        if self._frequency_mask is None:
+            return 1
+        else:
+            return self._frequency_mask
+
+    @frequency_mask.setter
+    def frequency_mask(self, value: np.ndarray):
+        """
+        Define a mask in the spectral domain to fit only certain frequencies
+
+        Parameters
+        ----------
+        value
+            mask of zeros and ones
+        """
+        if value is not None:
+            assert value.shape == self.expected_periodogram.grid.n, "shape mismatch between mask and grid"
+        self._frequency_mask = value
+
+    def whittle(self, p: np.ndarray, ep: np.ndarray):
+        """
+        Compute the Whittle distance between a periodogram p and a spectral density function ep
+
+        Parameters
+        ----------
+        p
+            periodogram of the data
+        ep
+            spectral density
+        Returns
+        -------
+
+        """
+        n_points = self.expected_periodogram.grid.n_points
+        return 1 / n_points * np.sum((np.log(ep) + p / ep) * self.frequency_mask)
 
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
         p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
-        whittle = 1 / z.shape[0] / z.shape[1] * np.sum(np.log(ep) + p / ep)
+        whittle = self.whittle(p, ep)
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)

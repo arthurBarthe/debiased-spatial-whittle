@@ -177,10 +177,10 @@ class ExpectedPeriodogram:
             The expected periodogram on the grid of Fourier frequencies
         """
         acv = self.grid.autocov(model)
-        return self.compute_ep_old(acv, self.periodogram.fold)
+        return self.compute_ep(acv, self.periodogram.fold)
     
     
-    def compute_ep_old(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
+    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
         """
         Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
         Fourier Transform identitied by the two-dimensional offset d. The standard expected periodogram corresponds to
@@ -276,7 +276,7 @@ class ExpectedPeriodogram:
         d_ep = []
         for p_name in params.names:
             aux = ifftshift(d_acv[p_name])
-            d_ep.append(self.compute_ep_old(aux, self.periodogram.fold))
+            d_ep.append(self.compute_ep(aux, self.periodogram.fold))
         return np.stack(d_ep, axis=-1)
 
     def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
@@ -300,7 +300,7 @@ class ExpectedPeriodogram:
         m1, m2 = m
         n1, n2 = self.grid.n
         acv = self.grid.autocov(model)
-        ep = self.compute_ep_old(acv, d=m)
+        ep = self.compute_ep(acv, d=m)
         return ep[max(0, m1): n1 + m1, max(0, m2): m2 + n2]
 
     def cov_dft_matrix(self, model: CovarianceModel):
@@ -377,7 +377,7 @@ class ExpectedPeriodogram:
         m1, m2 = m
         n1, n2 = self.grid.n
         acv = self.grid.autocov(model)
-        ep = self.compute_ep_old(acv, d=m)
+        ep = self.compute_ep(acv, d=m)
         return ep[max(m1 - n1 + 1, 0): m1 + 1, max(m2 - n2 + 1, 0): m2 + 1]
 
     def cov_antidiagonals(self, model: CovarianceModel, m: Tuple[int, int]):
@@ -423,7 +423,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         d_ep2 = 2 * np.real(fft(gradient_seq2, axis=0)).reshape((1, -1)) - gradient_seq2[0, :]
         return d_ep1 * d_ep2
 
-    def compute_ep_old(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)) \
+    def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)) \
             -> np.ndarray:
         """
         Computes the expected periodogram for the passed finite autocovariance function, in the case where...

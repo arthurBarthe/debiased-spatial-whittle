@@ -247,14 +247,14 @@ class Gaussian(Likelihood):
             z = self.z
         
         N = self.n_points
-        covMat = self.cov_func(params, lags=self.norm2)
+        covMat = self.cov_func(params, lags=self.grid.lag_matrix)
    
         L  = npl.cholesky(covMat)
         S1 = spl.solve_triangular(L,   z.flatten(),  lower=True)
         S2 = spl.solve_triangular(L.T, S1, lower=False)
        
         ll = -np.sum(np.log(np.diag(L)))         \
-              -0.5*np.dot(z.flatten(),S2)        \
+              -0.5* np.dot(z.flatten(),S2)        \
               -0.5*N*np.log(2*np.pi)
         return ll
         
@@ -275,7 +275,7 @@ class Gaussian(Likelihood):
             lags = self.norm2
 
         self.update_model_params(params)
-        return self.model(lags, time_domain=True)
+        return self.model(lags)
 
     
     def logprior(self, x: ndarray):

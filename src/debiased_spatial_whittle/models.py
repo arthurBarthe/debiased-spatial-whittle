@@ -335,6 +335,7 @@ class ExponentialModelUniDirectional(CovarianceModel):
         return np.stack((d_rho, d_sigma), axis=-1)
 
 import scipy
+from scipy.special import kv
 from autograd.scipy.special import gamma, iv
 from autograd.extend import primitive, defvjp, defjvp
 # kv = primitive(scipy.special.kv)
@@ -416,7 +417,7 @@ class SquaredExponentialModel(CovarianceModel):
         self.nugget = 0.
 
     def __call__(self, lags: np.ndarray, time_domain:bool=False, nu:Union[int, None]=None):
-        
+        lags = np.stack(lags, axis=0)
         if time_domain:
             d2 = lags         # this is the full covariance matrix
             nugget_effect = self.nugget.value*np.eye(len(lags))
@@ -506,36 +507,11 @@ class ChiSquaredModel(CovarianceModel):
         raise NotImplementedError()
 
 
-class PolynomialModel(CovarianceModel):
-    """
-    Covariance model for a process defined pointwise via a polynomial function
-    applied to a latent Gaussian process.
-    Currently limited to order 2.
-    """
-
-    def __init__(self, latent_model: CovarianceModel):
-        self.latent_model = latent_model
-        a = Parameter('a', (-1, 1))
-        b = Parameter('b', (-1, 1))
-        pol_parameters = Parameters([a, b])
-        super(PolynomialModel, self).__init__(ParametersUnion([self.latent_model.params, pol_parameters]))
-
-    def __call__(self, lags: np.ndarray):
-        a = self.a_1.value
-        b = self.b_1.value
-        term1 = 2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2
-        term2 = self.latent_model(lags)
-        return a**2 * term1 + b**2 * term2
-
-    def _gradient(self, x: np.ndarray):
-        raise NotImplementedError()
-
-
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        nu = Parameter('nu', (0.5, 100))
+        nu = Parameter('nu', (0.01, 100))
         parameters = Parameters([sigma, nu, rho])
         super(MaternCovarianceModel, self).__init__(parameters)
 
@@ -548,10 +524,24 @@ class MaternCovarianceModel(CovarianceModel):
             return (1.0 + K) * np.exp(-K) * sigma**2
         term1 = 2 ** (1 - nu) / gamma(nu)
         term2 = (np.sqrt(2 * nu) * d / rho) ** nu
-        term3 = kv_(nu, np.sqrt(2 * nu) * d / rho)
+        # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
+        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
+
+    def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        freq_grid = np.stack(freq_grid, axis=0)
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        pi = np.pi
+        s = np.sqrt(np.sum(np.power(freq_grid, 2), axis=0)) / (2 * pi)
+        if nu != np.inf:
+            sdf = sigma ** 2 / (4 * pi ** 2) * 4 * pi * gamma(nu + 1) * \
+                  (2 * nu) ** nu / (gamma(nu) * rho ** (2 * nu)) * \
+                  (2 * nu / rho ** 2 + 4 * pi ** 2 * s ** 2) ** (-(nu + 1))
+        else:
+            sdf = 1/(4 * pi ** 2)* sigma ** 2 * 2 * pi * rho ** 2 * np.exp(-2 * pi ** 2 * rho ** 2 * s ** 2)
+        return sdf
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()

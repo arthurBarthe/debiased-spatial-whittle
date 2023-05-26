@@ -34,8 +34,7 @@ def sim_circ_embedding(cov_func, shape):
 
 ####NEW OOP VERSION
 from typing import Tuple
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, \
-    PolynomialModel, ChiSquaredModel
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, ChiSquaredModel
 from debiased_spatial_whittle.grids import RectangularGrid
 
 
@@ -137,23 +136,6 @@ class ChiSquaredSamplerOnRectangularGrid:
             zs.append(self.latent_sampler())
         zs = np.stack(zs, axis=0)
         return np.sum(zs**2, axis=0)
-
-
-class PolynomialSamplerOnRectangularGrid:
-    """
-    Class for the sampling of a SquaredModel
-    """
-    def __init__(self, model: PolynomialModel, grid: RectangularGrid):
-        self.model = model
-        self.grid = grid
-        self.latent_sampler = SamplerOnRectangularGrid(self.model.latent_model, grid)
-
-    def __call__(self):
-        z = self.latent_sampler()
-        a = self.model.a_1.value
-        b = self.model.b_1.value
-        return a * z**2 + b * z
-    
 
 
 class SamplerSeparable:

@@ -79,7 +79,7 @@ class Likelihood(ABC):
     
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
-        free_params = self.model.params        
+        free_params = self.model.free_params
         updates = dict(zip(free_params.names, params))
         free_params.update_values(updates)
         return

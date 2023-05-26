@@ -3,6 +3,7 @@ np = BackendManager.get_backend()
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from functools import cached_property
 from typing import Tuple
 import matplotlib.pyplot as plt
 
@@ -104,12 +105,9 @@ class ImgGrid(Grid):
 
 
 ###NEW OOP VERSION
-from .models import CovarianceModel, SeparableModel
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
 from numpy.fft import ifftshift
 from typing import List, Tuple
-
-
-# TODO add non-orthogonal grids and lattices
 
 
 class RectangularGrid:
@@ -147,7 +145,7 @@ class RectangularGrid:
 
     @property
     def n_points(self):
-        """Total number of points, irrespective of the mask"""
+        """Total number of points of the grid, irrespective of the mask"""
         p = 1
         for ni in self.n:
             p *= ni
@@ -160,7 +158,7 @@ class RectangularGrid:
         lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags)
 
-    @property
+    @cached_property
     def lag_matrix(self):
         """
         Matrix of lags between the points of the grids ordered according to their coordinates.
