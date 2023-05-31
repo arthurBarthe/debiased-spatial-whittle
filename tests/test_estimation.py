@@ -124,11 +124,11 @@ def test_optim_with_gradient_shared_param():
     :return:
     """
     rho_0 = 8
-    m1 = ExponentialModelUniDirectional(axis=0)
+    m1 = ExponentialModel()
     m1.sigma = 1
-    m2 = ExponentialModelUniDirectional(axis=1)
+    m2 = ExponentialModel()
     m2.sigma = 2
-    model = SeparableModel((m1, m2))
+    model = SeparableModel((m1, m2), dims=[(0, ), (1, )])
     model.merge_parameters(('rho_0', 'rho_1'))
     m1.rho = rho_0
     # simulation
