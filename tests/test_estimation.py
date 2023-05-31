@@ -41,13 +41,13 @@ def test_separable_expcov():
     :return:
     """
     rho_0 = 8
-    m1 = ExponentialModelUniDirectional(axis=0)
+    m1 = ExponentialModel()
     m1.rho = rho_0
     m1.sigma = 1
-    m2 = ExponentialModelUniDirectional(axis=1)
+    m2 = ExponentialModel()
     m2.rho = 32
     m2.sigma = 2
-    model = SeparableModel((m1, m2))
+    model = SeparableModel((m1, m2), dims=[(0, ), (1, )])
     # simulation
     g = RectangularGrid((128, 128))
     sampler = SamplerOnRectangularGrid(model, g)
@@ -64,7 +64,6 @@ def test_separable_expcov():
     e(model_est, z)
     rho_0_est = m1.rho.value
     rho_1_est = m2.rho.value
-    print(rho_0_est, rho_1_est)
     assert np.abs(rho_0_est - rho_0) < 2
 
 
