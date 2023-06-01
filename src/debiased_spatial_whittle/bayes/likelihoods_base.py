@@ -1,3 +1,5 @@
+from typing import Optional
+
 from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
@@ -16,6 +18,8 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSampl
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
 
+from typing import Union
+
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
@@ -23,7 +27,7 @@ ifftshift = np.fft.ifftshift
 
 class Likelihood(ABC):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: None|float=0.1, use_taper:None|ndarray=None):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: Optional[float] =0.1, use_taper: Union[None, ndarray]=None):
         
         self._z = z
         self.grid = grid
@@ -75,7 +79,7 @@ class Likelihood(ABC):
     
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
-        free_params = self.model.params        
+        free_params = self.model.free_params
         updates = dict(zip(free_params.names, params))
         free_params.update_values(updates)
         return
@@ -93,7 +97,7 @@ class Likelihood(ABC):
         pass
     
     @abstractmethod
-    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...]=None, **cov_args) -> list[ndarray, ...]:
+    def cov_func(self, params: ndarray, lags: Optional[list[ndarray, ...]] =None, **cov_args) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
         
         # TODO: only for dewhittle and whittle
@@ -105,7 +109,7 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def mymethod(self,x:int|ndarray):
+    def mymethod(self,x:Union[int, ndarray]):
         self.abc = x
         return x+5
     
@@ -132,10 +136,10 @@ class Likelihood(ABC):
 
     
     @abstractmethod
-    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
-                                                       niter:int = 100, approx_grad:bool=False,
-                                                       print_res:bool = True, save_res:bool=True,
-                                                       loglik_kwargs:None|dict=None, **optargs):
+    def fit(self, x0: Union[None, ndarray], prior:bool = True, basin_hopping:bool = False,
+            niter:int = 100, approx_grad:bool=False,
+            print_res:bool = True, save_res:bool=True,
+            loglik_kwargs: Optional[dict] =None, **optargs):
         '''
         optimize the log-likelihood function given the data
         includes optional global optimizer
@@ -203,7 +207,7 @@ class Likelihood(ABC):
     
     
     @abstractmethod
-    def sim_z(self, params:None|ndarray=None):
+    def sim_z(self, params: Union[None, ndarray]=None):
         if params is None:
             params = np.exp(self.res.x)
             

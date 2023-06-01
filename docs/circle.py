@@ -17,5 +17,5 @@ plt.figure()
 plt.imshow(z, cmap='Spectral')
 plt.show()
 
-est = fit(z, circle, sq_exp_cov, [1., ], fold=True)
+est = fit(z, circle, sq_exp_cov, [1., ], fold=False)
 print(est)

@@ -7,7 +7,7 @@ import numpy as np
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
-from .periodogram import compute_ep
+from .periodogram import compute_ep_old
 from .confidence import CovarianceFFT, McmcDiags
 from scipy.linalg import inv
 
@@ -72,8 +72,8 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 
     if cov_func_prime is not None:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
-            e_per_prime = compute_ep(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per_prime = compute_ep_old(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
             return whittle(per, e_per), whittle_prime(per, e_per, e_per_prime)
 
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
@@ -83,7 +83,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
                                          callback=opt_callback)
     else:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
             return whittle(per, e_per)
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
                                          init_guess,
@@ -119,18 +119,78 @@ class DebiasedWhittle:
     def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
+        self.frequency_mask = None
+
+    @property
+    def frequency_mask(self):
+        if self._frequency_mask is None:
+            return 1
+        else:
+            return self._frequency_mask
+
+    @frequency_mask.setter
+    def frequency_mask(self, value: np.ndarray):
+        """
+        Define a mask in the spectral domain to fit only certain frequencies
+
+        Parameters
+        ----------
+        value
+            mask of zeros and ones
+        """
+        if value is not None:
+            assert value.shape == self.expected_periodogram.grid.n, "shape mismatch between mask and grid"
+        self._frequency_mask = value
+
+    def whittle(self, p: np.ndarray, ep: np.ndarray):
+        """
+        Compute the Whittle distance between a periodogram p and a spectral density function ep
+
+        Parameters
+        ----------
+        p
+            periodogram of the data
+        ep
+            spectral density
+        Returns
+        -------
+
+        """
+        n_points = self.expected_periodogram.grid.n_points
+        return 1 / n_points * np.sum((np.log(ep) + p / ep) * self.frequency_mask)
 
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
         p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
-        whittle = 1 / z.shape[0] / z.shape[1] * np.sum(np.log(ep) + p / ep)
+        whittle = self.whittle(p, ep)
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
         return whittle, d_whittle
+
+    def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
+        """
+        Evaluate the expectation of the Debiased Whittle likelihood estimator for a given
+        parameter.
+
+        Parameters
+        ----------
+        true_model
+            Covariance model of the process
+        eval_model
+            Covariance model for which we evaluate the likelihood
+
+        Returns
+        -------
+            Expectation of the Debiased Whittle likelihood under true_model, evaluated at
+            eval_model
+        """
+        ep_true = self.expected_periodogram(true_model)
+        ep_eval = self.expected_periodogram(eval_model)
+        return np.sum(np.log(ep_eval) + ep_true / ep_eval)
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
         """Provides the expectation of the hessian matrix"""

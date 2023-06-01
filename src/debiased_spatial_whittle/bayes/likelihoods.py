@@ -16,6 +16,8 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
 
+from typing import Union, Optional, Dict
+
 import autograd.scipy.linalg as spl
 npl = np.linalg
 fftn = np.fft.fftn
@@ -26,7 +28,7 @@ fftfreq = np.fft.fftfreq
 
 class DeWhittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: None|ndarray=None):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: Union[None, ndarray]=None):
         super().__init__(z, grid, model, nugget, use_taper)
         
         
@@ -35,7 +37,7 @@ class DeWhittle(Likelihood):
         return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
 
         
-    def __call__(self, params: ndarray, z:None|ndarray=None, const:str='whittle', **cov_args) -> float: 
+    def __call__(self, params: ndarray, z:Optional[ndarray]=None, const:str='whittle', **cov_args) -> float: 
         params = np.exp(params)
         
         if z is None:
@@ -64,7 +66,7 @@ class DeWhittle(Likelihood):
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
     
-    def cov_func(self, params: ndarray, lags:None|list[ndarray, ...]=None, **cov_args) -> ndarray:
+    def cov_func(self, params: ndarray, lags: Optional[list[ndarray, ...]] =None, **cov_args) -> ndarray:
         return super().cov_func(params, lags, **cov_args)
     
     def logprior(self, x: ndarray):
@@ -82,18 +84,18 @@ class DeWhittle(Likelihood):
     def mymethod(self, x):
         super().mymethod(x)
     
-    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
-                                                       niter:int = 100, 
-                                                       print_res:bool = True,
-                                                       save_res:bool = True,
-                                                       loglik_kwargs:None|dict=None,
-                                                       **optargs):
+    def fit(self, x0:Optional[ndarray], prior:bool = True, basin_hopping:bool = False,
+            niter:int = 100,
+            print_res:bool = True,
+            save_res:bool = True,
+            loglik_kwargs: Optional[dict] =None,
+            **optargs):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
                            print_res=print_res, save_res=save_res, 
                            loglik_kwargs=loglik_kwargs, **optargs)
     
-    def sim_z(self, params:None|ndarray=None):
+    def sim_z(self, params:Optional[ndarray]=None):
         return super().sim_z(params)
     
     def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 
@@ -118,7 +120,7 @@ class DeWhittle(Likelihood):
 
 class Whittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:None|ndarray=None, infsum_shape:tuple = (3,3)):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:Optional[ndarray]=None, infsum_shape:tuple = (3,3)):
         super().__init__(z, grid, model, nugget, use_taper)
         self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
         
@@ -155,7 +157,7 @@ class Whittle(Likelihood):
         assert np.all(f>0)
         return f
 
-    def __call__(self, params: ndarray, z:None|ndarray=None, **kwargs) -> float:
+    def __call__(self, params: ndarray, z:Optional[ndarray]=None, **kwargs) -> float:
         '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
         params = np.exp(params)
@@ -173,7 +175,7 @@ class Whittle(Likelihood):
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
     
-    def cov_func(self, params: ndarray, lags: None|ndarray=None, **cov_args) -> ndarray:
+    def cov_func(self, params: ndarray, lags: Optional[ndarray]=None, **cov_args) -> ndarray:
         return super().cov_func(params, lags, **cov_args)
     
     def logprior(self, x: ndarray):
@@ -191,18 +193,18 @@ class Whittle(Likelihood):
     def mymethod(self, x):
         super().mymethod(x)
     
-    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
+    def fit(self, x0: Optional[ndarray], prior:bool = True, basin_hopping:bool = False, 
                                                        niter:int = 100, 
                                                        print_res:bool = True,
                                                        save_res:bool = True,
-                                                       loglik_kwargs:None|dict=None,
+                                                       loglik_kwargs:Optional[Dict]=None,
                                                        **optargs):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
                            print_res=print_res, save_res=save_res, 
                            loglik_kwargs=loglik_kwargs, **optargs)    
 
-    def sim_z(self, params:None|ndarray=None):
+    def sim_z(self, params:Optional[ndarray]=None):
         return super().sim_z(params)
     
     def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 
@@ -236,7 +238,7 @@ class Gaussian(Likelihood):
         
         super().__init__(z, grid, model, nugget=nugget, use_taper=None)
 
-    def __call__(self, params: ndarray, z:None|ndarray=None) -> float:
+    def __call__(self, params: ndarray, z:Optional[ndarray]=None) -> float:
         '''Computes Gaussian likelihood in O(|n|^3) time'''
         params = np.exp(params)
         
@@ -251,8 +253,8 @@ class Gaussian(Likelihood):
         S2 = spl.solve_triangular(L.T, S1, lower=False)
        
         ll = -np.sum(np.log(np.diag(L)))         \
-              -0.5*np.dot(z.flatten(),S2)        \
-              -0.5*N*np.log(2*np.pi) # TODO: wrong constant
+              -0.5* np.dot(z.flatten(),S2)        \
+              -0.5*N*np.log(2*np.pi)
         return ll
         
     @property
@@ -266,7 +268,7 @@ class Gaussian(Likelihood):
     def update_model_params(self, params: ndarray) -> None:
         return super().update_model_params(params)
     
-    def cov_func(self, params: ndarray, lags: None|ndarray=None) -> ndarray:
+    def cov_func(self, params: ndarray, lags: Optional[ndarray]=None) -> ndarray:
         
         self.update_model_params(params)
 
@@ -291,18 +293,18 @@ class Gaussian(Likelihood):
     def mymethod(self, x):
         super().mymethod(x)
     
-    def fit(self, x0: None|ndarray, prior:bool = True, basin_hopping:bool = False, 
+    def fit(self, x0: Optional[ndarray], prior:bool = True, basin_hopping:bool = False, 
                                                        niter:int = 100, 
                                                        print_res:bool = True,
                                                        save_res:bool = True,
-                                                       loglik_kwargs:None|dict=None,
+                                                       loglik_kwargs:Optional[Dict]=None,
                                                        **optargs):
         
         return super().fit(x0=x0, prior=prior, basin_hopping=basin_hopping, niter=niter, 
                            print_res=print_res, save_res=save_res, 
                            loglik_kwargs=loglik_kwargs, **optargs)
      
-    def sim_z(self, params:None|ndarray=None):
+    def sim_z(self, params:Optional[ndarray]=None):
         return super().sim_z(params)
     
     def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 

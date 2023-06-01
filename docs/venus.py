@@ -43,11 +43,11 @@ plt.show()
 from numpy.fft import fftshift
 plt.figure()
 per = periodogram(z)
-plt.imshow(fftshift(10 * np.log10(per) * frequency_mask))
+plt.imshow(10 * np.log10(per) * frequency_mask)
 plt.show()
 
-model = MaternModel()
-model.rho.init_guess=10
+model = MaternCovarianceModel()
+
 model.sigma.init_guess = 1
 model.nu.init_guess = 1
 
