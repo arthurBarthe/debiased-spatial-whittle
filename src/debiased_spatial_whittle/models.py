@@ -367,7 +367,7 @@ class MaternModel(CovarianceModel):
         term3 = kv_(v, args + mask)          # TODO: bad solution
         acf = sigma**2 * const * term2 * term3
         acf += (nugget_effect-acf)*mask
-        return acf
+        return acf #sdfsadffasdf
     
     def f(self, freq_grid:Union[List, np.ndarray], infsum_grid:Union[List, np.ndarray], d:int=2):
         '''aliased spectral density, should match with the acf'''
