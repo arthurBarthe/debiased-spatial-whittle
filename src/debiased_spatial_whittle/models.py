@@ -280,6 +280,7 @@ class SeparableModel(CovarianceModel):
         return 'SeparableModel(\n' + '\n'.join([m.__repr__() for m in self.models]) + '\n)'
 
 
+
 class ExponentialModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
