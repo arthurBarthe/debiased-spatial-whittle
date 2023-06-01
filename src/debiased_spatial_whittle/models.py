@@ -284,7 +284,7 @@ class ExponentialModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        nugget = Parameter('nugget', (1e-6, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
         
         parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
@@ -344,7 +344,7 @@ class MaternModel(CovarianceModel):
         rho = Parameter('rho', (0.01, 1000))
         sigma = Parameter('sigma', (0.01, 1000))
         nu = Parameter('nu', (0.01, 1000))
-        nugget = Parameter('nugget', (1e-6, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
         
         parameters = Parameters([rho, sigma, nu, nugget])
         super(MaternModel, self).__init__(parameters)
@@ -394,7 +394,7 @@ class SquaredExponentialModel(CovarianceModel):
     def __init__(self):
         rho = Parameter('rho', (0.01, 1000))
         sigma = Parameter('sigma', (0.01, 1000))
-        nugget = Parameter('nugget', (1e-6, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
         
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)

@@ -32,7 +32,12 @@ grid = RectangularGrid(n)
 # dw.fit(init_guess, prior=False, approx_grad=True)
 # stop
 
-
+# import matplotlib as mpl
+# bounds = np.quantile(z, np.linspace(0,1,500)) + 0.7
+# # bounds = np.linspace(0,1,500)
+# cm = plt.get_cmap('Spectral')
+# rbga = cm(bounds)
+# cmap = mpl.colors.ListedColormap(rbga, name='myColorMap', N=rbga.shape[0])
 
 model = MaternModel()                # try exponential model
 model.nu = 0.8860611533657291
