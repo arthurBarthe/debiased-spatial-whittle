@@ -10,7 +10,7 @@ keywords = ["random fields", "statistics", "whittle", "spatial", "matern", "krig
 [tool.poetry.dependencies]
 python = ">=3.8, <3.11"
 numpy = "^1.21.5"
-matplotlib = "^3.1.2"
+matplotlib = "^3.7.0"
 scipy = "^1.7.3"
 progressbar2 = "^4.2.0"
 snakeviz = "^2.1.1"
