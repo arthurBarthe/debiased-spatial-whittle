@@ -1,6 +1,7 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
 
+from functools import cached_property
 from abc import ABC, abstractmethod
 from pathlib import Path
 from functools import cached_property
@@ -151,7 +152,7 @@ class RectangularGrid:
             p *= ni
         return p
 
-    @property
+    @cached_property
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
@@ -172,7 +173,7 @@ class RectangularGrid:
         grid = np.meshgrid(*xs, indexing='ij')
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
-        return lags
+        return np.array(lags)
 
     @property
     def spatial_kernel(self):

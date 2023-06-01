@@ -235,8 +235,7 @@ class Gaussian(Likelihood):
         
         if grid.n_points>10000:
             ValueError('Too many observations for Gaussian likelihood')
-            
-        self.norm2 = np.sum((lags**2 for lags in grid.lag_matrix))     # TODO: should distance?
+        
         super().__init__(z, grid, model, nugget=nugget, use_taper=None)
 
     def __call__(self, params: ndarray, z:Optional[ndarray]=None) -> float:
@@ -271,10 +270,10 @@ class Gaussian(Likelihood):
     
     def cov_func(self, params: ndarray, lags: Optional[ndarray]=None) -> ndarray:
         
-        if lags is None:
-            lags = self.norm2
-
         self.update_model_params(params)
+
+        if lags is None:
+            lags = self.grid.lag_matrix
         return self.model(lags)
 
     
@@ -285,7 +284,7 @@ class Gaussian(Likelihood):
         return super().logpost(x, **loglik_kwargs)
         
     def adj_loglik(self, x: ndarray):
-        raise ValueError('too ')
+        raise ValueError('too costly')
         return super().adj_loglik(x)
         
     def adj_logpost(self, x: ndarray):

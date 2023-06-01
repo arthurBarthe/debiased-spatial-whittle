@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.io
 
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import MaternCovarianceModel
+from debiased_spatial_whittle.models import MaternCovarianceModel, MaternModel
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 
@@ -47,6 +47,7 @@ plt.imshow(10 * np.log10(per) * frequency_mask)
 plt.show()
 
 model = MaternCovarianceModel()
+
 model.sigma.init_guess = 1
 model.nu.init_guess = 1
 
