@@ -14,7 +14,7 @@ cov_func = lambda lags: sq_exp_cov(lags, rho=15.)
 z = sim_circ_embedding(cov_func, shape)[0]
 z *= circle
 plt.figure()
-plt.imshow(z, cmap='Spectral')
+plt.imshow(z, cmap='bwr')
 plt.show()
 
 est = fit(z, circle, sq_exp_cov, [1., ], fold=False)

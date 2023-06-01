@@ -9,13 +9,13 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.bayes.likelihoods import Gaussian, Whittle
 
 m = 32
-nu = 2.5
+nu = 0.1
 
 model_family = MaternCovarianceModel
 
 grid = RectangularGrid((m, m))
 model = model_family()
-model.rho = 4
+model.rho = 1
 model.sigma = 1
 model.nugget = 0.2
 model.nu = nu
@@ -32,7 +32,7 @@ p = Periodogram()
 ep = ExpectedPeriodogram(grid, p)
 db = DebiasedWhittle(p, ep)
 
-thetas = np.arange(1, 6, 0.1)
+thetas = np.arange(1, 6, 0.25)
 e_values = np.zeros_like(thetas)
 r_values = np.zeros_like(thetas)
 r_values_gaussian = np.zeros_like(thetas)

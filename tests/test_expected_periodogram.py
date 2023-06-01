@@ -76,13 +76,13 @@ def test_separable_expected_periodogram():
     :return:
     """
     rho_0 = 8
-    m1 = ExponentialModelUniDirectional(axis=0)
+    m1 = ExponentialModel()
     m1.rho = rho_0
     m1.sigma = 1
-    m2 = ExponentialModelUniDirectional(axis=1)
+    m2 = ExponentialModel()
     m2.rho = 32
     m2.sigma = 2
-    model = SeparableModel((m1, m2))
+    model = SeparableModel((m1, m2), dims=[(0, ), (1, )])
     g = RectangularGrid((64, 64))
     p = Periodogram()
     ep1 = ExpectedPeriodogram(g, p)
