@@ -79,9 +79,10 @@ class Likelihood(ABC):
     
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
-        updates = dict(zip(self.free_params.names, params))
-        self.free_params.update_values(updates)
-        return
+       all_params = self.model.params
+       updates = dict(zip(all_params.names, params))
+       all_params.update_values(updates)
+       return
     
     @abstractmethod
     def __call__(self, x: ndarray) -> float: # loglik
