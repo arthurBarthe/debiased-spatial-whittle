@@ -182,8 +182,6 @@ def gauss_posterior_test():
     legend_labels = ['gaussian', 'deWhittle', 'whittle']
     plot_marginals([gauss_post, dewhittle_post, whittle_post], np.log(params), title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
-gauss_posterior_test()
-stop
 def main():
     dewhittle_full_bayes()
     whittle_matern_test()

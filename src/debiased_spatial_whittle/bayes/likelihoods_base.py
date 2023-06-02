@@ -36,7 +36,7 @@ class Likelihood(ABC):
         
         self.use_taper = use_taper
         self.periodogram = Periodogram(taper=use_taper)
-        self._I = self.periodogram(z)
+        self._I = self.periodogram(z)   # TODO: make periodogram cached_property
         
         # TODO: add model args
         self.model = model
@@ -79,9 +79,8 @@ class Likelihood(ABC):
     
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
-        free_params = self.model.free_params
-        updates = dict(zip(free_params.names, params))
-        free_params.update_values(updates)
+        updates = dict(zip(self.free_params.names, params))
+        self.free_params.update_values(updates)
         return
     
     @abstractmethod

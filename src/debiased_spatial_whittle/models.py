@@ -99,7 +99,7 @@ class Parameters:
 
     def free_params(self):
         list_free = list(filter(lambda p: p.free, self))
-        return Parameters(list(set(list_free)))
+        return Parameters(list_free)
 
     def __getitem__(self, item):
         return self.param_dict[item]
@@ -403,7 +403,7 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
         # set a default value to zero for the nugget
-        self.nugget = 0.
+        # self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
         
