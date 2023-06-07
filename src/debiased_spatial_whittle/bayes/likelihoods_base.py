@@ -180,7 +180,7 @@ class Likelihood(ABC):
         # setattr(self, attribute, res)
         
         if attribute=='MLE':
-            res['BIC'] = self.n_params*np.log(self.grid.n_points) - 2*self(res.x)         # negative logpost
+            res['BIC'] = self.n_params * np.log(self.grid.n_points) - 2*self(res.x)         # negative logpost
         
         if print_res:
             print(f'{self.label} {attribute}:  {np.round(np.exp(res.x),3)}')
@@ -193,6 +193,7 @@ class Likelihood(ABC):
                 self.propcov = -np.linalg.inv(hess)
             else:    
                 try:
+                    # TODO: clean this up
                     self.propcov = np.linalg.inv(-hessian(self.logpost)(self.res.x))
                     
                     if not np.all(np.isfinite(self.propcov)):       # use numerical diff
@@ -265,9 +266,14 @@ class Likelihood(ABC):
         L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
         self.C = np.linalg.inv(B@L_inv)
         
-        self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.res.x))
-        
-        if not np.all(np.isfinite(self.adj_propcov)):       # use numerical diff
+        try:
+            self.adj_propcov = np.linalg.inv(-hessian(self.adj_loglik)(self.res.x))
+            
+            # TODO: clean this up
+            if not np.all(np.isfinite(self.adj_propcov)):       # use numerical diff
+                hess = Hessian(self.adj_logpost)(self.res.x)
+                self.adj_propcov = -np.linalg.inv(hess)
+        except:
             hess = Hessian(self.adj_logpost)(self.res.x)
             self.adj_propcov = -np.linalg.inv(hess)
         return

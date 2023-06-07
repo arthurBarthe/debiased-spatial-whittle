@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import scipy.io
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
@@ -26,10 +26,22 @@ plt.show()
 
 grid = RectangularGrid(n)
 
+# frequency mask corresponding to the data processing
+from numpy.fft import fftfreq
+m, n = z.shape
+x, y = np.meshgrid(fftfreq(m) * 2 * np.pi, fftfreq(n) * 2 * np.pi, indexing='ij')
+freq_norm = np.sqrt(x ** 2 + y ** 2)
+frequency_mask = freq_norm < np.pi
+print(z.shape, frequency_mask.shape)
 
-# init_guess = np.log([50, .5, 1, 1e-3])
-# dw = DeWhittle(z, grid, MaternModel(), nugget=None)
-# dw.fit(init_guess, prior=False, approx_grad=True)
+plt.figure()
+plt.imshow(frequency_mask)
+plt.show()
+
+init_guess = np.log([1, 1., 1.])
+dw = DeWhittle(z, grid, MaternCovarianceModel(), nugget=1e-10)
+dw.frequency_mask = frequency_mask
+dw.fit(init_guess, prior=False, approx_grad=True)
 # stop
 
 # import matplotlib as mpl
@@ -39,26 +51,34 @@ grid = RectangularGrid(n)
 # rbga = cm(bounds)
 # cmap = mpl.colors.ListedColormap(rbga, name='myColorMap', N=rbga.shape[0])
 
-model = MaternModel()                # try exponential model
-model.nu = 0.8860611533657291
-nugget = 0.0012308293585964476
-dw = DeWhittle(z, grid, model, nugget=nugget)
-init_guess = np.log([8.33, 1.786])
-dw.fit(init_guess, approx_grad=True, prior=False)
+# model = MaternModel()                # try exponential model
+# model.nu = 0.8860611533657291
+# nugget = 0.0012308293585964476
+# dw = DeWhittle(z, grid, model, nugget=nugget)
+# dw.frequency_mask = frequency_mask
+
+
+# init_guess = np.log([50.,1.])
+# dw.fit(init_guess, approx_grad=True, prior=False)
 # print(dw.propcov)
+
+# stop
 
 niter=2000
 dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
 # stop
 
-MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=500, approx_grad=True)
+_MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=500, approx_grad=True)
+MLEs = _MLEs[np.exp(_MLEs[:,0])<300]    # TODO: filter outliers
+dw.MLEs = MLEs
+dw.MLEs_cov = np.cov(MLEs.T)
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
 
 title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$', r'log$\nu$'], legend_labels, shape=(1,3))
 
 
 

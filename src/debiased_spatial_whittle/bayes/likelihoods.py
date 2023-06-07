@@ -30,11 +30,33 @@ class DeWhittle(Likelihood):
     
     def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: Union[None, ndarray]=None):
         super().__init__(z, grid, model, nugget, use_taper)
-        
-        
+        self.frequency_mask = None
+    
+    # TODO: add this to Whittle
+    @property
+    def frequency_mask(self):
+        if self._frequency_mask is None:
+            return 1
+        else:
+            return self._frequency_mask
+
+    @frequency_mask.setter
+    def frequency_mask(self, value: np.ndarray):
+        """
+        Define a mask in the spectral domain to fit only certain frequencies
+
+        Parameters
+        ----------
+        value
+            mask of zeros and ones
+        """
+        if value is not None:
+            assert value.shape == self.grid.n, "shape mismatch between mask and grid"
+        self._frequency_mask = value
+    
     def expected_periodogram(self, params: ndarray, **cov_args) -> ndarray:
         acf = self.cov_func(params, lags = None, **cov_args)
-        return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask) 
+        return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask)
 
         
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, const:str='whittle', **cov_args) -> float: 
@@ -53,7 +75,7 @@ class DeWhittle(Likelihood):
         else:
             a=1/N
             
-        ll = -(a) * np.sum(np.log(e_I) + I / e_I)
+        ll = -(a) * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
         return ll
     
     @property

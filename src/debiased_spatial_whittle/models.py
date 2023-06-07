@@ -490,10 +490,10 @@ class ChiSquaredModel(CovarianceModel):
 
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
         nu = Parameter('nu', (0.01, 100))
-        parameters = Parameters([sigma, nu, rho])
+        parameters = Parameters([rho, sigma, nu])
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
