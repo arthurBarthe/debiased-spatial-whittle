@@ -10,39 +10,62 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
+from debiased_spatial_whittle.interpolation import SimpleKriging
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 
-
+np.random.seed(15344352)
 
 # load the topography data and standardize by the std
-z = scipy.io.loadmat('Frederik53.mat')['topodata']
-z = (z - np.mean(z)) / np.std(z)    # this is changed
-n = z.shape
+realdata = scipy.io.loadmat('Frederik53.mat')['topodata']
+realdata = (realdata - np.mean(realdata)) / np.std(realdata)    # this is changed
+n = realdata.shape
 
 # plot
 plt.figure()
-plt.imshow(z, origin='lower', cmap='Spectral')
+plt.imshow(realdata, origin='lower', cmap='Spectral')
 plt.show()
 
-grid = RectangularGrid(n)
+
 
 # frequency mask corresponding to the data processing
 from numpy.fft import fftfreq
-m, n = z.shape
-x, y = np.meshgrid(fftfreq(m) * 2 * np.pi, fftfreq(n) * 2 * np.pi, indexing='ij')
+n1, n2 = realdata.shape
+x, y = np.meshgrid(fftfreq(n1) * 2 * np.pi, fftfreq(n2) * 2 * np.pi, indexing='ij')
 freq_norm = np.sqrt(x ** 2 + y ** 2)
 frequency_mask = freq_norm < np.pi
-print(z.shape, frequency_mask.shape)
+print(realdata.shape, frequency_mask.shape)
 
 plt.figure()
 plt.imshow(frequency_mask)
 plt.show()
 
-init_guess = np.log([1, 1., 1.])
+
+mask = np.ones(n, dtype=bool)
+
+print(mask.shape)
+
+# picking missing points within the frequency mask
+n_missing = 10
+full_obs_grid = np.argwhere(frequency_mask)
+missing_idxs = np.random.randint(len(full_obs_grid), size=n_missing)
+missing_points = full_obs_grid[missing_idxs]
+mask[tuple(missing_points.T)] = False
+
+plt.figure()
+plt.imshow(mask)
+plt.show()
+# stop
+
+z = realdata * mask
+
+grid = RectangularGrid(n, mask=mask)
+
+# plt.imshow(z)
+# stop
+init_guess = np.log([1., 1., 1.])
 dw = DeWhittle(z, grid, MaternCovarianceModel(), nugget=1e-10)
 dw.frequency_mask = frequency_mask
 dw.fit(init_guess, prior=False, approx_grad=True)
-# stop
 
 # import matplotlib as mpl
 # bounds = np.quantile(z, np.linspace(0,1,500)) + 0.7
@@ -84,7 +107,7 @@ plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$',
 
 sim_z = dw.sim_z(np.exp(dw.res.x))
 
-fig, ax = plt.subplots(2,1, figsize=(40,10))
+fig, ax = plt.subplots(2,1, figsize=(20,10))
 ax[0].set_title('Sea Temperature Data', fontsize=22)
 im1 = ax[0].imshow(z, cmap='Spectral', origin='lower')
 fig.colorbar(im1, ax=ax[0])
@@ -95,3 +118,11 @@ fig.colorbar(im2, ax=ax[1])
     
 fig.tight_layout()
 plt.show()
+
+
+
+interp = SimpleKriging(z, grid, MaternCovarianceModel())
+preds = interp.bayesian_prediction(interp.missing_xs, adj_dewhittle_post)
+plot_marginals(preds.T, shape=(2,5), truths=realdata[~mask], title='posterior predictive densities')
+
+

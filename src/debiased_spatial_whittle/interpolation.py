@@ -159,4 +159,4 @@ def interpolation_test():
     plot_marginals(preds.T, shape=(2,5), truths=z_[~m], title='posterior predictive densities')
 
 
-interpolation_test()
+# interpolation_test()
