@@ -122,7 +122,7 @@ plt.show()
 
 
 interp = SimpleKriging(z, grid, MaternCovarianceModel())
-preds = interp.bayesian_prediction(interp.missing_xs, adj_dewhittle_post)
-plot_marginals(preds.T, shape=(2,5), truths=realdata[~mask], title='posterior predictive densities')
+approx_preds = interp.approx_bayesian_prediction(interp.missing_xs, adj_dewhittle_post, n_closest=100)
+plot_marginals(approx_preds.T, shape=(2,5), truths=realdata[~mask], title='posterior predictive densities')
 
 
