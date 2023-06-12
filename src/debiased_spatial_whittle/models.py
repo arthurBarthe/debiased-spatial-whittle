@@ -412,16 +412,20 @@ class NewTransformedModel(CovarianceModel):
         transform_param = Parameter('logD', (1, 50))
         eta_param = Parameter('eta', (-1, 1))
         nu_param = Parameter('nu', (-np.pi / 2, np.pi / 2))
-        parameters = ParametersUnion([Parameters([transform_param, eta_param, nu_param]), input_model.params])
+        z2_param = Parameter('logz2', (3, 5))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param, nu_param, z2_param]), input_model.params])
         super(NewTransformedModel, self).__init__(parameters)
 
     def transform_on_grid(self, ks):
-        return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, ks)
+        return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, self.logz2_0.value, ks)
 
     def call_on_rectangular_grid(self, grid):
         from numpy.fft import fftn, ifftn
+        # periodic covariance of the input model
         acv = grid.autocov(self.input_model)
+        # to spectral domain
         f = fftn(acv, axes=(0, 1))
+        # apply the frequency-domain mapping
         transform = self.transform_on_grid(grid.fourier_frequencies2)
         transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         term1 = np.matmul(f, transform_transpose)

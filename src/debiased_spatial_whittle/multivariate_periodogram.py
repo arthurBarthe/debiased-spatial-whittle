@@ -26,7 +26,7 @@ class Periodogram:
         p = np.matmul(j_vec, j_vec_transpose)
         return p
 
-
+"""
 class TransformedExpectedPeriodogram:
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram, ep: ExpectedPeriodogram):
         self.grid = grid
@@ -40,4 +40,4 @@ class TransformedExpectedPeriodogram:
         transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         term1 = np.matmul(input_ep, transform_transpose)
         return np.matmul(transform, term1)
-
+"""
