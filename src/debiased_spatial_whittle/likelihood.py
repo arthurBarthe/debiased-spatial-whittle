@@ -268,6 +268,7 @@ class DebiasedWhittle:
         """
         # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
+        sampler.n_sims = 100
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()

@@ -59,6 +59,8 @@ class SamplerOnRectangularGrid:
         self.sampling_grid = grid
         self._f = None
         self._n_sims = 1
+        self._i_sim = 0
+        self._z = None
         try:
             self.f
 
@@ -97,20 +99,19 @@ class SamplerOnRectangularGrid:
         -------
 
         """
-        f = self.f
-        shape = f.shape + (self.n_sims, )
-        e = (np.random.randn(*shape) + 1j * np.random.randn(*shape))
-        f = np.expand_dims(f, -1)
-        z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z, axes=range(self.sampling_grid.ndim)))
-        for i, n in enumerate(self.grid.n):
-            z_inv = np.take(z_inv, np.arange(n), i)
-        # print(z_inv.shape)
-        #z_inv = np.reshape(z_inv, self.grid.n)
-        z = z_inv * np.expand_dims(self.grid.mask, -1)
-        if self.n_sims == 1:
-            return z[..., 0]
-        return z
+        if self._i_sim % self.n_sims == 0:
+            f = self.f
+            shape = f.shape + (self.n_sims, )
+            e = (np.random.randn(*shape) + 1j * np.random.randn(*shape))
+            f = np.expand_dims(f, -1)
+            z = np.sqrt(np.maximum(f, 0)) * e
+            z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z, axes=range(self.sampling_grid.ndim)))
+            for i, n in enumerate(self.grid.n):
+                z_inv = np.take(z_inv, np.arange(n), i)
+            self._z = z_inv * np.expand_dims(self.grid.mask, -1)
+        result =  self._z[..., self._i_sim % self._n_sims]
+        self._i_sim += 1
+        return result
 
 
 class TSamplerOnRectangularGrid:
