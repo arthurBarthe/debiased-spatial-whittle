@@ -47,15 +47,18 @@ def prod_list(l: Tuple[int]):
 
 
 class SamplerOnRectangularGrid:
-    """Class that allows to define samplers for Rectangular grids, for which
+    """
+    Class that allows to define samplers for Rectangular grids, for which
     fast exact sampling can be achieved via circulant embeddings and the use of the
-    Fast Fourier Transform."""
+    Fast Fourier Transform.
+    """
 
     def __init__(self, model: CovarianceModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
         self.sampling_grid = grid
         self._f = None
+        self._n_sims = 1
         try:
             self.f
 
@@ -63,6 +66,14 @@ class SamplerOnRectangularGrid:
             print('up-sampling')
             n = tuple(2*n for n in self.grid.n)
             self.sampling_grid = RectangularGrid(n)    # may cause bugs?
+
+    @property
+    def n_sims(self):
+        return self._n_sims
+
+    @n_sims.setter
+    def n_sims(self, value: int):
+        self._n_sims = value
 
     @property
     def f(self):
@@ -78,15 +89,25 @@ class SamplerOnRectangularGrid:
 
     # TODO make this work for 1-d and 3-d
     def __call__(self):
+        """
+        Samples nsims independent realizations of a Gaussian Process specified by
+        the provided covariance model, on the provided rectangular grid.
+
+        Returns
+        -------
+
+        """
         f = self.f
-        e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
+        shape = f.shape + (self.n_sims, )
+        e = (np.random.randn(*shape) + 1j * np.random.randn(*shape))
+        f = np.expand_dims(f, -1)
         z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z))
+        z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z, axes=range(self.sampling_grid.ndim)))
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
         # print(z_inv.shape)
-        z_inv = np.reshape(z_inv, self.grid.n)
-        z = z_inv * self.grid.mask
+        #z_inv = np.reshape(z_inv, self.grid.n)
+        z = z_inv * np.expand_dims(self.grid.mask, -1)
         return z
 
 
