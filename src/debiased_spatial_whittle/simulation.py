@@ -108,6 +108,8 @@ class SamplerOnRectangularGrid:
         # print(z_inv.shape)
         #z_inv = np.reshape(z_inv, self.grid.n)
         z = z_inv * np.expand_dims(self.grid.mask, -1)
+        if self.n_sims == 1:
+            return z[..., 0]
         return z
 
 
