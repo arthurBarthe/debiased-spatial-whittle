@@ -361,7 +361,8 @@ class BivariateUniformCorrelation(CovarianceModel):
     def __init__(self, base_model: CovarianceModel):
         self.base_model = base_model
         r = Parameter('r', (-0.99, 0.99))
-        parameters = ParametersUnion([Parameters([r, ]), base_model.params])
+        f = Parameter('f', (0.1, 10))
+        parameters = ParametersUnion([Parameters([r, f]), base_model.params])
         super(BivariateUniformCorrelation, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
@@ -370,9 +371,9 @@ class BivariateUniformCorrelation(CovarianceModel):
         acv12 = acv11 * self.r_0.value
         out = np.zeros(acv11.shape + (2, 2))
         out[..., 0, 0] = acv11
-        out[..., 1, 1] = acv11
-        out[..., 0, 1] = acv12
-        out[..., 1, 0] = acv12
+        out[..., 1, 1] = acv11 * self.f_0.value ** 2
+        out[..., 0, 1] = acv12 * self.f_0.value
+        out[..., 1, 0] = acv12 * self.f_0.value
         return out
 
     def _gradient(self, x: np.ndarray):
