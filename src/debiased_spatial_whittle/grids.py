@@ -239,7 +239,7 @@ class RectangularGrid:
         #TODO check that the ifftshift "trick" works for odd sizes
         if hasattr(model, 'call_on_rectangular_grid'):
             return model.call_on_rectangular_grid(self)
-        return ifftshift(model(self.lags_unique))
+        return ifftshift(model(self.lags_unique), axes=list(range(self.ndim)))
 
     def autocov_separable(self, model: SeparableModel):
         assert isinstance(model, SeparableModel), "You can only call autocov_separable on a separable model"
