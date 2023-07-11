@@ -165,7 +165,7 @@ class SamplerBUCOnRectangularGrid:
         assert isinstance(model, BivariateUniformCorrelation)
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(np.zeros(2), [[1, model.r_0], [model.r_0, 1]])
+        self.e_dist = multivariate_normal(np.zeros(2), [[1, model.r_0.value], [model.r_0.value, 1]])
         self._f = None
 
     @property
@@ -184,7 +184,7 @@ class SamplerBUCOnRectangularGrid:
     def __call__(self, periodic: bool = False, return_spectral: bool = False):
         f = np.expand_dims(self.f, -1)
         e = self.e_dist.rvs(size=f.shape + (2,))
-        e[..., -1] *= self.model.f_0
+        e[..., -1] *= self.model.f_0.value
         e = e[..., 0, :] + 1j * e[..., 1, :]
         z = np.sqrt(f) * e
         if return_spectral:
