@@ -59,13 +59,19 @@ plt.show()
 z = realdata * mask
 
 grid = RectangularGrid(n, mask=mask)
+model = MaternCovarianceModel()
+# model.nu = 1/2
 
-# plt.imshow(z)
-# stop
+
 init_guess = np.log([1., 1., 1.])
 dw = DeWhittle(z, grid, MaternCovarianceModel(), nugget=1e-10)
 dw.frequency_mask = frequency_mask
 dw.fit(init_guess, prior=False, approx_grad=True)
+
+whittle = Whittle(z, grid, MaternCovarianceModel(), nugget=1e-10)
+whittle.frequency_mask = frequency_mask
+whittle.fit(init_guess, prior=False, approx_grad=True)
+
 
 # import matplotlib as mpl
 # bounds = np.quantile(z, np.linspace(0,1,500)) + 0.7
@@ -89,6 +95,7 @@ dw.fit(init_guess, prior=False, approx_grad=True)
 
 niter=2000
 dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
+whittle_post, A = whittle.RW_MH(niter, acceptance_lag=100)
 # stop
 
 _MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=500, approx_grad=True)
@@ -100,8 +107,8 @@ adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
 
 title = 'posterior comparisons'
-legend_labels = ['deWhittle', 'adj deWhittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$', r'log$\nu$'], legend_labels, shape=(1,3))
+legend_labels = ['deWhittle', 'adj deWhittle', 'whittle']
+plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post], None, title, [r'log$\rho$', r'log$\sigma$', r'log$\nu$'], legend_labels, shape=(1,3))
 
 
 
@@ -121,8 +128,15 @@ plt.show()
 
 
 
-interp = SimpleKriging(z, grid, MaternCovarianceModel())
-approx_preds = interp.approx_bayesian_prediction(interp.missing_xs, adj_dewhittle_post, n_closest=100)
-plot_marginals(approx_preds.T, shape=(2,5), truths=realdata[~mask], title='posterior predictive densities')
+interp = SimpleKriging(z, grid, model)
+dewhittle_approx_preds = interp.approx_bayesian_prediction(interp.missing_xs, adj_dewhittle_post, n_closest=100)
+whittle_approx_preds = interp.approx_bayesian_prediction(interp.missing_xs, whittle_post, n_closest=100)
+
+legend_labels = ['deWhittle', 'Whittle']
+plot_marginals([dewhittle_approx_preds, whittle_approx_preds], 
+                                   shape=(2,5), 
+                                   truths=realdata[~mask], 
+                                   density_labels=legend_labels,
+                                   title='posterior predictive densities')
 
 

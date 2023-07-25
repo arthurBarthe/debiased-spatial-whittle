@@ -79,7 +79,7 @@ def whittle_test():
     
     
 def whittle_matern_test():    # TODO: wrong spectral density
-    sim_model = MaternModel()
+    sim_model = MaternCovarianceModel()
     sim_model.rho = 10
     sim_model.sigma = 1
     sim_model.nu = 3/2
@@ -89,7 +89,7 @@ def whittle_matern_test():    # TODO: wrong spectral density
     z = sampler()
     
     params = np.array([10.,1.,3/2])
-    model = MaternModel()
+    model = MaternCovarianceModel()
     # model.nu =3/2
     whittle = Whittle(z, grid, model, nugget=0.1)
     whittle.fit(np.log(params), prior=False, approx_grad=True)

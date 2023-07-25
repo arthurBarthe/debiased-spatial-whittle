@@ -150,7 +150,28 @@ class Whittle(Likelihood):
         
         self.infsum_shape = infsum_shape   # aliasing
         self.infsum_grid  = np.meshgrid(*(2*np.pi*np.arange(-(n//2), n//2+1)/self.grid.delta[i] for i,n in enumerate(infsum_shape)), indexing='ij')    # np.arange(0,1) for non-aliased version 
+        self.frequency_mask = None
+    
+    @property
+    def frequency_mask(self):
+        if self._frequency_mask is None:
+            return 1
+        else:
+            return self._frequency_mask
 
+    @frequency_mask.setter
+    def frequency_mask(self, value: np.ndarray):
+        """
+        Define a mask in the spectral domain to fit only certain frequencies
+
+        Parameters
+        ----------
+        value
+            mask of zeros and ones
+        """
+        if value is not None:
+            assert value.shape == self.grid.n, "shape mismatch between mask and grid"
+        self._frequency_mask = value
 
     @property
     def label(self):
@@ -191,7 +212,7 @@ class Whittle(Likelihood):
             
         f = self.f(params)           # this may be unstable for small grids/nugget
         
-        ll = -(1/2) * np.sum(np.log(f) + I / f)
+        ll = -(1/2) * np.sum(  (np.log(f) + I / f) * self.frequency_mask  )
         return ll
 
     def update_model_params(self, params: ndarray) -> None:
