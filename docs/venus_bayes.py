@@ -45,7 +45,7 @@ mask = np.ones(n, dtype=bool)
 print(mask.shape)
 
 # picking missing points within the frequency mask
-n_missing = 10
+n_missing = 10    # TODO: add more missing points!!
 full_obs_grid = np.argwhere(frequency_mask)
 missing_idxs = np.random.randint(len(full_obs_grid), size=n_missing)
 missing_points = full_obs_grid[missing_idxs]
@@ -139,4 +139,26 @@ plot_marginals([dewhittle_approx_preds, whittle_approx_preds],
                                    density_labels=legend_labels,
                                    title='posterior predictive densities')
 
+from numpy import ndarray
+def rmse(y: ndarray, y_tilde: ndarray) -> ndarray:
+    '''
+    Root mean square error of predictions at independent spatial locations.
 
+    Parameters
+    ----------
+    y : ndarray
+        real data, array of dimension (npoints).
+    y_tilde : ndarray
+        posterior predictive for each spatial location, array of dimension (ndraws, npoints).
+
+    Returns
+    -------
+    float
+        RMSE of each spatial location, array of dimension (npoints).
+
+    '''
+    return np.sqrt(np.mean((y-y_tilde)**2, axis=0))
+
+
+print(rmse(realdata[~mask], dewhittle_approx_preds))
+print(rmse(realdata[~mask], whittle_approx_preds))
