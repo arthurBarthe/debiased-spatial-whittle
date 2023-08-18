@@ -516,6 +516,7 @@ class MaternCovarianceModel(CovarianceModel):
         return val
 
     def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        # TODO: include infinite sum grid
         freq_grid = np.stack(freq_grid, axis=0)
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         pi = np.pi

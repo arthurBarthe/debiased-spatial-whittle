@@ -257,6 +257,7 @@ class Likelihood(ABC):
     @abstractmethod
     def prepare_curvature_adjustment(self):
         # TODO: singular value decomp
+        # TODO: make this for MCMC class!
         
         if not self.res.type=='MLE':
             raise TypeError('must optimize log-likelihood first')

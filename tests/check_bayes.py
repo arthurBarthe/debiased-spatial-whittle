@@ -21,7 +21,7 @@ def dewhittle_test():
     
     dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
     dw.fit(None, prior=False)
-    MLEs = dw.sim_MLEs(params, niter=50)
+    MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=50)    # TODO: why is this params?
     plot_marginals([MLEs], np.log(params))
 
 def dewhittle_matern_conditional_nu_test():
@@ -39,7 +39,7 @@ def dewhittle_matern_conditional_nu_test():
     model.nu =3/2
     dw = DeWhittle(z, grid, model, nugget=0.1)
     dw.fit(None, prior=False)
-    MLEs = dw.sim_MLEs(params, niter=50)
+    MLEs = dw.sim_MLEs(params, niter=50)      # TODO: why is this params?
     plot_marginals([MLEs], np.log(params))
     
 def dewhittle_matern_test():
