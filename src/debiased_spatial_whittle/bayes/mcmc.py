@@ -71,7 +71,7 @@ class MCMC:
         # TODO: clean this up        
         # TODO: separate class?
         
-        if x0 is None:
+        if x0 is None: # TODO: fix this
             x0 = np.zeros(self.n_params)
         
         if loglik_kwargs is None:

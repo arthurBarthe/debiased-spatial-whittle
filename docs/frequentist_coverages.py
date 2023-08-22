@@ -12,107 +12,83 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
-from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, GaussianPrior, MCMC
+from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 
-np.random.seed(1535235325)
+
 
 n = (64, 64)
-rho, sigma, nugget = 8., np.sqrt(1.), 0.1  # pick smaller rho
+rho, sigma, nugget = 10., np.sqrt(1.), 0.1
 
 grid = RectangularGrid(n)
-# TODO: try exponential model
-model = ExponentialModel()
+model = SquaredExponentialModel()
 model.rho = rho
 model.sigma = sigma
 model.nugget = nugget
 
 
 sampler = SamplerOnRectangularGrid(model, grid)
-dw = DeWhittle(sampler(), grid, ExponentialModel(), nugget=nugget) # just for initialization
 
-prior_mean = np.log([rho, sigma])
+params = np.log([rho, sigma])
 
-prior = GaussianPrior(prior_mean, 0.1*np.eye(2))   # prior on unrestricted space
+# stop
 
 
-n_datasets=1000
-mcmc_niter=5000
-mle_niter= 500
+n_datasets=10
+mcmc_niter=1000
+mle_niter= 200
 acceptance_lag = mcmc_niter+1
-d=len(prior_mean)
+d=len(params)
+
+def make_quantiles(alphas:list|ndarray):
+    quant_list = []
+    for alpha in alphas:
+        if alpha>1:
+            alpha/=100
+        quant_list.append(alpha/2)
+        quant_list.append(1-(alpha/2))
+    return quant_list
 
 
-quantiles = [0.025,0.975]
+alphas = np.arange(5,100,5)
+alphas_list = [alpha for alpha in alphas for _ in (0, 1)]*8
+quantiles = make_quantiles(alphas)
 n_q = len(quantiles)
 
 dewhittle_post_quantiles     = np.zeros((n_datasets,d*n_q))
 adj_dewhittle_post_quantiles = np.zeros((n_datasets,d*n_q))
+whittle_post_quantiles       = np.zeros((n_datasets,d*n_q))
+adj_whittle_post_quantiles   = np.zeros((n_datasets,d*n_q))
 
-dewhittle_post_probs     = np.zeros((n_datasets, d))
-adj_dewhittle_post_probs = np.zeros((n_datasets, d))
-
-params_array = prior.sim(n_datasets)
-inside=0
-for i, params in enumerate(params_array):
-    print(f'iteration: {i+1}, params={np.exp(params).round(3)}', end=':\n')
+print(f'True Params:  {np.round(np.exp(params),3)}')
+for i in range(n_datasets):
+    print(i+1, end=':\n')
     
-    z = dw.sim_z(np.exp(params))
-        
-    dw = DeWhittle(z, grid, ExponentialModel(), nugget=nugget)
-    mcmc = MCMC(dw, prior)
-    mcmc.fit(None, prior=False, print_res=False)
-    post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    MLEs = dw.sim_MLEs(np.exp(mcmc.res.x), niter=mle_niter, print_res=False)
-    # dw.fit(None, prior=False, print_res=False)
-    dw.prepare_curvature_adjustment()
-    adj_post = mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
-
-    q     = np.quantile(post, quantiles, axis=0).T.flatten()
-    q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
+    z = sampler()
     
-    dewhittle_post_quantiles[i] = q
-    adj_dewhittle_post_quantiles[i] = q_adj
+    for likelihood in [DeWhittle,Whittle]: # ,Whittle
+            
+        ll = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget)
+        ll.fit(None, prior=False, print_res=False)
+        post, A = ll.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
+        MLEs = ll.estimate_standard_errors_MLE(ll.res.x, monte_carlo=True, niter=mle_niter, print_res=False)
+        ll.prepare_curvature_adjustment()
+        adj_post, A = ll.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
     
-    print(q.round(3), q_adj.round(3), params.round(3), sep='\n')
-    print('')
-    
-    probs     = np.sum(post < params, axis=0)/mcmc_niter
-    probs_adj = np.sum(adj_post < params, axis=0)/mcmc_niter
-    
-    dewhittle_post_probs[i] = probs
-    adj_dewhittle_post_probs[i] = probs_adj
-    
-    print(probs.round(3), probs_adj.round(3), sep='\n')
-    print('')
-    
-
-
-
-import matplotlib
-import matplotlib as plt
-
-matplotlib.rcParams.update({'font.size': 16})
-
-fig,ax = plt.subplots(2,2, figsize=(15,10))
-fig.suptitle('Posterior quantile estimates', fontsize=24)#, fontweight='bold')
-ax[0,0].hist(dw_post_p[:,0], bins='sturges', edgecolor='k')
-ax[0,1].hist(dw_post_p[:,1], bins='sturges', edgecolor='k')
-
-ax[1,0].hist(adj_dw_post_p[:,0], bins='sturges', edgecolor='k')
-ax[1,1].hist(adj_dw_post_p[:,1], bins='sturges', edgecolor='k')
-
-ax[1,0].set_xlabel( r'$log\rho$', fontsize=22)
-ax[1,1].set_xlabel( r'$log\sigma$', fontsize=22)
-
-ax[0,0].text(.9, 110, 'debiased Whittle', color='r',fontsize=20)
-ax[1,0].text(.8, 65., 'Adjusted debiased Whittle', color='r',fontsize=20)
-fig.subplots_adjust(hspace=0.3, wspace=-1.5)
-fig.tight_layout()
-
+        q     = np.quantile(post, quantiles, axis=0).T.flatten()
+        q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
+        if ll.label =='Debiased Whittle':
+            dewhittle_post_quantiles[i] = q
+            adj_dewhittle_post_quantiles[i] = q_adj
+        else:
+            whittle_post_quantiles[i] = q
+            adj_whittle_post_quantiles[i] = q_adj
+            
+        print(q, q_adj, sep='\n')
+        print('')
 
             
     
-stop
+# stop
     
 import pandas as pd    
 post_list = ['dewhittle', 'adj_dewhittle', 'whittle', 'adj_whittle']

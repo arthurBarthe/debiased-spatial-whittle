@@ -8,7 +8,7 @@ from autograd.scipy import stats as ag_stats
 from abc import ABC, abstractmethod
 
 class Prior(ABC):
-    # TODO: do on regular parameter space!!
+    # TODO: do on regular parameter space!! add inv_transform to prior and likelihood class!!
     
     @property
     @abstractmethod
