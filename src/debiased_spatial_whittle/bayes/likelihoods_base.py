@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 
 from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend('autograd')
@@ -16,19 +16,21 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
-from debiased_spatial_whittle.bayes.funcs import transform
+from debiased_spatial_whittle.bayes.funcs import transform, compute_propcov
 from typing import Union
 
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
 
+inv = np.linalg.inv
+cholesky = np.linalg.cholesky
 
 class Likelihood(ABC):
     
     def __init__(self, z: ndarray, grid: RectangularGrid,
                  model: CovarianceModel, nugget: Optional[float] = 0.1,
-                 use_taper: Union[None, ndarray]=None, transform_params: bool=True):
+                 use_taper: Union[None, ndarray]=None, transform_func: Optional[Callable] = None):
         
         self._z = z
         self.grid = grid
@@ -56,7 +58,11 @@ class Likelihood(ABC):
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
         
-        self._transform_params = transform_params
+        if transform_func is None:
+            self.transform = self._transform
+        else:
+            self.transform = transform_func
+        
         
     
     @property
@@ -80,9 +86,8 @@ class Likelihood(ABC):
     def n_points(self):
         return self.grid.n_points
     
-    @property
-    def transform_params(self):
-        return self._transform_params
+    def _transform(self, x: ndarray, inv:bool=True) -> ndarray:
+        return x
     
     @abstractmethod
     def update_model_params(self, params: ndarray) -> None:
@@ -120,26 +125,12 @@ class Likelihood(ABC):
         self.abc = x
         return x+5
     
-    
-    # @abstractmethod
-    # def logprior(self, x: ndarray) -> float:
-    #     '''uninformative prior on the transformed (unrestricted space)'''
-    #     k = self.n_params
-    #     return stats.multivariate_normal.logpdf(x, np.zeros(k), cov=np.eye(k)*100)
-
-
-    # @abstractmethod
-    # def logpost(self, x: ndarray, **loglik_kwargs) -> float:
-    #     return self(x, **loglik_kwargs) + self.logprior(x)
 
     
     @abstractmethod
     def adj_loglik(self, x: ndarray, **loglikargs) -> float: 
         return self(self.res.x + self.C @ (x - self.res.x), **loglikargs)
 
-    # @abstractmethod
-    # def adj_logpost(self, x: ndarray) -> float:
-    #     return self.adj_loglik(x) + self.logprior(x)    
     
     @abstractmethod
     def sim_z(self, params: Union[None, ndarray]=None):
@@ -156,15 +147,15 @@ class Likelihood(ABC):
         self.MLEs = np.zeros((niter, self.n_params), dtype=np.float64)
         while niter>i:
             
-            _z = self.sim_z(params)
+            z = self.sim_z(params)
 
             if False:
-                # print(_z[4,11])
+                # print(z[4,11])
                 import matplotlib.pyplot as plt
-                plt.imshow(_z, origin='lower')
+                plt.imshow(z, origin='lower')
                 plt.show()
                 
-            loglik_kwargs = {'z':_z}
+            loglik_kwargs = {'z':z}
             
             def obj(x):     return -self(x, **loglik_kwargs)
             
@@ -173,25 +164,27 @@ class Likelihood(ABC):
             else:
                 gradient = False
                 
-            if self.transform_params:
-                x0 = transform(params, inv=False)
-            else:
-                x0 = params
+                
+            x0 = self.transform(params, inv=False)
                 
             # TODO: no basin-hopping
             res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **opt_kwargs)
-
-            if not res['success']:
+            if res.x[0] > 100:
+                print(res['success'])
+                import matplotlib.pyplot as plt
+                plt.imshow(z)
+                plt.show()
+            if not res['success'] or np.linalg.norm(res.x - params)>1000:
                 continue
 
             else:
                 if print_res:
-                    print(f'{i+1})   MLE:  {np.round(np.exp(res.x),3)}')
+                    print(f'{i+1})   MLE:  {self.transform(res.x).round(3)}')
                 self.MLEs[i] = res.x
                 i+=1
             
         self.MLEs_cov = np.cov(self.MLEs.T)
-        self.prepare_curvature_adjustment()      # compute C matrix for posterior adjustment
+        # self.prepare_curvature_adjustment()      # compute C matrix for posterior adjustment
         return self.MLEs
 
 
@@ -200,11 +193,51 @@ class Likelihood(ABC):
         pass
     
     @abstractmethod
-    def prepare_curvature_adjustment(self):
+    def prepare_curvature_adjustment(self, mle: ndarray):
         # TODO: singular value decomp
+        # TODO: change in likelihoods.py!!
 
-        B = np.linalg.cholesky(self.MLEs_cov)
-
-        L_inv = np.linalg.inv(np.linalg.cholesky(self.propcov))    # propcov only for MLE
-        self.C = np.linalg.inv(B@L_inv)
+        B = cholesky(self.MLEs_cov)
+        
+        # TODO: only autograd propcov
+        propcov = compute_propcov(self, mle)
+        L_inv = inv(cholesky(propcov))    # propcov only for MLE
+        self.C = inv(B @ L_inv)
         return
+    
+    
+    # @abstractmethod
+    # def sim_var_grad(self, params: ndarray, niter:int=5000, print_res:bool=True, approx_grad:bool = False, **opt_kwargs) -> ndarray:
+    #     '''estimate J(x) matrix, var[grad(ll)]'''
+    #     # TODO: more testing!
+        
+    #     if self.transform_params:
+    #         x = transform(params, inv=False)
+            
+    #     i = 0
+    #     self.grad_at_params = np.zeros((niter, self.n_params), dtype=np.float64)
+    #     self.hess_at_params = np.zeros((niter, self.n_params, self.n_params), dtype=np.float64)
+    #     while niter>i:
+            
+    #         z = self.sim_z(params)
+    #         loglik_kwargs = {'z':z}
+            
+    #         grad_at_params = grad(self)(x, **loglik_kwargs)
+    #         hess_at_params = hessian(self)(x, **loglik_kwargs)
+           
+    #         if not np.all(np.isfinite(grad_at_params)):    # TODO: approx grad!!
+    #             continue
+            
+    #         if not np.all(np.isfinite(hess_at_params)):    # TODO: approx grad!!
+    #             continue
+
+    #         else:   # TODO: fix this for if one false, one true
+    #             if print_res:
+    #                 print(f'{i+1})') # grad: {grad_at_params.round(3)}')
+    #             self.grad_at_params[i] = grad_at_params
+    #             self.hess_at_params[i] = hess_at_params
+    #             i+=1
+            
+    #     self.J = np.cov(self.grad_at_params.T)
+    #     # self.prepare_curvature_adjustment()      # compute C matrix for posterior adjustment
+    #     return self.J

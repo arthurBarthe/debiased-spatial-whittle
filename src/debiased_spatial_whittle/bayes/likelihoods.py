@@ -10,7 +10,7 @@ from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
 from debiased_spatial_whittle.bayes.funcs import transform
 
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, Callable
 
 import autograd.scipy.linalg as spl
 npl = np.linalg
@@ -22,8 +22,8 @@ fftfreq = np.fft.fftfreq
 
 class DeWhittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: Union[None, ndarray]=None, transform_params:bool = True):
-        super().__init__(z, grid, model, nugget, use_taper, transform_params)
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper: Union[None, ndarray]=None, transform_func: Optional[Callable] = None):
+        super().__init__(z, grid, model, nugget, use_taper, transform_func)
         self.frequency_mask = None
     
     @property
@@ -54,8 +54,7 @@ class DeWhittle(Likelihood):
         
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, **cov_args) -> float: 
         
-        if self.transform_params:
-            params = transform(params)
+        params = self.transform(params, inv=True)
         
         if z is None:
             I = self.I
@@ -96,6 +95,12 @@ class DeWhittle(Likelihood):
         return super().sim_MLEs(params, niter, print_res=print_res, **opt_kwargs)
     
     
+    # def sim_var_grad(self, params: ndarray, niter:int=5000, print_res:bool=True, 
+    #                                                      **opt_kwargs) -> ndarray:
+        
+    #     return super().sim_var_grad(params, niter, print_res=print_res, **opt_kwargs)
+    
+    
     def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
         # TODO: update this with sim_MLEs
         if monte_carlo:
@@ -103,14 +108,21 @@ class DeWhittle(Likelihood):
         else:
             pass
     
-    def prepare_curvature_adjustment(self):           # maybe not abstract method
-        return super().prepare_curvature_adjustment()
+    def prepare_curvature_adjustment(self, mle):           # maybe not abstract method
+        return super().prepare_curvature_adjustment(mle)
 
 
 class Whittle(Likelihood):
     
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, use_taper:Optional[ndarray]=None, infsum_shape:tuple = (3,3), transform_params:bool = True):
-        super().__init__(z, grid, model, nugget, use_taper, transform_params)
+    def __init__(self, z: ndarray, grid: RectangularGrid,
+                 model: CovarianceModel,
+                 nugget: float, use_taper:Optional[ndarray]=None,
+                 infsum_shape:tuple = (3,3),
+                 transform_func: Optional[Callable] = None):
+        
+        
+        super().__init__(z, grid, model, nugget, use_taper, transform_func)
+        
         self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
         
         self.freq_grid    = np.meshgrid(*(2*np.pi*fftfreq(_n) for _n in self.n), indexing='ij')         # / (delta*n1)?
@@ -170,8 +182,7 @@ class Whittle(Likelihood):
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, **kwargs) -> float:
         '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
-        if self.transform_params:
-            params = transform(params)
+        params = self.transform(params, inv=True)
         
         if z is None:
             I = self.I
@@ -218,18 +229,16 @@ class Whittle(Likelihood):
 
 class Gaussian(Likelihood):
 
-
-    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, transform_params:bool=True):
+    def __init__(self, z: ndarray, grid: RectangularGrid, model: CovarianceModel, nugget: float, transform_func: Optional[Callable] = None):
         
         if grid.n_points>10000:
             ValueError('Too many observations for Gaussian likelihood')
         
-        super().__init__(z, grid, model, nugget=nugget, use_taper=None, transform_params=transform_params)
+        super().__init__(z, grid, model, nugget=nugget, use_taper=None, transform_func=transform_func)
 
     def __call__(self, params: ndarray, z:Optional[ndarray]=None) -> float:
         '''Computes Gaussian likelihood in O(|n|^3) time'''
-        if self.transform_params:            
-            params = transform(params)
+        params = self.transform(params, inv=True)
         
         if z is None:
             z = self.z
