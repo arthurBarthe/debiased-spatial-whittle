@@ -11,7 +11,7 @@ from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
 from debiased_spatial_whittle.bayes.funcs import transform
 
 from typing import Union, Optional, Dict, Callable
-
+from functools import cached_property
 import autograd.scipy.linalg as spl
 npl = np.linalg
 fftn = np.fft.fftn
@@ -67,70 +67,39 @@ class DeWhittle(Likelihood):
         ll = -(1/2) * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
         return ll
     
-    @property
-    def label(self):
-        return 'Debiased Whittle'
-    
-    def __repr__(self):
-        return f'{self.label} with {self.model.name} and {self.grid.n}'
-    
-    def update_model_params(self, params: ndarray) -> None:
-        return super().update_model_params(params)
-    
-    def cov_func(self, params: ndarray, lags: Optional[list[ndarray, ...]] =None, **cov_args) -> ndarray:
-        return super().cov_func(params, lags, **cov_args)
-            
-    def adj_loglik(self, x: ndarray):
-        return super().adj_loglik(x)
-        
-    def mymethod(self, x):
-        super().mymethod(x)
-    
-    def sim_z(self, params:Optional[ndarray]=None):
-        return super().sim_z(params)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 
-                                                         **opt_kwargs) -> ndarray:
-        
-        return super().sim_MLEs(params, niter, print_res=print_res, **opt_kwargs)
-    
-    
-    # def sim_var_grad(self, params: ndarray, niter:int=5000, print_res:bool=True, 
-    #                                                      **opt_kwargs) -> ndarray:
-        
-    #     return super().sim_var_grad(params, niter, print_res=print_res, **opt_kwargs)
-    
-    
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
-        # TODO: update this with sim_MLEs
-        if monte_carlo:
-            return super().sim_MLEs(params, niter, **sim_kwargs)
-        else:
-            pass
-    
-    def prepare_curvature_adjustment(self, mle):           # maybe not abstract method
-        return super().prepare_curvature_adjustment(mle)
-
 
 class Whittle(Likelihood):
     
     def __init__(self, z: ndarray, grid: RectangularGrid,
                  model: CovarianceModel,
                  nugget: float, use_taper:Optional[ndarray]=None,
-                 infsum_shape:tuple = (3,3),
+                 aliased_grid_shape:tuple = (3,3),
                  transform_func: Optional[Callable] = None):
         
         
         super().__init__(z, grid, model, nugget, use_taper, transform_func)
         
-        self.g = np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.grid.n), indexing='ij'))  # for regular whittle
-        
-        self.freq_grid    = np.meshgrid(*(2*np.pi*fftfreq(_n) for _n in self.n), indexing='ij')         # / (delta*n1)?
-        
-        self.infsum_shape = infsum_shape   # aliasing
-        self.infsum_grid  = np.meshgrid(*(2*np.pi*np.arange(-(n//2), n//2+1)/self.grid.delta[i] for i,n in enumerate(infsum_shape)), indexing='ij')    # np.arange(0,1) for non-aliased version 
+        self._aliased_grid_shape = aliased_grid_shape   # aliasing
         self.frequency_mask = None
     
+    @cached_property
+    def freq_grid(self):
+        '''grid of frequencies to compute covariance function''' 
+        return np.meshgrid(*(2*np.pi*fftfreq(n) for n in self.n), indexing='ij')         # / (delta*n)?
+    
+    @property
+    def aliased_grid_shape(self):
+        '''size of the infinite grid for aliaising in spectral density'''
+        return self._aliased_grid_shape
+    
+    @cached_property
+    def aliased_grid(self):
+        '''grid to compute the aliased spectral density, truncated infinite sum grid'''
+        shape = self.aliased_grid_shape
+        delta = self.grid.delta
+        return np.meshgrid(*(2*np.pi*np.arange(-(n//2), n//2+1)/delta[i] for i,n in enumerate(shape)), indexing='ij')    # np.arange(0,1) for non-aliased version
+    
+
     @property
     def frequency_mask(self):
         if self._frequency_mask is None:
@@ -152,12 +121,6 @@ class Whittle(Likelihood):
             assert value.shape == self.grid.n, "shape mismatch between mask and grid"
         self._frequency_mask = value
 
-    @property
-    def label(self):
-        return 'Whittle'
-    
-    def __repr__(self):
-        return f'{self.label} with {self.model.name} and {self.grid.n}'
     
     def f(self, params: ndarray) -> ndarray:
         '''
@@ -165,16 +128,21 @@ class Whittle(Likelihood):
         '''
         
         self.update_model_params(params)        
-        f = self.model.f(self.freq_grid, self.infsum_grid)
+        f = self.model.f(self.freq_grid, self.aliased_grid)
         return f
 
+    @cached_property
+    def freq_grid_for_fft(self):    
+        '''grid for fft of covariance func for regular whittle'''
+        return np.stack(np.meshgrid(*(np.arange(-n//2,n//2) for n in self.n), indexing='ij'))
+    
     def aliased_f_fft(self, params: ndarray, **cov_args) -> ndarray:
         '''
         Computes the aliased spectral density in O(|n|log|n|) time for the given covariance model
         For small grids may need to upsample
         '''
         
-        acf = ifftshift(self.cov_func(params, self.g, **cov_args))  # undoing ifftshift
+        acf = ifftshift(self.cov_func(params, self.freq_grid_for_fft, **cov_args))  # undoing ifftshift
         f = np.real(fftn(fftshift(acf)))
         assert np.all(f>0)
         return f
@@ -182,6 +150,7 @@ class Whittle(Likelihood):
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, **kwargs) -> float:
         '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
+        # TODO: include optional arguemtn to input infnite sum grid
         params = self.transform(params, inv=True)
         
         if z is None:
@@ -193,38 +162,6 @@ class Whittle(Likelihood):
         
         ll = -(1/2) * np.sum(  (np.log(f) + I / f) * self.frequency_mask  )
         return ll
-
-    def update_model_params(self, params: ndarray) -> None:
-        return super().update_model_params(params)
-    
-    def cov_func(self, params: ndarray, lags: Optional[ndarray]=None, **cov_args) -> ndarray:
-        return super().cov_func(params, lags, **cov_args)    
-        
-    def adj_loglik(self, x: ndarray):
-        return super().adj_loglik(x)
-        
-    def mymethod(self, x):
-        super().mymethod(x)
-
-    def sim_z(self, params:Optional[ndarray]=None):
-        return super().sim_z(params)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 
-                                                         **opt_kwargs) -> ndarray:
-        
-        return super().sim_MLEs(params, niter, print_res=print_res, **opt_kwargs)
-    
-    
-    
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000, **sim_kwargs):           # maybe not abstract method
-    
-        if monte_carlo:
-            return super().sim_MLEs(params, niter, **sim_kwargs)
-        else:
-            pass   # Theorem 3 from paper
-    
-    def prepare_curvature_adjustment(self):           # maybe not abstract method
-        return super().prepare_curvature_adjustment()
     
 
 class Gaussian(Likelihood):
@@ -255,49 +192,7 @@ class Gaussian(Likelihood):
               -0.5*N*np.log(2*np.pi)
         return ll
         
-    @property
-    def label(self):
-        return 'Gaussian model'
-    
-    def __repr__(self):
-        return f'{self.label} with {self.model.name} and {self.grid.n}'
-
-    
-    def update_model_params(self, params: ndarray) -> None:
-        return super().update_model_params(params)
-    
-    def cov_func(self, params: ndarray, lags: Optional[ndarray]=None) -> ndarray:
-        
-        self.update_model_params(params)
-
-        if lags is None:
-            lags = self.grid.lag_matrix
-        return self.model(lags)
-        
     def adj_loglik(self, x: ndarray):
+        # TODO: better error message?
         raise ValueError('too costly')
-        return super().adj_loglik(x)
         
-    def mymethod(self, x):
-        super().mymethod(x)
-    
-     
-    def sim_z(self, params:Optional[ndarray]=None):
-        return super().sim_z(params)
-    
-    def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, 
-                                                         **opt_kwargs) -> ndarray:
-        
-        return super().sim_MLEs(params, niter, print_res=print_res, **opt_kwargs)
-    
- 
-    def estimate_standard_errors_MLE(self, params: ndarray, monte_carlo:bool=False, niter:int=5000):           # maybe not abstract method
-    
-        if monte_carlo:
-            return super().sim_MLEs(params, niter)
-        else:
-            raise NotImplementedError   # https://en.wikipedia.org/wiki/Fisher_information#Multivariate_normal_distribution
-    
-    def prepare_curvature_adjustment(self):           # maybe not abstract method
-        return super().prepare_curvature_adjustment()
-    

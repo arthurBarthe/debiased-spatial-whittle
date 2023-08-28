@@ -18,8 +18,10 @@ from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, Gaussia
 np.random.seed(1535235325)
 
 def f(i):
+    # TODO: use partial func!!
+    # TODO: remove Optimizer!
     
-    n = (128, 128)
+    n = (64, 64)
     grid = RectangularGrid(n)
     
     rho, sigma, nugget = 8., np.sqrt(1.), 0.1  # pick smaller rho
@@ -49,11 +51,12 @@ def f(i):
     acceptance_lag = mcmc_niter+1
     
     MLEs = dw.sim_MLEs(dw_opt.res.x, niter=mle_niter, print_res=False)
-    dw.prepare_curvature_adjustment(dw_opt.res.x)
+    # dw.prepare_curvature_adjustment(dw_opt.res.x)
+    dw.compute_C2(dw_opt.res.x)
     
     dw_mcmc = MCMC(dw, prior)
     post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
+    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C2)
     
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
@@ -77,7 +80,7 @@ d=2 # len(prior_mean)
 
 
 
-n_datasets=1000
+n_datasets=500
 params_array = np.zeros((n_datasets,d))
 dw_post_quants     = np.zeros((n_datasets,d*n_q))
 adj_dw_post_quants = np.zeros((n_datasets,d*n_q))
@@ -86,7 +89,7 @@ dw_post_probs     = np.zeros((n_datasets, d))
 adj_dw_post_probs = np.zeros((n_datasets, d))
 
 
-with Pool(processes=20, initializer=init_pool_processes) as pool:
+with Pool(processes=32, initializer=init_pool_processes) as pool:
 
     for i, res in enumerate(pool.imap(f, range(n_datasets))):   # could do imap_unordered
         params, q, q_adj, probs, probs_adj = res
@@ -105,7 +108,7 @@ with Pool(processes=20, initializer=init_pool_processes) as pool:
         print('')
         
 
-n = (128, 128)
+n = (64, 64)
 rho, sigma= 8., np.sqrt(1.)
 prior_mean = np.array([rho, sigma])    
 prior_cov = np.array([[1., 0.], [0., .01]])
@@ -131,8 +134,8 @@ ax[1,1].hist(adj_dw_post_probs[:,1], bins='sturges', edgecolor='k')
 ax[1,0].set_xlabel( r'$\rho$', fontsize=22)
 ax[1,1].set_xlabel( r'$\sigma$', fontsize=22)
 
-ax[0,0].text(.9, 240, 'debiased Whittle', color='r',fontsize=20)
-ax[1,0].text(.8, 160., 'Adjusted debiased Whittle', color='r',fontsize=20)
+# ax[0,0].text(.9, 240, 'debiased Whittle', color='r',fontsize=20)
+# ax[1,0].text(.8, 160., 'Adjusted debiased Whittle', color='r',fontsize=20)
 
 # for axis in ax.flatten():
     # axis.set_xticks([])

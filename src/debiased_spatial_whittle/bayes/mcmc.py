@@ -13,9 +13,10 @@ from scipy.optimize import minimize, basinhopping
 from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
 from debiased_spatial_whittle.bayes.prior import Prior
 from debiased_spatial_whittle.bayes import GaussianPrior
-from debiased_spatial_whittle.bayes.funcs import transform, compute_propcov
+from debiased_spatial_whittle.bayes.funcs import transform, compute_hessian
 
 from typing import Union, Optional, Dict, Callable
+from debiased_spatial_whittle.bayes.funcs import transform, fit
 
 
 class Optimizer:
@@ -35,61 +36,64 @@ class Optimizer:
     
     def _transform(self, x: ndarray, inv:bool=True) -> ndarray:
         return x
-        
     
-    def fit(self, x0: Union[None, ndarray]=None, prior:bool = True, basin_hopping:bool = False,
-            niter:int = 100, approx_grad:bool=False,
-            print_res:bool = True, save_res:bool=True,
-            loglik_kwargs: Optional[dict] =None, **optargs):
-        '''
-        optimize the log-likelihood function given the data
-        includes optional global optimizer
-        '''
-        # TODO: clean this up        
-        # TODO: separate class?
+    def fit(self, **kwargs):
+        return fit(self.likelihood, **kwargs)
+    
+    
+    # def fit(self, x0: Union[None, ndarray]=None, prior:bool = True, basin_hopping:bool = False,
+    #         niter:int = 100, approx_grad:bool=False,
+    #         print_res:bool = True, save_res:bool=True,
+    #         loglik_kwargs: Optional[dict] =None, **optargs):
+    #     '''
+    #     optimize the log-likelihood function given the data
+    #     includes optional global optimizer
+    #     '''
+    #     # TODO: clean this up        
+    #     # TODO: separate class?
         
-        if x0 is None: # TODO: fix this
-            x0 = self.transform(np.ones(self.n_params), inv=False)
+    #     if x0 is None: # TODO: fix this
+    #         x0 = self.transform(np.ones(self.n_params), inv=False)
         
-        if loglik_kwargs is None:
-            loglik_kwargs = dict()
+    #     if loglik_kwargs is None:
+    #         loglik_kwargs = dict()
             
-        attribute = 'MLE'
-        def obj(x):     return -self.likelihood(x, **loglik_kwargs)  # TODO: assuming __call__ is loglike
+    #     attribute = 'MLE'
+    #     def obj(x):     return -self.likelihood(x, **loglik_kwargs)  # TODO: assuming __call__ is loglike
             
-        if not approx_grad:
-            gradient = grad(obj)
-        else:
-            gradient = False
+    #     if not approx_grad:
+    #         gradient = grad(obj)
+    #     else:
+    #         gradient = False
         
-        if basin_hopping:          # for global optimization
-        # TODO: separate method?
-            minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
-            res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
-            success = res.lowest_optimization_result['success']
-        else:            
-            res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
-            success = res['success']
+    #     if basin_hopping:          # for global optimization
+    #     # TODO: separate method?
+    #         minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
+    #         res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
+    #         success = res.lowest_optimization_result['success']
+    #     else:            
+    #         res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
+    #         success = res['success']
             
-        if not success:
-            print('Optimizer failed!')
-            # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
+    #     if not success:
+    #         print('Optimizer failed!')
+    #         # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
             
-        res['type'] = attribute
-        # setattr(self, attribute, res)
+    #     res['type'] = attribute
+    #     # setattr(self, attribute, res)
         
-        if attribute=='MLE':
-            res['BIC'] = self.n_params * np.log(self.likelihood.grid.n_points) - 2*self.likelihood(res.x)         # negative logpost
+    #     if attribute=='MLE':
+    #         res['BIC'] = self.n_params * np.log(self.likelihood.grid.n_points) - 2*self.likelihood(res.x)         # negative logpost
         
-        if print_res:
-            print(f'{self.likelihood.label} {attribute}:  {self.transform(res.x).round(3)}')
+    #     if print_res:
+    #         print(f'{self.likelihood.label} {attribute}:  {self.transform(res.x).round(3)}')
             
-        if save_res:
-            setattr(self, 'res', res)
-            setattr(self.likelihood, 'res', res)
+    #     if save_res:
+    #         setattr(self, 'res', res)
+    #         setattr(self.likelihood, 'res', res)
             
-        # self.propcov = self.compute_propcov(res.x, approx_grad)                      
-        return res
+    #     # self.propcov = self.compute_propcov(res.x, approx_grad)                      
+    #     return res
 
 class MCMC:
     
@@ -170,21 +174,21 @@ class MCMC:
     #     self.propcov = self.compute_propcov(res.x, approx_grad)                      
     #     return res
     
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **postargs):
+    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **logpost_kwargs):
         '''Random walk Metropolis-Hastings: samples the specified posterior'''
         
         # TODO: mcmc diagnostics
         
         if adjusted:
-            posterior = self.adj_logpost
-            propcov   = compute_propcov(self.adj_logpost, self.likelihood.res.x)
+            def posterior(x): return self.adj_logpost(x, **logpost_kwargs)
             label = 'adjusted ' + self.likelihood.label
             
         else:
-            posterior = self.logpost
-            propcov   = compute_propcov(self.logpost, self.likelihood.res.x)
+            def posterior(x): return self.logpost(x, **logpost_kwargs)
             label = self.likelihood.label
-    
+            
+        propcov   = compute_hessian(posterior, self.likelihood.res.x, inv=True)
+            
         A     = np.zeros(niter, dtype=np.float64)
         U     = np.random.rand(niter)
             

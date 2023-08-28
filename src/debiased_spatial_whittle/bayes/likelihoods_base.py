@@ -16,7 +16,7 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
-from debiased_spatial_whittle.bayes.funcs import transform, compute_propcov
+from debiased_spatial_whittle.bayes.funcs import transform, compute_hessian, svd_decomp, fit
 from typing import Union
 
 fftn = np.fft.fftn
@@ -27,7 +27,7 @@ inv = np.linalg.inv
 cholesky = np.linalg.cholesky
 
 class Likelihood(ABC):
-    
+
     def __init__(self, z: ndarray, grid: RectangularGrid,
                  model: CovarianceModel, nugget: Optional[float] = 0.1,
                  use_taper: Union[None, ndarray]=None, transform_func: Optional[Callable] = None):
@@ -62,8 +62,6 @@ class Likelihood(ABC):
             self.transform = self._transform
         else:
             self.transform = transform_func
-        
-        
     
     @property
     def z(self):
@@ -90,25 +88,22 @@ class Likelihood(ABC):
         return x
     
     @abstractmethod
+    def __call__(self, x: ndarray) -> float: # loglik
+        pass
+    
+    @property
+    def label(self) -> str:
+        return self.__class__.__name__
+    
+    def __repr__(self):
+        return f'{self.label} likelihood with {self.model.name} and n={self.n}'
+    
     def update_model_params(self, params: ndarray) -> None:
        all_params = self.model.params
        updates = dict(zip(all_params.names, params))
        all_params.update_values(updates)
        return
-    
-    @abstractmethod
-    def __call__(self, x: ndarray) -> float: # loglik
-        pass
-    
-    @abstractmethod
-    def __repr__(self):
-        pass
-    
-    @property
-    def label(self) -> str:
-        pass
-    
-    @abstractmethod
+   
     def cov_func(self, params: ndarray, lags: Optional[list[ndarray, ...]] =None, **cov_args) -> list[ndarray, ...]:
         '''compute covariance func on a grid of lags given parameters'''
         
@@ -119,20 +114,14 @@ class Likelihood(ABC):
         self.update_model_params(params)
         return ifftshift(self.model(np.stack(lags), **cov_args))
     
+    def fit(self, **kwargs):
+        # TODO: copy docstring and kwargs over from fit
+        return fit(self, **kwargs)
     
-    @abstractmethod
-    def mymethod(self,x:Union[int, ndarray]):
-        self.abc = x
-        return x+5
-    
+    def adj_loglik(self, x: ndarray, C, **loglikargs) -> float: 
+        return self(self.res.x + C @ (x - self.res.x), **loglikargs)
 
     
-    @abstractmethod
-    def adj_loglik(self, x: ndarray, **loglikargs) -> float: 
-        return self(self.res.x + self.C @ (x - self.res.x), **loglikargs)
-
-    
-    @abstractmethod
     def sim_z(self, params: Union[None, ndarray]=None):
             
         self.update_model_params(params)
@@ -140,7 +129,6 @@ class Likelihood(ABC):
         # print(sampler.gaussian_sampler.sampling_grid.n)
         return sampler()
     
-    @abstractmethod
     def sim_MLEs(self, params: ndarray, niter:int=5000, print_res:bool=True, approx_grad:bool = False, **opt_kwargs) -> ndarray:
         '''simulation approximation of the sampling distribution of MLE at params'''
         i = 0
@@ -166,7 +154,7 @@ class Likelihood(ABC):
                 
                 
             x0 = self.transform(params, inv=False)
-                
+            # TODO: use fit!!
             # TODO: no basin-hopping
             res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **opt_kwargs)
             if res.x[0] > 100:
@@ -187,23 +175,57 @@ class Likelihood(ABC):
         # self.prepare_curvature_adjustment()      # compute C matrix for posterior adjustment
         return self.MLEs
 
-
-    @abstractmethod
-    def estimate_standard_errors_MLE(self):           # maybe not abstract method
-        pass
+    # @abstractmethod
+    # def estimate_standard_errors_MLE(self):           # maybe not abstract method
+    #     pass
     
-    @abstractmethod
-    def prepare_curvature_adjustment(self, mle: ndarray):
+    def compute_C_old(self, mle: ndarray):
         # TODO: singular value decomp
         # TODO: change in likelihoods.py!!
+        # TODO: approx_grad!!!
 
         B = cholesky(self.MLEs_cov)
         
         # TODO: only autograd propcov
-        propcov = compute_propcov(self, mle)
+        propcov = compute_hessian(self, mle, inv=True)
         L_inv = inv(cholesky(propcov))    # propcov only for MLE
         self.C = inv(B @ L_inv)
         return
+    
+    def compute_C2(self, mle: ndarray):
+        B = svd_decomp(self.MLEs_cov)
+        
+        propcov = compute_hessian(self, mle, inv=True)
+        L_inv = inv(svd_decomp(propcov))    # propcov only for MLE
+        self.C2 = inv(B @ L_inv)
+        return
+    
+    def compute_C3(self, mle: ndarray):
+        '''
+        C = M^-1 M_A
+        M_A = svd(H J^-1 H)
+        M   = svd(H)
+        '''
+        M_A = svd_decomp(inv(self.MLEs_cov))
+        
+        M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
+        self.C3 = inv(M) @ M_A
+        return
+    
+    def compute_C4(self, mle: ndarray):
+        '''
+        C = M^-1 M_A
+        M_A = svd(H J^-1 H)
+        M   = svd(H)
+        '''
+        # TODO: Use theortical matrices!
+        # M_A = svd_decomp(inv(self.MLEs_cov))
+        
+        # M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
+        # self.C3 = inv(M) @ M_A
+        return
+
+
     
     
     # @abstractmethod
