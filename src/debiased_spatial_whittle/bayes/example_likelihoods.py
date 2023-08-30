@@ -1,12 +1,13 @@
 import autograd.numpy as np
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, SquaredModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, Parameters
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, MCMC, GaussianPrior, Optimizer
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
-
-from debiased_spatial_whittle.bayes.funcs import transform
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessian
+from debiased_spatial_whittle.likelihood import DebiasedWhittle
 
 from autograd import grad, hessian
 
@@ -25,44 +26,35 @@ sampler = SamplerOnRectangularGrid(model, grid)
 z = sampler()
 
 
-prior_mean = np.array([model.rho.value, model.sigma.value])
-
-prior = GaussianPrior(prior_mean, 0.1*np.eye(2))   # prior on unrestricted space
-
-mle_niter=500
+mle_niter=2000
 dw = DeWhittle(z, grid, ExponentialModel(), nugget=0.1, transform_func=None)
 
-dw.fit()
+dw.fit(x0=params)
 MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
 dw.compute_C_old(dw.res.x)
 dw.compute_C2(dw.res.x)
 dw.compute_C3(dw.res.x)
 
+grads = dw.sim_J_matrix(dw.res.x, niter=5000)
+
+p = Periodogram()
+ep = ExpectedPeriodogram(grid, p)
+d = DebiasedWhittle(p, ep)
+dw.update_model_params(dw.res.x)
+H = d.fisher(dw.model, Parameters([ dw.model.rho, dw.model.sigma ]))
+dw.H = H
+
+dw.compute_C()
+
 mcmc_niter=5000
-dw_mcmc = MCMC(dw, prior)
-dw_post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=1000)
-adj_dw_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=1000, C=dw.C)
-adj2_dw_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=1000, C=dw.C2)
-adj3_dw_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=1000, C=dw.C3)
+dw_post = RW_MH(mcmc_niter, dw.res.x, dw, compute_hessian(dw, dw.res.x, inv=True))
+adj_dw_post  = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C),  C=dw.C)
+adj1_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C1), C=dw.C1)
+adj2_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C2), C=dw.C2)
+adj3_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C3), C=dw.C3)
 
 title = 'posterior comparisons'
-legend_labels = ['deWhittle', 'adj deWhittle', 'adj2 deWhittle', 'adj3 deWhittle']
-posts = [dw_post, adj_dw_post, adj2_dw_post, adj3_dw_post]
-plot_marginals(posts, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2),  cmap='hsv')
-
-
-stop
-
-
-grads = dw.sim_var_grad(np.exp(dw_mcmc.res.x), niter=mle_niter, print_res=True)
-
-HJH1 = dw.MLEs_cov   # J^-1
-
-H = -np.mean(dw.hess_at_params, axis=0)
-# H = -hessian(dw)(dw_mcmc.res.x)
-
-print(HJH1)
-print(inv(H) @ dw.J @ inv(H))
-# print(H @ inv(dw.J) @ H)
-
+legend_labels = ['deWhittle', 'adj deWhittle', 'adj1 deWhittle', 'adj2 deWhittle', 'adj3 deWhittle']
+posts = [dw_post, adj_dw_post, adj1_dw_post, adj2_dw_post, adj3_dw_post]
+plot_marginals(posts, params, title, [r'$\rho$', r'$\sigma$'], legend_labels, shape=(1,2),  cmap='hsv')
 

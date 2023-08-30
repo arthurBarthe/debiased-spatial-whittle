@@ -5,7 +5,7 @@ np = BackendManager.get_backend()
 import types
 from numpy import ndarray
 from autograd import grad, hessian
-from numdifftools import Hessian
+from numdifftools import Gradient, Hessian
 from typing import Callable, Union
 from scipy.optimize import minimize, basinhopping
 
@@ -52,24 +52,83 @@ def transform(x: ndarray, inv:bool=True) -> ndarray:
     return np.log(x)
 
 
-def compute_hessian(logpost: Callable, 
+def compute_gradient(func: Callable, 
+                     x: ndarray, 
+                     approx_grad: bool=False,
+                     **func_kwargs) -> ndarray:
+    '''
+    Computes the gradient of a function evaluated at point x.
+
+    Parameters
+    ----------
+    func : Callable
+        Function for gradient to be computed.
+    x : ndarray
+        Point which gradient is evaluated.
+    approx_grad : bool, optional
+        Use numerical differentiation. The default is False.
+    **func_kwargs :
+        Optional keyword arguments for func.
+
+    Returns
+    -------
+    ndarray
+        Gradient of func at x.
+
+    '''    
+    
+    if approx_grad:
+        grad_f = Gradient(func)(x, **func_kwargs)
+    else:
+        grad_f = grad(func)(x, **func_kwargs)                 # autodiff
+        
+        if not np.all(np.isfinite(grad_f)):
+            grad_f = -Gradient(func)(x, **func_kwargs)        # fallback to numerical diff
+
+    return grad_f
+
+def compute_hessian(func: Callable, 
                     x: ndarray, 
                     approx_grad: bool=False, 
-                    inv:bool=False) -> ndarray:
-    
+                    inv:bool=False,
+                    **func_kwargs) -> ndarray:
     '''
-    computes the negative hessian evaluated at point x
-    if inv=True, computes the inverse hessian
-    '''    
+    Computes the negative Hessian of specified function, usually a 
+    log-likelihood or log-posterior.
+
+    Parameters
+    ----------
+    func : Callable
+        Function for Hessian to be computed..
+    x : ndarray
+        Point which Hessian is evaluated.
+    approx_grad : bool, optional
+        Use numerical differentiation. The default is False.
+    inv : bool, optional
+        Compute the inverse of the Hessian. For MCMC proposal covariance matrix. The default is False.
+    **func_kwargs :
+        Optional keyword arguments for func.
+
+    Raises
+    ------
+    error
+        Prints warning if Hessian not invertible.
+
+    Returns
+    -------
+    ndarray
+        Hessian of func at x.
+
+    '''
     # TODO: test this with compute_propcov_original
     
     if approx_grad:
-        hess = -Hessian(logpost)(x)
+        hess = -Hessian(func)(x, **func_kwargs)
     else:
-        hess = -hessian(logpost)(x)            # autodiff
+        hess = -hessian(func)(x, **func_kwargs)            # autodiff
         
         if not np.all(np.isfinite(hess)):
-            hess = -Hessian(logpost)(x)        # fallback to numerical diff
+            hess = -Hessian(func)(x, **func_kwargs)        # fallback to numerical diff
             
     if not inv:
         return hess
@@ -83,11 +142,12 @@ def compute_hessian(logpost: Callable,
         return False
 
 
-def fit(func: Callable, x0: Union[None, ndarray]=None,
+def fit(func: Callable, 
+        x0: Union[None, ndarray]=None,
         basin_hopping:bool = False,
         approx_grad:bool=False,
         transform_params: Union[None,Callable] = None,
-        include_prior: str = False,
+        included_prior: str = False,
         print_res:bool = True,
         save_res:bool=True,
         loglik_kwargs: Union[None,Callable]=None,
@@ -100,7 +160,7 @@ def fit(func: Callable, x0: Union[None, ndarray]=None,
     # TODO: test this!
     is_func = isinstance(func, types.FunctionType)    # check if func is a function or class
     
-    attribute = 'MAP' if include_prior else 'MLE'     # TODO: not including prior anywhere
+    attribute = 'MAP' if included_prior else 'MLE'     # TODO: not including prior anywhere
     
     if is_func and transform_params is None:
         def transform_params(x: ndarray, inv:bool=True) -> ndarray:    return x
@@ -144,6 +204,40 @@ def fit(func: Callable, x0: Union[None, ndarray]=None,
     return res
 
 
+def RW_MH(niter, x0, log_posterior, propcov, acceptance_lag=1000, **logpost_kwargs):
+    from time import time
+    n_params  = len(x0)
+    h         = 2.38/np.sqrt(n_params)
+    
+    A          = np.zeros(niter, dtype=np.float64)
+    U          = np.random.rand(niter)
+    props      = h*np.random.multivariate_normal(np.zeros(len(propcov)), propcov, size=niter)
+    post_draws = np.zeros((niter, n_params))
+    
+    post_draws[0] = x0
+    crnt_step     = x0
+    bottom        = log_posterior(crnt_step, **logpost_kwargs)
+    # print(bottom)
+    
+    print(f'{"initializing RWMH":-^50}')
+    t0 = time()
+    for i in range(1, niter):
+        
+        prop_step = crnt_step + props[i]
+        top       = log_posterior(prop_step, **logpost_kwargs)
+        # print(top)
+        
+        A[i]      = np.min((1., np.exp(top-bottom)))
+        if U[i] < A[i]:
+            crnt_step  = prop_step
+            bottom     = top
+        
+        post_draws[i]   = crnt_step
+            
+        if (i+1)%acceptance_lag==0:
+            print(f'Iteration: {i+1}    Acceptance rate: {A[i-(acceptance_lag-1): (i+1)].mean().round(3)}    Time: {np.round(time()-t0,3)}s')
+            
+    return post_draws
         
     
 

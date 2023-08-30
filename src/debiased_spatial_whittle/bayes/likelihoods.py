@@ -52,7 +52,7 @@ class DeWhittle(Likelihood):
         return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask)
 
         
-    def __call__(self, params: ndarray, z:Optional[ndarray]=None, **cov_args) -> float: 
+    def __call__(self, params: ndarray, z:Optional[ndarray]=None, constant:str = 'whittle', **cov_args) -> float: 
         
         params = self.transform(params, inv=True)
         
@@ -63,8 +63,13 @@ class DeWhittle(Likelihood):
                     
         e_I = self.expected_periodogram(params, **cov_args)
         
-        # TODO: constants?            
-        ll = -(1/2) * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
+        # TODO: constants?
+        if constant == 'dewhittle':
+            c = 1/self.n_points
+        else:
+            c = 1/2
+        
+        ll = - c * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
         return ll
     
 

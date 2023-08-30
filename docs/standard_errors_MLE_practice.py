@@ -17,6 +17,8 @@ from numpy.linalg import inv
 
 n = (64, 64)
 grid = RectangularGrid(n)
+N = grid.n_points
+
 lags = grid.lags_unique
 
 model = ExponentialModel()
@@ -48,15 +50,16 @@ hessians = np.zeros((M, p, p))
 for i in range(M):
     print(f'\ri={i+1}', end='')
     z = dw.sim_z(params)
-    plt.imshow(z)
-    plt.show()
-    grads[i] = grad(dw)(params, z=z)          # TODO: CONSTANTS ON DEWHITTLE!!!!
-    hessians[i] = hessian(dw)(params, z=z)
+    
+    # plt.imshow(z)
+    # plt.show()
+    grads[i] = grad(dw)(params, z=z, constant='whittle')          # TODO: CONSTANTS ON DEWHITTLE!!!!
+    hessians[i] = hessian(dw)(params, z=z, constant='whittle')
 
-Jhat = np.cov(grads.T) 
+Jhat = np.cov((2/N) * grads.T)
 print()
 print( Jhat )
-print( -np.mean(hessians,axis=0)/ grid.n_points )
+print( -2 * np.mean(hessians,axis=0)/ grid.n_points )
 
 sandwich = inv(H) @ Jhat @ inv(H)   # TODO: H is negative?
 print(inv(sandwich))
