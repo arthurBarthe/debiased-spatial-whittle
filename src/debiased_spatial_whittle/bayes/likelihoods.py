@@ -3,11 +3,13 @@ BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
 from autograd.numpy import ndarray
+from autograd import jacobian
 
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.bayes.likelihoods_base import Likelihood
+from debiased_spatial_whittle.models import Parameters 
 from debiased_spatial_whittle.bayes.funcs import transform
 
 from typing import Union, Optional, Dict, Callable
@@ -49,7 +51,7 @@ class DeWhittle(Likelihood):
     
     def expected_periodogram(self, params: ndarray, **cov_args) -> ndarray:
         acf = self.cov_func(params, lags = None, **cov_args)
-        return compute_ep(acf, self.grid.spatial_kernel, self.grid.mask)
+        return compute_ep(ifftshift(acf), self.grid.spatial_kernel, self.grid.mask)
 
         
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, constant:str = 'whittle', **cov_args) -> float: 
@@ -71,6 +73,25 @@ class DeWhittle(Likelihood):
         
         ll = - c * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
         return ll
+    
+    
+    def d_cov_func(self, params: ndarray, lags: Optional[ndarray] = None) -> ndarray:
+        '''compute derivates of covariance function w.r.t. parameters'''
+        # TODO: THIS IN GENERAL DOESNT WORK!
+        if lags is None:
+            lags = self.grid.lags_unique
+        
+        self.update_model_params(params)
+        d_cov = self.model._gradient(lags).T[:len(params)]     # for regular parameterization
+        
+        x = self.transform(params, inv=False)
+        jac = np.diag(jacobian(self.transform)(x, inv=True))        # need jacobian when transforming parameters        
+        
+        return jac[(...,) + (np.newaxis,) * self.grid.ndim ] * d_cov
+        
+        
+        
+        
     
 
 class Whittle(Likelihood):
@@ -147,7 +168,7 @@ class Whittle(Likelihood):
         For small grids may need to upsample
         '''
         
-        acf = ifftshift(self.cov_func(params, self.freq_grid_for_fft, **cov_args))  # undoing ifftshift
+        acf = self.cov_func(params, self.freq_grid_for_fft, **cov_args)
         f = np.real(fftn(fftshift(acf)))
         assert np.all(f>0)
         return f

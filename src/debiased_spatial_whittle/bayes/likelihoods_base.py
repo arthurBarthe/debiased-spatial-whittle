@@ -112,7 +112,7 @@ class Likelihood(ABC):
             lags = self.grid.lags_unique
 
         self.update_model_params(params)
-        return ifftshift(self.model(np.stack(lags), **cov_args))
+        return self.model(np.stack(lags), **cov_args)
     
     def fit(self, **fit_kwargs):
         # TODO: copy docstring and kwargs over from fit

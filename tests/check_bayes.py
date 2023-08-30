@@ -155,12 +155,12 @@ def dewhittle_squaredmodel_full_bayes():
 
 def gauss_posterior_test():
     model = SquaredExponentialModel()
-    model.rho = 8
+    model.rho = 3
     model.sigma = 1
     model.nugget=0.1
     grid = RectangularGrid((32,32))
     
-    params = np.array([8.,1.])
+    params = np.array([3.,1.])
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
     

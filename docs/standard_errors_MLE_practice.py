@@ -35,7 +35,6 @@ ep = ExpectedPeriodogram(grid, p)
 d = DebiasedWhittle(p, ep)
 H = d.fisher(model, Parameters([model.rho, model.sigma ]))
 print(H)
-# assert h.shape == (2, 2)
 assert np.all(np.diag(H) >= 0)
 
 J = d.jmatrix(model, Parameters([model.rho, model.sigma ]))

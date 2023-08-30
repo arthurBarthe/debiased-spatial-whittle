@@ -1,7 +1,7 @@
 import autograd.numpy as np
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, SquaredModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, Parameters
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, MCMC, GaussianPrior, Optimizer
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
@@ -9,7 +9,7 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, Square
 from debiased_spatial_whittle.bayes.funcs import transform
 from numpy.testing import assert_allclose
 
-from autograd import grad, hessian
+from autograd import grad, hessian, jacobian
 
 np.random.seed(5325234)
 inv = np.linalg.inv
@@ -75,9 +75,33 @@ def test_likelihood_gauss_grad():
     assert np.all(np.isfinite(ll_grad))
     assert np.all(np.isfinite(ll_hess))
     
+    
+    
+def test_dewhittle_d_cov_func():
+    # TODO: this is not in general true!!
+    n = (32,32)
+    params = np.array([8.,1.])
+    model = ExponentialModel()
+    model.rho = params[0]
+    model.sigma = params[1]
+    model.nugget=0.1
+    grid = RectangularGrid(n)
+    lags = grid.lags_unique
+    
+    dw = DeWhittle(np.ones(n), grid, ExponentialModel(), nugget=0.1, transform_func=transform)
+    
+    def cov(x, lags):
+        return dw.cov_func(transform(x), lags)
+    
+    x = np.log(params)
+    grads = jacobian(cov)(x, lags).T
+    
+    assert_allclose(grads, dw.d_cov_func(params) )
+    
 if __name__ == '__main__':
     test_likelihood_dewhittle_grad()
     test_likelihood_whittle_grad()
     test_likelihood_gauss_grad()
+    test_dewhittle_d_cov_func()
     
     
