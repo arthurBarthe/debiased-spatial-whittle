@@ -40,6 +40,26 @@ def exp_model(params: ndarray, lags):
     return acf
 
 
+
+def d_exp_model(params: ndarray, lags):
+    rho, sigma = np.exp(params)
+    nugget = 0.1
+    
+    d = np.sqrt(sum((lag ** 2 for lag in lags)))
+    d_rho = (sigma**2 / rho) * d * np.exp(- d / rho)
+    d_sigma = 2 * sigma**2 * np.exp(- d / rho)
+    return np.stack((d_rho, d_sigma), axis=0)
+
+# params = np.array([8., 1.5])
+x = np.random.randn(2)*10
+print(x)
+grads1 = jacobian(exp_model)(x, lags).T   # Theoretical deriv. with log transform
+grads2 = d_exp_model(x, lags)
+
+print(np.allclose(grads1, grads2))
+
+stop
+
 grads = model.gradient(grid.lags_unique, Parameters([model.rho, model.sigma ]))
 d_rho, d_sigma = grads['rho'], grads['sigma']
 
