@@ -101,12 +101,37 @@ def test_dewhittle_d_cov_func():
         
 
     
-# TODO: write test to confirm Arthur's H to my H, too much replication?
+def test_dewhittle_fisher():
+    '''test to confirm Arthur's H to my H, too much replication?'''
+    
+    from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+    from debiased_spatial_whittle.likelihood import DebiasedWhittle
+
+    n=(64,64)
+    grid = RectangularGrid(n)
+    model = ExponentialModel()
+    params = abs(np.random.randn(2)*[3,1])
+    model.rho = params[0]
+    model.sigma = params[1]
+    model.nugget=0.1
+    
+    dw = DeWhittle(np.ones(n), grid, ExponentialModel(), nugget=0.1, transform_func=None)
+    
+    
+    p = Periodogram()
+    ep = ExpectedPeriodogram(grid, p)
+    d = DebiasedWhittle(p, ep)
+    H = d.fisher(model, Parameters([model.rho, model.sigma ]))
+    assert np.all(np.diag(H) >= 0)
+    
+    H2 = dw.fisher(params)
+    assert_allclose( H, H2 * (2/dw.n_points) )
+    
 
 if __name__ == '__main__':
     test_likelihood_dewhittle_grad()
     test_likelihood_whittle_grad()
     test_likelihood_gauss_grad()
     test_dewhittle_d_cov_func()
-    
+    test_dewhittle_fisher()
     

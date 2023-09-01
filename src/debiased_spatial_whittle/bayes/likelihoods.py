@@ -99,7 +99,20 @@ class DeWhittle(Likelihood):
             aux = ifftshift(d_cov[i])
             d_ep.append(compute_ep(aux, self.grid.spatial_kernel, self.grid.mask, fold=True))  # TODO: ask about spatial_kernel and grid.mask
         return np.stack(d_ep, axis=0)
+    
+    
+    def fisher(self, params: ndarray) -> ndarray:
+        '''Computes the Fisher information matrix at parameter values'''
+        ep = self.expected_periodogram(params)
+        d_ep = self.d_expected_periodogram(params)
         
+        d = len(params)
+        H = np.zeros((d,d))
+        for i in range(d):
+            for j in range(d):
+                H[i,j] = np.sum( d_ep[i] * d_ep[j] / ep ** 2 )
+                
+        return H / 2
         
     
 

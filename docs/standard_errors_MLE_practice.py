@@ -22,7 +22,7 @@ N = grid.n_points
 lags = grid.lags_unique
 
 model = ExponentialModel()
-params = np.array([8., 1.])
+params =  np.array([8., 1.]) + np.random.rand(2)
 model.rho = params[0]
 model.sigma = params[1]
 model.nugget=0.1
@@ -37,16 +37,18 @@ H = d.fisher(model, Parameters([model.rho, model.sigma ]))
 print(H)
 assert np.all(np.diag(H) >= 0)
 
-dep = dw.d_expected_periodogram(params)
-ep = dw.expected_periodogram(params)
-
-np.sum((dep[0] * dep[0])/ (ep ** 2)) / dw.n_points
+H2 = dw.fisher(params)
 
 
-J = d.jmatrix(model, Parameters([model.rho, model.sigma ]))
-approx_sandwich = inv(H) @ J @ inv(H)
+# TODO: test with log parameterization vs simulation!!!
+print(np.allclose(H, H2 * (2/dw.n_points) ))
+
+# J = d.jmatrix(model, Parameters([model.rho, model.sigma ]))
+# approx_sandwich = inv(H) @ J @ inv(H)
 # approx_sandwich = d.variance_of_estimates(model, Parameters([model.rho, model.sigma ]) )
 
+
+stop
 
 M = 5000
 p = len(params)
