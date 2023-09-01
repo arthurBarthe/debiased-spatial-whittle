@@ -76,20 +76,29 @@ class DeWhittle(Likelihood):
     
     
     def d_cov_func(self, params: ndarray, lags: Optional[ndarray] = None) -> ndarray:
-        '''compute derivates of covariance function w.r.t. parameters'''
-        # TODO: THIS IN GENERAL DOESNT WORK!
+        '''compute derivatives of covariance function w.r.t. parameters'''
         if lags is None:
             lags = self.grid.lags_unique
         
         self.update_model_params(params)
-        d_cov = self.model._gradient(lags).T[:len(params)]     # for regular parameterization
         
-        x = self.transform(params, inv=False)
-        jac = np.diag(jacobian(self.transform)(x, inv=True))        # need jacobian when transforming parameters        
+        if self.transform_flag:
+            d_cov = self.model._gradient_reparamed(lags).T       # only for log-transform
+        else:
+            d_cov = self.model._gradient(lags).T                 # for regular parameterization
+                
+        return d_cov[:len(params)]
         
-        return jac[(...,) + (np.newaxis,) * self.grid.ndim ] * d_cov
+    
+    def d_expected_periodogram(self, params: ndarray) -> ndarray:
+        '''Computes the derivative of the expected periodgram w.r.t. parameters'''
         
-        
+        d_cov = self.d_cov_func(params)
+        d_ep = []
+        for i in range(len(params)):
+            aux = ifftshift(d_cov[i])
+            d_ep.append(compute_ep(aux, self.grid.spatial_kernel, self.grid.mask, fold=True))  # TODO: ask about spatial_kernel and grid.mask
+        return np.stack(d_ep, axis=0)
         
         
     

@@ -58,10 +58,12 @@ class Likelihood(ABC):
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
         
-        if transform_func is None:
+        if transform_func is None:             # TODO: make a separate class
             self.transform = self._transform
+            self._transform_flag = False
         else:
             self.transform = transform_func
+            self._transform_flag = True
     
     @property
     def z(self):
@@ -86,6 +88,10 @@ class Likelihood(ABC):
     
     def _transform(self, x: ndarray, inv:bool=True) -> ndarray:
         return x
+    
+    @property
+    def transform_flag(self):
+        return self._transform_flag
     
     @abstractmethod
     def __call__(self, x: ndarray) -> float: # loglik

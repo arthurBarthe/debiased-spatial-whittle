@@ -307,6 +307,17 @@ class ExponentialModel(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         d_nugget = 1. * (d == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transformed, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d = np.sqrt(sum((lag ** 2 for lag in lags)))
+        d_rho = (sigma**2 / rho) * d * np.exp(- d / rho)
+        d_sigma = 2 * sigma**2 * np.exp(- d / rho)
+        d_nugget = 1 * (d == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+
 
 
 class ExponentialModelUniDirectional(CovarianceModel):
@@ -409,7 +420,7 @@ class SquaredExponentialModel(CovarianceModel):
         
         d2 = sum((lag**2 for lag in lags))
         nugget_effect = self.nugget.value*np.all(lags == 0, axis=0)
-        acf = self.sigma.value ** 2 * np.exp(- 0.5*d2 / self.rho.value ** 2) + nugget_effect  # exp(0.5) as well
+        acf = self.sigma.value ** 2 * np.exp( -0.5 * d2 / self.rho.value ** 2) + nugget_effect  # TODO: added exp(-0.5)
         return acf
     
     def f(self, freq_grid:Union[list, np.ndarray], infsum_grid:Union[list, np.ndarray], d:int=2):
@@ -431,8 +442,18 @@ class SquaredExponentialModel(CovarianceModel):
         the model's parameters"""
         # TODO: include nugget
         d2 = sum((lag ** 2 for lag in lags))
-        d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
-        d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
+        d_rho =  (1 / self.rho.value ** 3) * d2 * self.sigma.value ** 2 * np.exp( -0.5 * d2 / self.rho.value ** 2)
+        d_sigma = 2 * self.sigma.value * np.exp( -0.5 * d2 / self.rho.value ** 2)
+        d_nugget = 1 * (d2 == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transform, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d2 = sum((lag ** 2 for lag in lags))
+        d_rho = (sigma / rho) ** 2 * d2 * np.exp( -0.5 * d2 / rho ** 2 )
+        d_sigma = 2 * sigma ** 2 * np.exp( -0.5 * d2 / rho ** 2 )
         d_nugget = 1 * (d2 == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 

@@ -48,15 +48,55 @@ def d_exp_model(params: ndarray, lags):
     d = np.sqrt(sum((lag ** 2 for lag in lags)))
     d_rho = (sigma**2 / rho) * d * np.exp(- d / rho)
     d_sigma = 2 * sigma**2 * np.exp(- d / rho)
-    return np.stack((d_rho, d_sigma), axis=0)
+    return np.stack((d_rho, d_sigma), axis=-1)
 
 # params = np.array([8., 1.5])
 x = np.random.randn(2)*10
 print(x)
 grads1 = jacobian(exp_model)(x, lags).T   # Theoretical deriv. with log transform
-grads2 = d_exp_model(x, lags)
+grads2 = d_exp_model(x, lags).T
 
 print(np.allclose(grads1, grads2))
+
+
+
+
+
+def sqexp_model(params: ndarray, lags):
+    rho, sigma = np.exp(params)
+    nugget = 0.1
+    
+    d2 = sum((lag**2 for lag in lags))
+    nugget_effect = nugget*np.all(lags == 0, axis=0)
+    
+    acf = sigma** 2 * np.exp(- 0.5 * d2 / rho** 2) + nugget_effect  # exp(0.5) as well
+    return acf
+
+
+
+def d_sqexp_model(params: ndarray, lags):
+    rho, sigma = np.exp(params)
+    nugget = 0.1
+    
+    d2 = sum((lag ** 2 for lag in lags))
+    d_rho = (sigma / rho) ** 2 * d2 * np.exp( -0.5 * d2 / rho ** 2 )
+    d_sigma = 2 * sigma ** 2 * np.exp( -0.5 * d2 / rho ** 2 )
+    return np.stack((d_rho, d_sigma), axis=-1)
+
+
+
+x = np.random.randn(2)*10
+print(x)
+sqexp_grads1 = jacobian(sqexp_model)(x, lags).T   # Theoretical deriv. with log transform
+sqexp_grads2 = d_sqexp_model(x, lags).T
+
+print(np.allclose(sqexp_grads1 , sqexp_grads2 ))
+
+
+
+
+
+
 
 stop
 

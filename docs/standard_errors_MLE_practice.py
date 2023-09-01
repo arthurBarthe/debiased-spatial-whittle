@@ -37,6 +37,12 @@ H = d.fisher(model, Parameters([model.rho, model.sigma ]))
 print(H)
 assert np.all(np.diag(H) >= 0)
 
+dep = dw.d_expected_periodogram(params)
+ep = dw.expected_periodogram(params)
+
+np.sum((dep[0] * dep[0])/ (ep ** 2)) / dw.n_points
+
+
 J = d.jmatrix(model, Parameters([model.rho, model.sigma ]))
 approx_sandwich = inv(H) @ J @ inv(H)
 # approx_sandwich = d.variance_of_estimates(model, Parameters([model.rho, model.sigma ]) )

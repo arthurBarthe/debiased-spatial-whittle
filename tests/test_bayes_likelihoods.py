@@ -78,26 +78,31 @@ def test_likelihood_gauss_grad():
     
     
 def test_dewhittle_d_cov_func():
-    # TODO: this is not in general true!!
-    n = (32,32)
-    params = np.array([8.,1.])
-    model = ExponentialModel()
-    model.rho = params[0]
-    model.sigma = params[1]
-    model.nugget=0.1
+    '''test of derivates of covariances function, original and reparameterized version, only for SqExp and Exp models'''
+    n = (16,16)
     grid = RectangularGrid(n)
     lags = grid.lags_unique
+    model = ExponentialModel()   # SquaredExponentialModel()
     
-    dw = DeWhittle(np.ones(n), grid, ExponentialModel(), nugget=0.1, transform_func=transform)
-    
-    def cov(x, lags):
-        return dw.cov_func(transform(x), lags)
-    
-    x = np.log(params)
-    grads = jacobian(cov)(x, lags).T
-    
+    dw = DeWhittle(np.ones(n), grid, model, nugget=0.1, transform_func=None)
+    params = np.array([8.,2.]) + np.random.rand(2)
+    grads = jacobian(dw.cov_func)(params, lags).T
     assert_allclose(grads, dw.d_cov_func(params) )
     
+    
+    def reparamed_cov(x, lags):
+        return dw.cov_func(transform(x, inv=True), lags)
+    
+    dw = DeWhittle(np.ones(n), grid, model, nugget=0.1, transform_func=transform)
+    x = np.random.randn(2)*10
+    grads = jacobian(reparamed_cov)(x, lags).T
+    assert_allclose(grads, dw.d_cov_func( transform(x) ))
+    
+        
+
+    
+# TODO: write test to confirm Arthur's H to my H, too much replication?
+
 if __name__ == '__main__':
     test_likelihood_dewhittle_grad()
     test_likelihood_whittle_grad()
