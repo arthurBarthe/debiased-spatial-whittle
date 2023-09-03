@@ -10,18 +10,20 @@ from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerCorrelatedOnRectangularGrid
+from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = 0.9
+corr = 0.5
 
 g = RectangularGrid((256, 256))
-m = SquaredExponentialModel()
-m.rho = 45
+m = ExponentialModel()
+m.rho = 15
 m.sigma = 1
 bvm = BivariateUniformCorrelation(m)
-print(bvm.free_param_bounds)
+bvm.r_0 = corr
+bvm.f_0 = 1.
+print(bvm)
 
-s = SamplerCorrelatedOnRectangularGrid(m, g, corr)
+s = SamplerBUCOnRectangularGrid(bvm, g)
 
 data = s()
 
@@ -40,7 +42,7 @@ ep = ExpectedPeriodogram(g, p)
 
 db = MultivariateDebiasedWhittle(p, ep)
 
-rs = np.linspace(-0.99, 0.99, 50)
+rs = np.linspace(-0.9, 0.9, 50)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):

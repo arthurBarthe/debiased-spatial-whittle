@@ -210,6 +210,8 @@ class CovarianceModel(ABC):
 
     @abstractmethod
     def _gradient(self, x: np.ndarray):
+        """Provide the gradient with respect to all parameters of the covariance model for the passed lags.
+        The last dimension of the returned array should correspond to the parameters of the model."""
         pass
 
     def __setattr__(self, key: str, value: Union[float, Parameter]):
@@ -230,6 +232,25 @@ class CovarianceModel(ABC):
 
     def __repr__(self):
         return self.name + '(\n' + self.params.__repr__() + '\n)'
+
+    def __getstate__(self):
+        """
+        Necessary for pickling and unpiclking
+        Returns
+        -------
+        State as a dictionary
+        """
+        return self.__dict__
+
+    def __setstate__(self, state):
+        """
+        Necessary for pickling and unpickling.
+        Parameters
+        ----------
+        state
+            Dictionary with the new state
+        """
+        self.__dict__.update(state)
 
 
 class SeparableModelOld(CovarianceModel):

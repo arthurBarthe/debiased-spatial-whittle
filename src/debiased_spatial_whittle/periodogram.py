@@ -268,7 +268,9 @@ class ExpectedPeriodogram:
         Parameters
         ----------
         acv
-            Autocovariance evaluated on the grid
+            Autocovariance evaluated on the grid. In the case where the model is multivariate, the first
+            dimensions correspond to the lags (one dimension for each spatial dimension), and the last two dimensions
+            are used for the covariance matrix.
         fold
             Whether to apply folding of the expected periodogram
         d
