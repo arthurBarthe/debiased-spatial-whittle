@@ -35,7 +35,7 @@ print(hmat)
 
 # variance matrix of the score
 #jmat = db.jmatrix(model, model.params)
-jmat_sample = db.jmatrix_sample(model, model.params, n_sims=200)
+jmat_sample = db.jmatrix_sample(model, model.params, n_sims=500)
 #print(jmat)
 print(jmat_sample)
 
