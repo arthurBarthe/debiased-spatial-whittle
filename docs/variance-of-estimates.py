@@ -10,7 +10,7 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
 n = (256, 256)
-rho, sigma = 1, 1
+rho, sigma = 3, 1
 
 grid = RectangularGrid(n)
 model = ExponentialModel()
@@ -29,23 +29,23 @@ ax = fig.add_subplot()
 ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
-# expected hessian
+# Fisher matrix
 hmat = db.fisher(model, model.params)
 print(hmat)
 
 # variance matrix of the score
-jmat_mcmc = db.jmatrix(model, model.params, mcmc_mode=True)
-jmat = db.jmatrix(model, model.params)
-print(jmat_mcmc)
-print(jmat)
+#jmat = db.jmatrix(model, model.params)
+jmat_sample = db.jmatrix_sample(model, model.params, n_sims=200)
+#print(jmat)
+print(jmat_sample)
 
 # variance of estimates
-cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
-cov_mat = db.variance_of_estimates(model, model.params, jmat)
+#cov_mat = db.variance_of_estimates(model, model.params, jmat)
+cov_mat_sample = db.variance_of_estimates(model, model.params, jmat_sample)
 
 print('--------------')
-print(cov_mat_mcmc)
-print(cov_mat)
+#print(cov_mat)
+print(cov_mat_sample)
 
 if input('Run Monte Carlo simulations to compare with predicted variance (y/n)?') != 'y':
     sys.exit(0)
@@ -65,4 +65,4 @@ for i in range(n_samples):
     estimates[i, :] = model_est.params.values
 
 print(np.cov(estimates.T))
-print(cov_mat)
+print(cov_mat_sample)
