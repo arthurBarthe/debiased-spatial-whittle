@@ -398,7 +398,7 @@ class BivariateUniformCorrelation(CovarianceModel):
         return out
 
     def _gradient(self, x: np.ndarray):
-        pass
+        raise NotImplementedError('The gradient has not been implemented for this model')
 
 
 class TransformedModel(CovarianceModel):
@@ -440,6 +440,38 @@ class NewTransformedModel(CovarianceModel):
 
     def transform_on_grid(self, ks):
         return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, self.logz2_0.value, ks)
+
+    def call_on_rectangular_grid(self, grid):
+        from numpy.fft import fftn, ifftn
+        # periodic covariance of the input model
+        acv = grid.autocov(self.input_model)
+        # to spectral domain
+        f = fftn(acv, axes=(0, 1))
+        # apply the frequency-domain mapping
+        transform = self.transform_on_grid(grid.fourier_frequencies2)
+        transform_transpose = np.transpose(transform, (0, 1, -1, -2))
+        term1 = np.matmul(f, transform_transpose)
+        return ifftn(np.matmul(transform, term1), axes=(0, 1))
+
+    def __call__(self, lags: np.ndarray):
+        raise NotImplementedError('The autocovariance of this model can only be evaluated in specific cases')
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+
+class NewTransformedModel2(CovarianceModel):
+    """
+    Similar to the above class, but uses circulant embedding to alleviate some of the approximations.
+    """
+    def __init__(self, input_model: CovarianceModel, transform_function, transform_params):
+        self.input_model = input_model
+        self.transform = transform_function
+        super(NewTransformedModel, self).__init__(transform_params)
+
+    def transform_on_grid(self, ks):
+        return self.transform(*self.params.values, ks)
 
     def call_on_rectangular_grid(self, grid):
         from numpy.fft import fftn, ifftn

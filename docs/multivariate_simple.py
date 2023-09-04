@@ -12,15 +12,15 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = 0.5
+corr = - 0.5
 
 g = RectangularGrid((256, 256))
 m = ExponentialModel()
-m.rho = 15
+m.rho = 12
 m.sigma = 1
 bvm = BivariateUniformCorrelation(m)
 bvm.r_0 = corr
-bvm.f_0 = 1.
+bvm.f_0 = 2
 print(bvm)
 
 s = SamplerBUCOnRectangularGrid(bvm, g)
@@ -42,7 +42,7 @@ ep = ExpectedPeriodogram(g, p)
 
 db = MultivariateDebiasedWhittle(p, ep)
 
-rs = np.linspace(-0.9, 0.9, 50)
+rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
@@ -61,6 +61,7 @@ if input('Carry out optimization? (y/n) ... ') != 'y':
 e = Estimator(db)
 bvm.r_0 = None
 bvm.rho_1 = None
+bvm.f_0 = None
 bvm.sigma_1 = None
 print(e(bvm, data))
 
