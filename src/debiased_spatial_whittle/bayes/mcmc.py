@@ -39,61 +39,8 @@ class Optimizer:
     
     def fit(self, **kwargs):
         return fit(self.likelihood, **kwargs)
-    
-    
-    # def fit(self, x0: Union[None, ndarray]=None, prior:bool = True, basin_hopping:bool = False,
-    #         niter:int = 100, approx_grad:bool=False,
-    #         print_res:bool = True, save_res:bool=True,
-    #         loglik_kwargs: Optional[dict] =None, **optargs):
-    #     '''
-    #     optimize the log-likelihood function given the data
-    #     includes optional global optimizer
-    #     '''
-    #     # TODO: clean this up        
-    #     # TODO: separate class?
-        
-    #     if x0 is None: # TODO: fix this
-    #         x0 = self.transform(np.ones(self.n_params), inv=False)
-        
-    #     if loglik_kwargs is None:
-    #         loglik_kwargs = dict()
-            
-    #     attribute = 'MLE'
-    #     def obj(x):     return -self.likelihood(x, **loglik_kwargs)  # TODO: assuming __call__ is loglike
-            
-    #     if not approx_grad:
-    #         gradient = grad(obj)
-    #     else:
-    #         gradient = False
-        
-    #     if basin_hopping:          # for global optimization
-    #     # TODO: separate method?
-    #         minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
-    #         res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
-    #         success = res.lowest_optimization_result['success']
-    #     else:            
-    #         res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
-    #         success = res['success']
-            
-    #     if not success:
-    #         print('Optimizer failed!')
-    #         # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
-            
-    #     res['type'] = attribute
-    #     # setattr(self, attribute, res)
-        
-    #     if attribute=='MLE':
-    #         res['BIC'] = self.n_params * np.log(self.likelihood.grid.n_points) - 2*self.likelihood(res.x)         # negative logpost
-        
-    #     if print_res:
-    #         print(f'{self.likelihood.label} {attribute}:  {self.transform(res.x).round(3)}')
-            
-    #     if save_res:
-    #         setattr(self, 'res', res)
-    #         setattr(self.likelihood, 'res', res)
-            
-    #     # self.propcov = self.compute_propcov(res.x, approx_grad)                      
-    #     return res
+
+
 
 class MCMC:
     
@@ -115,64 +62,6 @@ class MCMC:
     
     def adj_logpost(self, x: ndarray, **loglik_kwargs) -> float:
         return self.likelihood.adj_loglik(x, **loglik_kwargs) + self.prior(x)
-    
-    
-    # def fit(self, x0: Union[None, ndarray], prior:bool = True, basin_hopping:bool = False,
-    #         niter:int = 100, approx_grad:bool=False,
-    #         print_res:bool = True, save_res:bool=True,
-    #         loglik_kwargs: Optional[dict] =None, **optargs):
-    #     '''
-    #     optimize the log-likelihood function given the data
-    #     includes optional global optimizer
-    #     '''
-    #     # TODO: clean this up        
-    #     # TODO: separate class?
-        
-    #     if x0 is None: # TODO: fix this
-    #         x0 = np.zeros(self.n_params)
-        
-    #     if loglik_kwargs is None:
-    #         loglik_kwargs = dict()
-            
-    #     if prior:                                         # for large samples, the prior is negligible
-    #         attribute = 'MAP'
-    #         def obj(x):     return -self.logpost(x, **loglik_kwargs)
-    #     else:
-    #         attribute = 'MLE'
-    #         def obj(x):     return -self.likelihood(x, **loglik_kwargs)  # TODO: assuming __call__ is loglike
-            
-    #     if not approx_grad:
-    #         gradient = grad(obj)
-    #     else:
-    #         gradient = False
-        
-    #     if basin_hopping:          # for global optimization
-    #     # TODO: separate method?
-    #         minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
-    #         res = basinhopping(obj, x0, niter=niter, minimizer_kwargs=minimizer_kwargs, **optargs)
-    #         success = res.lowest_optimization_result['success']
-    #     else:            
-    #         res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **optargs)
-    #         success = res['success']
-            
-    #     if not success:
-    #         print('Optimizer failed!')
-    #         # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
-            
-    #     res['type'] = attribute
-    #     # setattr(self, attribute, res)
-        
-    #     if attribute=='MLE':
-    #         res['BIC'] = self.n_params * np.log(self.likelihood.grid.n_points) - 2*self.likelihood(res.x)         # negative logpost
-        
-    #     if print_res:
-    #         print(f'{self.likelihood.label} {attribute}:  {np.round(np.exp(res.x),3)}')
-            
-    #     if save_res:
-    #         setattr(self, 'res', res)
-            
-    #     self.propcov = self.compute_propcov(res.x, approx_grad)                      
-    #     return res
     
     def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **logpost_kwargs):
         '''Random walk Metropolis-Hastings: samples the specified posterior'''

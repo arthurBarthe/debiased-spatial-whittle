@@ -40,6 +40,7 @@ class Likelihood(ABC):
         self.use_taper = use_taper
         self.periodogram = Periodogram(taper=use_taper)
         self._I = self.periodogram(z)   # TODO: make periodogram cached_property
+        self._constant = 1/2
         
         # TODO: add model args
         self.model = model
@@ -64,6 +65,17 @@ class Likelihood(ABC):
         else:
             self.transform = transform_func
             self._transform_flag = True
+        
+            
+            
+    @property
+    def constant(self):
+        '''multiplicative constant on the log-likelihood, only for Whittle and DeWhittle'''
+        return self._constant
+    
+    @constant.setter
+    def constant(self, c: float):
+        self._constant = c
     
     @property
     def z(self):
@@ -204,7 +216,7 @@ class Likelihood(ABC):
             self.grad_at_params[i] = grad_at_params
             i+=1
         
-        self.Jhat = np.cov( (2 / self.n_points) * self.grad_at_params.T)      # multiply by (2/N) for original dewhittle constants
+        self.Jhat = np.cov( self.grad_at_params.T )      # multiply by (2/N) for original dewhittle constants
         return self.grad_at_params
         
     
@@ -239,8 +251,8 @@ class Likelihood(ABC):
             self.hess_at_params[i] = hess_at_params
             i+=1
         
-        self.Hhat = - 2 * np.mean(self.hess_at_params,axis=0)/ self.n_points    # multiply by (2/N) for original dewhittle constants
-        self.Jhat = np.cov( (2 / self.n_points) * self.grad_at_params.T)
+        self.Hhat = - np.mean(self.hess_at_params,axis=0)         # multiply by (2/N) for original dewhittle constants
+        self.Jhat = np.cov( self.grad_at_params.T )
         return self.grad_at_params, self.hess_at_params
     
 
@@ -260,7 +272,7 @@ class Likelihood(ABC):
             Jhat = self.Jhat
         
         M_A = svd_decomp( H_ @ inv(Jhat) @ H_ )
-        M = svd_decomp( (self.n_points / 2) * H_ )   # TODO: THE CONSTANTS!!
+        M = svd_decomp( H_ )
         self.C = inv(M) @ M_A
         return
         
@@ -297,14 +309,16 @@ class Likelihood(ABC):
         return
     
     def compute_C4(self, mle: ndarray):
-        '''
-        C = M^-1 M_A
-        M_A = svd(H J^-1 H)
-        M   = svd(H)
-        '''
-        # TODO: Use theortical matrices!
-        # M_A = svd_decomp(inv(self.MLEs_cov))
+        if hasattr(self, 'Hhat'):
+            H_ = self.Hhat
+        elif hasattr(self, 'H'):
+            H_ = self.H
         
-        # M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
-        # self.C3 = inv(M) @ M_A
+        # TODO: analytic J?
+        if hasattr(self, 'Jhat'):
+            Jhat = self.Jhat
+        
+        M_A = svd_decomp( H_ @ inv(Jhat) @ H_ )
+        M = svd_decomp(compute_hessian(self, mle))  # observed fisher
+        self.C4 = inv(M) @ M_A
         return

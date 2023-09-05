@@ -54,7 +54,7 @@ class DeWhittle(Likelihood):
         return compute_ep(ifftshift(acf), self.grid.spatial_kernel, self.grid.mask)
 
         
-    def __call__(self, params: ndarray, z:Optional[ndarray]=None, constant:str = 'whittle', **cov_args) -> float: 
+    def __call__(self, params: ndarray, z:Optional[ndarray]=None, **cov_args) -> float: 
         
         params = self.transform(params, inv=True)
         
@@ -64,14 +64,8 @@ class DeWhittle(Likelihood):
             I = self.periodogram(z)
                     
         e_I = self.expected_periodogram(params, **cov_args)
-        
-        # TODO: constants?
-        if constant == 'dewhittle':
-            c = 1/self.n_points
-        else:
-            c = 1/2
-        
-        ll = - c * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
+                
+        ll = - self.constant * np.sum( (np.log(e_I) + I / e_I) * self.frequency_mask )
         return ll
     
     
@@ -111,8 +105,9 @@ class DeWhittle(Likelihood):
         for i in range(d):
             for j in range(d):
                 H[i,j] = np.sum( d_ep[i] * d_ep[j] / ep ** 2 )
-                
-        return H / 2
+         
+        self.H = self.constant * H 
+        return self.H
         
     
 
@@ -198,7 +193,7 @@ class Whittle(Likelihood):
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, **kwargs) -> float:
         '''Computes 2d Whittle likelihood'''
         # TODO: add spectral density
-        # TODO: include optional arguemtn to input infnite sum grid
+        # TODO: include optional argument to input infnite sum grid
         params = self.transform(params, inv=True)
         
         if z is None:
@@ -208,7 +203,7 @@ class Whittle(Likelihood):
             
         f = self.f(params)           # this may be unstable for small grids/nugget
         
-        ll = -(1/2) * np.sum(  (np.log(f) + I / f) * self.frequency_mask  )
+        ll = - self.constant * np.sum(  (np.log(f) + I / f) * self.frequency_mask  )
         return ll
     
 

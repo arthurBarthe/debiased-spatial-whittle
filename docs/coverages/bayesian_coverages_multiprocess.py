@@ -5,6 +5,8 @@ from scipy.linalg import inv
 from autograd.numpy import ndarray
 
 from multiprocessing import Pool
+from functools import partial
+from typing import Tuple
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
@@ -13,26 +15,18 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
-from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, GaussianPrior, Optimizer, MCMC
+from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, GaussianPrior, Optimizer, MCMC, Prior
+from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessian
 
 np.random.seed(1535235325)
 
-def f(i):
-    # TODO: use partial func!!
-    # TODO: remove Optimizer!
+def f(i, grid: RectangularGrid, prior_mean: ndarray, prior_cov: ndarray):
     
-    n = (64, 64)
-    grid = RectangularGrid(n)
-    
-    rho, sigma, nugget = 8., np.sqrt(1.), 0.1  # pick smaller rho
-    prior_mean = np.array([rho, sigma])    
-    prior_cov = np.array([[1., 0.], [0., .01]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
     prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
     params = prior.sim()
-    
     print(f'iteration: {i+1}, params={params.round(3)} \n')
     
-    model = SquaredExponentialModel()   # TODO: try sq. exponential model!!!
+    model = SquaredExponentialModel()   # TODO: try exponential model
     model.rho = params[0]
     model.sigma = params[1]
     model.nugget = nugget
@@ -43,20 +37,20 @@ def f(i):
     z = sampler()
         
     dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)
-    dw_opt = Optimizer(dw)
-    dw_opt.fit(print_res=False)
+    dw.fit(x0=params, print_res=False)
     
-    mle_niter= 500
+    
+    mle_niter= 1000
     mcmc_niter=5000
     acceptance_lag = mcmc_niter+1
     
-    MLEs = dw.sim_MLEs(dw_opt.res.x, niter=mle_niter, print_res=False)
-    # dw.prepare_curvature_adjustment(dw_opt.res.x)
-    dw.compute_C2(dw_opt.res.x)
+    MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
+    dw.compute_C3(dw.res.x)   # TODO: change C
     
     dw_mcmc = MCMC(dw, prior)
     post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C2)
+    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C3)
+    
     
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
@@ -64,14 +58,28 @@ def f(i):
     probs     = np.sum(post < params, axis=0)/mcmc_niter
     probs_adj = np.sum(adj_post < params, axis=0)/mcmc_niter
     
-    
-    
     return params, q, q_adj, probs, probs_adj
 
 
 
 def init_pool_processes():
     np.random.seed()
+    # np.random.RandomState()
+    # pass
+
+
+n = (64, 64)
+grid = RectangularGrid(n)
+
+rho, sigma, nugget = 7., np.sqrt(1.), 0.1  # pick smaller rho
+prior_mean = np.array([rho, sigma])    
+prior_cov = np.array([[1., 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
+prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
+ 
+model = SquaredExponentialModel() 
+
+
+
 
 
 quantiles = [0.025,0.975]
@@ -89,9 +97,10 @@ dw_post_probs     = np.zeros((n_datasets, d))
 adj_dw_post_probs = np.zeros((n_datasets, d))
 
 
-with Pool(processes=32, initializer=init_pool_processes) as pool:
+g = partial(f, grid=grid, prior_mean=prior_mean, prior_cov=prior_cov)
+with Pool(processes=20, initializer=init_pool_processes) as pool:
 
-    for i, res in enumerate(pool.imap(f, range(n_datasets))):   # could do imap_unordered
+    for i, res in enumerate(pool.imap(g, range(n_datasets))):   # could do imap_unordered
         params, q, q_adj, probs, probs_adj = res
         
         params_array[i] = params
@@ -108,11 +117,6 @@ with Pool(processes=32, initializer=init_pool_processes) as pool:
         print('')
         
 
-n = (64, 64)
-rho, sigma= 8., np.sqrt(1.)
-prior_mean = np.array([rho, sigma])    
-prior_cov = np.array([[1., 0.], [0., .01]])
-model = SquaredExponentialModel() 
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
