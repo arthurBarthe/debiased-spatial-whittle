@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple
-import numpy as np
 import matplotlib.pyplot as plt
 
-from numpy.fft import fftfreq
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
+fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 
 PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / 'france.jpg')
@@ -103,8 +105,9 @@ class ImgGrid(Grid):
 
 
 ###NEW OOP VERSION
-from .models import CovarianceModel, SeparableModel
-from numpy.fft import ifftshift
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
+
+ifftshift = np.fft.ifftshift
 from typing import List, Tuple
 
 
@@ -239,7 +242,7 @@ class RectangularGrid:
         #TODO check that the ifftshift "trick" works for odd sizes
         if hasattr(model, 'call_on_rectangular_grid'):
             return model.call_on_rectangular_grid(self)
-        return ifftshift(model(self.lags_unique), axes=list(range(self.ndim)))
+        return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
     def autocov_separable(self, model: SeparableModel):
         assert isinstance(model, SeparableModel), "You can only call autocov_separable on a separable model"

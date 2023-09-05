@@ -1,6 +1,6 @@
 # In this file we define covariance models
 from abc import ABC, abstractmethod
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 
 from scipy.special import gamma, kv
 from typing import Tuple, List, Dict, Union

@@ -1,7 +1,8 @@
 import sys
 
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
+print(f'np is {np}')
 
 import warnings
 from .periodogram import autocov
@@ -173,15 +174,17 @@ class SamplerBUCOnRectangularGrid:
         if self._f is None:
             cov = self.grid.autocov(self.model.base_model)
             f = prod_list(self.grid.n) * ifftn(cov)
+            f = np.real(f)
             min_ = np.min(f)
             if min_ <= -1e-5:
                 sys.exit(0)
                 warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-            self._f = np.maximum(f, 0)
+            self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
     # TODO make this work for 1-d and 3-d
     def __call__(self, periodic: bool = False, return_spectral: bool = False):
+        print(f'np is {np}')
         f = np.expand_dims(self.f, -1)
         e = self.e_dist.rvs(size=f.shape + (2,))
         e[..., -1] *= self.model.f_0.value
@@ -189,7 +192,7 @@ class SamplerBUCOnRectangularGrid:
         z = np.sqrt(f) * e
         if return_spectral:
             return z
-        z_inv = 1 / np.sqrt(self.grid.n_points) * np.real(fftn(z, axes=list(range(z.ndim - 1))))
+        z_inv = 1 / np.sqrt(np.array([self.grid.n_points, ])) * np.real(fftn(z, None, list(range(z.ndim - 1))))
         if periodic:
             return z_inv
         for i, n in enumerate(self.grid.n):

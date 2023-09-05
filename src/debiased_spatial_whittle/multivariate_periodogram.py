@@ -1,5 +1,8 @@
-import numpy as np
-from numpy.fft import fftn, ifftn
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
+fftn = np.fft.fftn
+
 from typing import List
 
 from debiased_spatial_whittle.grids import RectangularGrid
@@ -17,7 +20,7 @@ class Periodogram:
     def __call__(self, z: List[np.ndarray], return_fft: bool = False):
         n_spatial_dims = z[0].ndim
         z = np.stack(z, axis=-1)
-        j_vec = 1 / np.sqrt(z.shape[0] * z.shape[1]) * fftn(z, axes=list(range(n_spatial_dims)))
+        j_vec = 1 / np.sqrt(np.array(z.shape[0] * z.shape[1])) * fftn(z, None, list(range(n_spatial_dims)))
         j_vec = np.expand_dims(j_vec, -1)
         if return_fft:
             return j_vec

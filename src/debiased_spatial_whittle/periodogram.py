@@ -1,7 +1,8 @@
 from itertools import product
 from typing import Tuple
 
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
 
 from .spatial_kernel import spatial_kernel
 from .models import Parameters
@@ -64,8 +65,8 @@ def compute_ep(cov_func, grid, fold=True):
 
 
 ####NEW OOP VERSION
-from .models import CovarianceModel, SeparableModel
-from .grids import RectangularGrid
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
+from debiased_spatial_whittle.grids import RectangularGrid
 
 
 class Periodogram:

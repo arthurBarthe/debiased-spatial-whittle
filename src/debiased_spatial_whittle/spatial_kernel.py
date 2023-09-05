@@ -1,5 +1,9 @@
-import numpy as np
-from numpy.fft import fftn, ifftn
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
+fftn = np.fft.fftn
+ifftn = np.fft.ifftn
+
 from typing import Tuple
 
 

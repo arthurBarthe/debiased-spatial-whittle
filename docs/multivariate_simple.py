@@ -5,6 +5,9 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('torch')
+
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, BivariateUniformCorrelation
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
@@ -26,6 +29,7 @@ print(bvm)
 s = SamplerBUCOnRectangularGrid(bvm, g)
 
 data = s()
+print(type(data))
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
