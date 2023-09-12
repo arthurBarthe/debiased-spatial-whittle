@@ -40,16 +40,20 @@ def f(i, grid: RectangularGrid, prior_mean: ndarray, prior_cov: ndarray):
     dw.fit(x0=params, print_res=False)
     
     
-    mle_niter= 1000
+    
+    H = dw.fisher(dw.res.x)
+    grads = dw.sim_J_matrix(dw.res.x, niter=5000, print_res=False)
+    dw.compute_C()
+    
     mcmc_niter=5000
     acceptance_lag = mcmc_niter+1
-    
-    MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
-    dw.compute_C3(dw.res.x)   # TODO: change C
+    # mle_niter= 1000
+    # MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
+    # dw.compute_C3(dw.res.x)   # TODO: change C
     
     dw_mcmc = MCMC(dw, prior)
     post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C3)
+    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C)
     
     
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
@@ -98,7 +102,7 @@ adj_dw_post_probs = np.zeros((n_datasets, d))
 
 
 g = partial(f, grid=grid, prior_mean=prior_mean, prior_cov=prior_cov)
-with Pool(processes=20, initializer=init_pool_processes) as pool:
+with Pool(processes=25, initializer=init_pool_processes) as pool:
 
     for i, res in enumerate(pool.imap(g, range(n_datasets))):   # could do imap_unordered
         params, q, q_adj, probs, probs_adj = res
