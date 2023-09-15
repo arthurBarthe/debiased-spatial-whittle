@@ -162,7 +162,7 @@ class Likelihood(ABC):
                 plt.show()
                 
             loglik_kwargs = {'z':z}
-            res = self.fit(x0=self.transform(params, inv=False),
+            res = self.fit(x0=params,
                            included_prior=False, 
                            print_res=False, 
                            save_res=False, 
@@ -206,8 +206,7 @@ class Likelihood(ABC):
             loglik_kwargs = {'z':z}
             
             # TODO: func kwargs?
-            grad_at_params = compute_gradient(self, self.transform(params, inv=False),
-                                              approx_grad=approx_grad, **loglik_kwargs)   
+            grad_at_params = compute_gradient(self, params, approx_grad=approx_grad, **loglik_kwargs)   
            
             if not np.all(np.isfinite(grad_at_params)):
                 continue
@@ -240,11 +239,8 @@ class Likelihood(ABC):
             z = self.sim_z(params)
             loglik_kwargs = {'z':z}
             
-            grad_at_params = compute_gradient(self, self.transform(params, inv=False),
-                                              approx_grad=approx_grad, **loglik_kwargs)
-            
-            hess_at_params = compute_hessian(self, self.transform(params, inv=False),
-                                             approx_grad=approx_grad, **loglik_kwargs)
+            grad_at_params = compute_gradient(self, params, approx_grad=approx_grad, **loglik_kwargs)   # TODO: func kwargs?
+            hess_at_params = compute_hessian(self, params, approx_grad=approx_grad, **loglik_kwargs)
            
             if not np.all(np.isfinite(grad_at_params)) or np.all(np.isfinite(hess_at_params)):
                 continue
