@@ -7,6 +7,7 @@ from numpy.fft import fft, ifft, fftshift
 from scipy.linalg import inv
 from autograd.numpy import ndarray
 
+import multiprocessing as mp
 from multiprocessing import Pool
 from functools import partial
 from typing import Tuple
@@ -28,29 +29,14 @@ import os, sys
 start = 1
 n_datasets= 100
 
-def get_last_line_number(file_name: str):
-    ''' 
-    This will open the file "primes.txt" and try to convert the last
-    line to an integer. This should be the last prime that was found. 
-    Return that prime. 
-    '''
-    try:
-        with open(file_name, 'r') as f:
-            last_line = f.readlines()[-1]
-            last_line_number = int( last_line.split(' ')[0] ) + 1
-            print(last_line_number)
-    except IOError:
-        print('Error: Could not open existing file.')
-        sys.exit(1)
-    except ValueError:  
-        print('Error: Last line could not be converted to an integer.') 
-        sys.exit(1)
 
-    return last_line_number
-
-
-
-def func(i, likelihood: Likelihood, grid: RectangularGrid, prior_mean: ndarray, prior_cov: ndarray):
+def func(i: int, 
+         likelihood: Likelihood, 
+         grid: RectangularGrid, 
+         prior_mean: ndarray, 
+         prior_cov: ndarray,
+         mcmc_niter: int,
+         mle_niter: int):
     
     prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
     params = prior.sim()
@@ -67,20 +53,28 @@ def func(i, likelihood: Likelihood, grid: RectangularGrid, prior_mean: ndarray, 
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
         
-    dw = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)
-    dw.fit(x0=params, print_res=False)
-    # TODO change
+    name = likelihood.__name__
+    approx_grad = True if name=='Gaussian' else False
     
-    mle_niter  = 100
-    mcmc_niter = 500
+    ll = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)   # TODO: use params on logspace!!
+    ll.fit(x0=params, print_res=False, approx_grad = approx_grad)
+    
+    # MCMC
+    mcmc = MCMC(ll, prior)
     acceptance_lag = mcmc_niter+1
-    
-    MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
-    dw.compute_C3(dw.res.x)   # TODO: change C
-    
-    dw_mcmc = MCMC(dw, prior)
-    post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C3)
+    post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag, approx_grad=approx_grad)
+        
+    if name in {'DeWhittle', 'Whittle'}:
+        
+        # MLEs = ll.sim_MLEs(ll.res.x, niter=mle_niter, print_res=False)
+        H = ll.fisher(ll.res.x)
+        ll.sim_J_matrix(ll.res.x, niter=mle_niter)
+        ll.compute_C4(ll.res.x)   # TODO: change C
+        
+        adj_post = mcmc.RW_MH(mcmc_niter, adjusted=True, 
+                              acceptance_lag=acceptance_lag, C=ll.C4)
+    else:
+        adj_post = np.zeros((mcmc_niter, ll.n_params))
     
     
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
@@ -112,19 +106,31 @@ def main():
      
     model = SquaredExponentialModel() 
     
-    likelihood = DeWhittle
+    likelihood = Gaussian
     
     file_name = f'{likelihood.__name__}_{n[0]}x{n[1]}_{model.name}.txt'
+    
+    mle_niter  = 1000
+    mcmc_niter = 5000
+
+
+    g = partial(func, 
+                likelihood=likelihood, 
+                grid=grid, 
+                prior_mean=prior_mean, 
+                prior_cov=prior_cov,
+                mcmc_niter=mcmc_niter,
+                mle_niter=mle_niter)
+    
     
     with open('submit_coverages.sh', 'r') as f:
         text = f.read()
         idx = text.find('ncpus=')
-        ncpus = int(text[ idx+6 : idx+8 ])   # TODO: regex?? better way, +9 if >99!!
-        
-    print(ncpus)
+        nprocesses = int(text[ idx+6 : idx+8 ])  # TODO: change when ncpus<100!!
     
-    g = partial(func, likelihood=likelihood, grid=grid, prior_mean=prior_mean, prior_cov=prior_cov)
-    with Pool(processes=None, initializer=init_pool_processes, maxtasksperchild=1) as pool:
+    # nprocesses = 20  # mp.cpu_count()
+    
+    with Pool(processes=nprocesses, initializer=init_pool_processes, maxtasksperchild=1) as pool:
     
         for i, result in enumerate(pool.imap(g, range(n_datasets))):   # could do imap_unordered
                 
@@ -136,7 +142,7 @@ def main():
             print(probs.round(3), probs_adj.round(3), sep='\n')
             print('')
             
-            print(file_name)
+            print(i, file_name)
             if os.path.exists(file_name):
                 # start = get_last_line_number(file_name)
                 new_file = False

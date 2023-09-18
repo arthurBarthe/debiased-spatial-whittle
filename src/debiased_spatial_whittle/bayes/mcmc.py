@@ -63,7 +63,13 @@ class MCMC:
     def adj_logpost(self, x: ndarray, **loglik_kwargs) -> float:
         return self.likelihood.adj_loglik(x, **loglik_kwargs) + self.prior(x)
     
-    def RW_MH(self, niter:int, adjusted:bool=False, acceptance_lag:int=1000, print_res:bool=True, **logpost_kwargs):
+    def RW_MH(self, niter:int,
+              adjusted:bool=False,
+              acceptance_lag:int=1000,
+              print_res:bool=True,
+              approx_grad:bool=False,
+              **logpost_kwargs):
+        
         '''Random walk Metropolis-Hastings: samples the specified posterior'''
         
         # TODO: mcmc diagnostics
@@ -76,7 +82,10 @@ class MCMC:
             def posterior(x): return self.logpost(x, **logpost_kwargs)
             label = self.likelihood.label
             
-        propcov   = compute_hessian(posterior, self.likelihood.res.x, inv=True)
+        propcov   = compute_hessian(posterior, 
+                                    self.likelihood.res.x, 
+                                    approx_grad=approx_grad, 
+                                    inv=True)
             
         A     = np.zeros(niter, dtype=np.float64)
         U     = np.random.rand(niter)
