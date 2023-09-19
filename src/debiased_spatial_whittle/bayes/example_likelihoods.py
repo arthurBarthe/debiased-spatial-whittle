@@ -54,7 +54,7 @@ adj4_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj
 
 gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1)
 gauss.fit(x0=params, included_prior=False, approx_grad=True)
-gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=False), acceptance_lag=100)
+gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=True), acceptance_lag=100)
 
 
 title = 'posterior comparisons'
