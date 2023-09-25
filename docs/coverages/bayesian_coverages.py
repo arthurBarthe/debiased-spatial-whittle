@@ -26,8 +26,8 @@ from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessi
 
 import os, sys
 
-start = 1
-n_datasets= 500
+# start = 1
+# n_datasets= 500
 
 
 def func(i: int, 
@@ -94,15 +94,15 @@ def init_pool_processes():
 
 def main():
     
-    global start, n_datasets
+    # global start, n_datasets
     
-    likelihood_name, n1 = sys.argv[1], int(sys.argv[2])    # argument for C3? # TODO: make args string?
+    likelihood_name, n1, n_datasets = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])    # argument for C3? # TODO: make args string?
     if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
         likelihood = eval(likelihood_name)
         
     n = (n1,n1)
         
-    print(f'{sys.argv[0]} run with likelihood={likelihood.__name__} and {n=}' )
+    print(f'{sys.argv[0]} run with likelihood={likelihood.__name__} with {n=} and {n_datasets=}')
     
     grid = RectangularGrid(n)
     
@@ -115,7 +115,7 @@ def main():
         
     file_name = f'{likelihood.__name__}_{n[0]}x{n[1]}_{model.name}.txt'
     
-    mle_niter  = 1000
+    mle_niter  = 2000
     mcmc_niter = 5000
 
     g = partial(func, 
@@ -154,10 +154,6 @@ def main():
                 
             else:
                 new_file = True
-
-            if start >= n_datasets:
-                print('Already finished.')
-                sys.exit(1)
             
             with open(file_name, 'a+') as f:
                 if new_file:
