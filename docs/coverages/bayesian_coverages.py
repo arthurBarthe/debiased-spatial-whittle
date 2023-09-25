@@ -1,8 +1,16 @@
+#!/usr/bin/env python3
+
+
 import autograd.numpy as np
 from autograd import grad
 from numpy.fft import fft, ifft, fftshift
 from scipy.linalg import inv
 from autograd.numpy import ndarray
+
+import multiprocessing as mp
+from multiprocessing import Pool
+from functools import partial
+from typing import Tuple
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
@@ -11,193 +19,159 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
-from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian, GaussianPrior, Optimizer, MCMC
+from debiased_spatial_whittle.bayes import Likelihood, DeWhittle, Whittle, Gaussian, GaussianPrior, Optimizer, MCMC, Prior
+from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessian
 
-np.random.seed(1535235325)
+# np.random.seed(1535235325)
 
-n = (128, 128)
-rho, sigma, nugget = 8., np.sqrt(1.), 0.1  # pick smaller rho
+import os, sys
 
-grid = RectangularGrid(n)
-
-model = ExponentialModel()   # TODO: try sq. exponential model!!!
-model.rho = rho
-model.sigma = sigma
-model.nugget = nugget
+start = 1
+n_datasets= 500
 
 
-sampler = SamplerOnRectangularGrid(model, grid)
-dw = DeWhittle(sampler(), grid, ExponentialModel(), nugget=nugget, transform_func=None) # just for initialization
-
-prior_mean = np.array([rho, sigma])    
-prior_cov = np.array([[1., 0.], [0., .01]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
-
-prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
-
-
-n_datasets=1000
-mcmc_niter=5000
-mle_niter= 500
-acceptance_lag = mcmc_niter+1
-d=len(prior_mean)
-
-
-quantiles = [0.025,0.975]
-n_q = len(quantiles)
-
-dw_post_quants     = np.zeros((n_datasets,d*n_q))
-adj_dw_post_quants = np.zeros((n_datasets,d*n_q))
-
-dw_post_probs     = np.zeros((n_datasets, d))
-adj_dw_post_probs = np.zeros((n_datasets, d))
-
-params_array = prior.sim(n_datasets)
-inside=0
-for i, params in enumerate(params_array):
-    print(f'iteration: {i+1}, params={params.round(3)}', end=':\n')
+def func(i: int, 
+         likelihood: Likelihood, 
+         grid: RectangularGrid, 
+         prior_mean: ndarray, 
+         prior_cov: ndarray,
+         mcmc_niter: int,
+         mle_niter: int):
     
-    z = dw.sim_z(params)
-        
-    dw = DeWhittle(z, grid, ExponentialModel(), nugget=nugget, transform_func=None)
-        
-    dw_opt = Optimizer(dw)
-    dw_opt.fit()
-    MLEs = dw.sim_MLEs(dw_opt.res.x, niter=mle_niter, print_res=False)
-    dw.prepare_curvature_adjustment(dw_opt.res.x)
+    prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
+    params = prior.sim()
+    print(f'iteration: {i+1}, params={params.round(3)} \n')
     
-    dw_mcmc = MCMC(dw, prior)
-    post = dw_mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag)
-    adj_post = dw_mcmc.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag)
-
+    nugget=0.1
+    model = SquaredExponentialModel()   # TODO: try exponential model
+    model.rho = params[0]
+    model.sigma = params[1]
+    model.nugget = nugget
+    
+    quantiles = [0.025,0.975]
+    
+    sampler = SamplerOnRectangularGrid(model, grid)
+    z = sampler()
+        
+    name = likelihood.__name__
+    approx_grad = True if name=='Gaussian' else False
+    
+    ll = likelihood(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)   # TODO: use params on logspace!!
+    ll.fit(x0=params, print_res=False, approx_grad = approx_grad)
+    
+    # MCMC
+    mcmc = MCMC(ll, prior)
+    acceptance_lag = mcmc_niter+1
+    post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag, approx_grad=approx_grad)
+        
+    if name in {'DeWhittle', 'Whittle'}:
+        
+        # MLEs = ll.sim_MLEs(ll.res.x, niter=mle_niter, print_res=False)
+        H = ll.fisher(ll.res.x)
+        ll.sim_J_matrix(ll.res.x, niter=mle_niter)
+        ll.compute_C3(ll.res.x)   # TODO: change C # TODO: for C3 can get singular matrix error!!
+        
+        adj_post = mcmc.RW_MH(mcmc_niter, adjusted=True, 
+                              acceptance_lag=acceptance_lag, C=ll.C3)
+    else:
+        adj_post = np.zeros((mcmc_niter, ll.n_params))
+    
+    
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
-    
-    dw_post_quants[i] = q
-    adj_dw_post_quants[i] = q_adj
-    
-    print(q.round(3), q_adj.round(3), params.round(3), sep='\n')
-    print('')
-    
+        
     probs     = np.sum(post < params, axis=0)/mcmc_niter
     probs_adj = np.sum(adj_post < params, axis=0)/mcmc_niter
     
-    dw_post_probs[i] = probs
-    adj_dw_post_probs[i] = probs_adj
+    return params, q, q_adj, probs, probs_adj
+
+
+
+def init_pool_processes():
+    np.random.seed()
+    # pass
+
+
+def main():
     
-    print(probs.round(3), probs_adj.round(3), sep='\n')
-    print('')
+    global start, n_datasets
     
-
-
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-
-mpl.rcParams.update({'font.size': 16})
-mpl.rcParams['axes.spines.top']   = False
-mpl.rcParams['axes.spines.right'] = False
-
-prior_label = rf'$\rho \sim N({prior_mean[0]}, {np.diag(prior_cov)[0]})$, $\sigma \sim N({prior_mean[1]}, {np.diag(prior_cov)[1]})$ '
-
-fig,ax = plt.subplots(2,2, figsize=(15,10))
-fig.suptitle(f'Posterior quantile estimates, {n=}, {model.name}, {prior_label}', fontsize=24)#, fontweight='bold')
-ax[0,0].hist(dw_post_probs[:,0], bins='sturges', edgecolor='k')
-ax[0,1].hist(dw_post_probs[:,1], bins='sturges', edgecolor='k')
-
-ax[1,0].hist(adj_dw_post_probs[:,0], bins='sturges', edgecolor='k')
-ax[1,1].hist(adj_dw_post_probs[:,1], bins='sturges', edgecolor='k')
-
-ax[1,0].set_xlabel( r'$\rho$', fontsize=22)
-ax[1,1].set_xlabel( r'$\sigma$', fontsize=22)
-
-ax[0,0].text(.9, 240, 'debiased Whittle', color='r',fontsize=20)
-ax[1,0].text(.8, 160., 'Adjusted debiased Whittle', color='r',fontsize=20)
-
-# for axis in ax.flatten():
-    # axis.set_xticks([])
-    # axis.set_yticks([])
-
-fig.subplots_adjust(hspace=0.3, wspace=-1.5)
-fig.tight_layout()
-plt.show()
-
-    
-from scipy import stats
-unif = stats.uniform(0,1)
-qs = np.linspace(0,1, 1000)
-theory_quants = unif.ppf(qs)
-
-fig,ax = plt.subplots(1,2, figsize=(15,7))
-fig.suptitle(f'QQ plot, posterior quantiles vs standard uniform, {n=}, {model.name}, {prior_label}')
-ax[0].plot(theory_quants, theory_quants, c='r', linewidth=3, label='standard uniform', zorder=10)
-ax[0].plot(theory_quants, np.quantile(dw_post_probs[:,0], qs), 
-           '.', c='g', markersize=10., label='dewhittle')
-ax[0].plot(theory_quants, np.quantile(adj_dw_post_probs[:,0], qs), 
-           '.', c='blue', markersize=10., label='adj dewhittle')
-ax[0].legend()
-ax
-
-ax[1].plot(theory_quants, theory_quants, c='r', linewidth=3, label='standard uniform', zorder=10)
-ax[1].plot(theory_quants, np.quantile(dw_post_probs[:,1], qs), 
-           '.', c='g', markersize=10., label='dewhittle')
-ax[1].plot(theory_quants, np.quantile(adj_dw_post_probs[:,1], qs), 
-           '.', c='blue', markersize=10., label='adj dewhittle')
-ax[1].legend()
-
-
-ax[0].set_xlabel( r'$\rho$', fontsize=22)
-ax[1].set_xlabel( r'$\sigma$', fontsize=22)
-
-fig.tight_layout()
-plt.show()
-
-
-
-stop
-    
-import pandas as pd    
-post_list = ['dewhittle', 'adj_dewhittle', 'whittle', 'adj_whittle']
-param_list = ['rho', 'sigma']
-index  = pd.MultiIndex.from_product([post_list, param_list, quantiles], 
-                          names=["posterior", "parameter", "quantile"])
-
-new_index = []
-for i,idx in enumerate(index):
-    *post_params,q = idx
-    new_index.append((*post_params,alphas_list[i],q))
-
-
-k = d*n_q*len(post_list)
-posterior_quantiles = np.hstack((
-                       dw_post_quants, adj_dw_post_quants,
-                       whittle_post_quantiles, adj_whittle_post_quantiles,
-                       )).reshape(n_datasets,k)
-
-
-df = pd.DataFrame(posterior_quantiles, columns=tuple(new_index))
-df.columns.names = ["posterior", "parameter", "alpha", "quantile"]
-
-
-
-# not a great solution
-coverages={}
-for idx in zip(new_index[::2], new_index[1::2]):
-    
-    cols = df[list(idx)]
-    ll, param, alpha, q = cols.columns[0]
-    interval = pd.arrays.IntervalArray.from_arrays(*cols.to_numpy().T, closed='both')
-    if 'rho' == param:        
-        count = interval.contains(params[0]).sum()
-    else:
-        count = interval.contains(params[1]).sum()
+    likelihood_name, n1 = sys.argv[1], int(sys.argv[2])    # argument for C3? # TODO: make args string?
+    if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
+        likelihood = eval(likelihood_name)
         
-    print(f'{ll} coverage for parameter {param} at alpha={alpha}:   {count/n_datasets}')
+    n = (n1,n1)
+        
+    print(f'{sys.argv[0]} run with likelihood={likelihood.__name__} and {n=}' )
     
-    coverages[(ll,param,alpha)] = count/n_datasets
-    # coverages.append(count/n_datasets)
+    grid = RectangularGrid(n)
+    
+    rho, sigma, nugget = 7., np.sqrt(1.), 0.1  # pick smaller rho
+    prior_mean = np.array([rho, sigma])    
+    prior_cov = np.array([[1., 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
+    # prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
+     
+    model = SquaredExponentialModel() 
+        
+    file_name = f'{likelihood.__name__}_{n[0]}x{n[1]}_{model.name}.txt'
+    
+    mle_niter  = 1000
+    mcmc_niter = 5000
 
-coverages_arr = np.fromiter(coverages.values(), dtype=float)[None]
-df_coverages = pd.DataFrame(coverages_arr,  columns=coverages.keys())
+    g = partial(func, 
+                likelihood=likelihood, 
+                grid=grid, 
+                prior_mean=prior_mean, 
+                prior_cov=prior_cov,
+                mcmc_niter=mcmc_niter,
+                mle_niter=mle_niter)
+    
+    
+    with open('submit_coverages.sh', 'r') as f:
+        text = f.read()
+        idx = text.find('ncpus=')
+        nprocesses = int(text[ idx+6 : idx+8 ]) - 2  # TODO: change when ncpus<100!! -2 to not overload error
+    
+    # nprocesses = 20  # mp.cpu_count()
+    
+    with Pool(processes=nprocesses, initializer=init_pool_processes, maxtasksperchild=1) as pool:
+    
+        for i, result in enumerate(pool.imap(g, range(n_datasets))):   # could do imap_unordered
+                
+            params, q, q_adj, probs, probs_adj = result   # TODO: save parameters as well!!!
+                        
+            print(q.round(3), q_adj.round(3), params.round(3), sep='\n')
+            print('')
+            
+            print(probs.round(3), probs_adj.round(3), sep='\n')
+            print('')
+            
+            print(i, file_name)
+            if os.path.exists(file_name):
+                # start = get_last_line_number(file_name)
+                new_file = False
+                print('Found an existing file')
+                
+            else:
+                new_file = True
 
-plt.plot(alphas, df_coverages['adj_dewhittle', 'rho'].to_numpy()[0], '.')
-plt.show()
+            if start >= n_datasets:
+                print('Already finished.')
+                sys.exit(1)
+            
+            with open(file_name, 'a+') as f:
+                if new_file:
+                    f.write(f'# prior_mean={prior_mean.tolist()}, prior_cov={prior_cov.tolist()}\n')
+                    f.write('quantile adj_quantile prob prob_adj\n')
+                
+                res = np.concatenate([q, q_adj, probs, probs_adj])
+                for i, number in enumerate(res):
+                    val = f'{number:f}'
+                    if i+1<12:
+                        f.write(val + ' ')
+                    else:
+                        f.write(val + '\n')
+                
+
+if __name__ == '__main__':
+    main()
