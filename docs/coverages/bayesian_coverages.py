@@ -25,6 +25,7 @@ from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessi
 # np.random.seed(1535235325)
 
 import os, sys
+import matplotlib.pyplot as plt
 
 # start = 1
 # n_datasets= 500
@@ -75,8 +76,9 @@ def func(i: int,
                               acceptance_lag=acceptance_lag, C=ll.C3)
     else:
         adj_post = np.zeros((mcmc_niter, ll.n_params))
-    
-    
+        
+    plot_marginals([post, adj_post], truths=params)
+
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
         
@@ -96,9 +98,13 @@ def main():
     
     # global start, n_datasets
     
-    likelihood_name, n1, n_datasets = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])    # argument for C3? # TODO: make args string?
-    if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
-        likelihood = eval(likelihood_name)
+    likelihood = DeWhittle
+    n1 = 64
+    n_datasets = 10
+    
+    # likelihood_name, n1, n_datasets = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])    # argument for C3? # TODO: make args string?
+    # if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
+        # likelihood = eval(likelihood_name)
         
     n = (n1,n1)
         
@@ -106,7 +112,7 @@ def main():
     
     grid = RectangularGrid(n)
     
-    rho, sigma, nugget = 7., np.sqrt(1.), 0.1  # pick smaller rho
+    rho, sigma, nugget = 7., 3., 0.1  # pick smaller rho
     prior_mean = np.array([rho, sigma])    
     prior_cov = np.array([[1., 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
     # prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
@@ -116,7 +122,7 @@ def main():
     file_name = f'{likelihood.__name__}_{n[0]}x{n[1]}_{model.name}.txt'
     
     mle_niter  = 2000
-    mcmc_niter = 5000
+    mcmc_niter = 10000
 
     g = partial(func, 
                 likelihood=likelihood, 
@@ -132,7 +138,7 @@ def main():
         idx = text.find('ncpus=')
         nprocesses = int(text[ idx+6 : idx+8 ]) - 2  # TODO: change when ncpus<100!! -2 to not overload error
     
-    # nprocesses = 20  # mp.cpu_count()
+    nprocesses = 10  # mp.cpu_count()
     
     with Pool(processes=nprocesses, initializer=init_pool_processes, maxtasksperchild=1) as pool:
     

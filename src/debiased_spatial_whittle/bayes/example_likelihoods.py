@@ -15,7 +15,7 @@ np.random.seed(53252336)
 
 inv = np.linalg.inv
 
-params = np.array([7.,1.])
+params = np.array([7.,2.])
 model = SquaredExponentialModel()
 model.rho = params[0]
 model.sigma = params[1]
@@ -53,13 +53,14 @@ adj4_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj
 adj5_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C5), C=dw.C5)
 adj52_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C5_2), C=dw.C5_2)
 
-gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
-gauss.fit(x0=params, included_prior=False, approx_grad=True)
-gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=True), acceptance_lag=100)
+if False:
+    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
+    gauss.fit(x0=params, included_prior=False, approx_grad=True)
+    gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=True), acceptance_lag=100)
+    
 
-
-title = 'posterior comparisons'
-density_labels = ['gauss', 'deWhittle', 'adj2 deWhittle', 'adj3 deWhittle', 'adj4 deWhittle', 'adj5 deWhittle', 'adj52 deWhittle']
-posts = [gauss_post, dw_post, adj2_dw_post, adj3_dw_post, adj4_dw_post, adj5_dw_post, adj52_dw_post]
+title = f'Posterior comparisons, {n=}'
+density_labels = ['deWhittle', 'adj2 deWhittle', 'adj3 deWhittle', 'adj4 deWhittle', 'adj5 deWhittle', 'adj52 deWhittle']
+posts = [dw_post, adj2_dw_post, adj3_dw_post, adj4_dw_post, adj5_dw_post, adj52_dw_post]
 plot_marginals(posts, params, title, [r'$\rho$', r'$\sigma$'], density_labels, shape=(1,2),  cmap='hsv')
 
