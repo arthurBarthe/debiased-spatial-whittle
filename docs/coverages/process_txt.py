@@ -11,11 +11,11 @@ mpl.rcParams['axes.spines.top']   = False
 mpl.rcParams['axes.spines.right'] = False
 
 
-n = (64,64)
+# n = (64,64)
 # n = (128,128)
-# n = (256,256)
+n = (256,256)
 # n = (512,512)
-rho, sigma, nugget = 7., np.sqrt(1.), 0.1  # pick smaller rho
+rho, sigma, nugget = 7., 3., 0.1  # pick smaller rho
 
 prior_mean = np.array([rho, sigma])
 prior_cov = np.array([[1., 0.], [0., .1]])
@@ -34,21 +34,17 @@ adj_q = np.zeros((500,4))
 p = np.zeros((500,2))
 adj_p = np.zeros((500,2))
 
-with open(f'DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt', 'r') as f:
-    all_lines = f.readlines()
-    # print(lines)
+file_name = f'C2/C2_DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt'
+arr = np.loadtxt(file_name, skiprows=2)
 
-for i, line in enumerate(all_lines[2:]): 
-    # print(i)
-    numbers = re.findall(r"[-+]?(?:\d*\.*\d+)", line)
+# stop
+
+# params = arr[:, :2]
+q     = arr[:, -8:-6]
+adj_q = arr[:, -6:-4]
+p     = arr[:, -4:-2]
+adj_p = arr[:, -2:]    
     
-    q[i]     = numbers[:4]
-    adj_q[i] = numbers[4:8]
-    p[i]     = numbers[8:10]
-    adj_p[i] = numbers[10:12]
-    
-    
-print(q)
 
 prior_label = rf'$\rho \sim N({prior_mean[0]}, {np.diag(prior_cov)[0]})$, $\sigma \sim N({prior_mean[1]}, {np.diag(prior_cov)[1]})$ '
 
@@ -63,18 +59,19 @@ ax[1,1].hist(adj_p[:,1], bins='sturges', edgecolor='k')
 ax[1,0].set_xlabel( r'$\rho$', fontsize=22)
 ax[1,1].set_xlabel( r'$\sigma$', fontsize=22)
 
-ax[0,0].text(.9, 240, 'debiased Whittle', color='r',fontsize=20)
-ax[1,0].text(.8, 160., 'Adjusted debiased Whittle', color='r',fontsize=20)
+ax[0,0].set_title('debiased Whittle', color='r',fontsize=20, x=1.05, y=1.05)
+ax[1,0].set_title('Adjusted debiased Whittle', color='r',fontsize=20, x=1.05, y=1.05)
 
 # for axis in ax.flatten():
     # axis.set_xticks([])
     # axis.set_yticks([])
 
-fig.subplots_adjust(hspace=0.3, wspace=-1.5)
+# fig.subplots_adjust(hspace=0.3, wspace=-1.0)
 fig.tight_layout()
 plt.show()
 
-    
+# stop
+
 from scipy import stats
 unif = stats.uniform(0,1)
 qs = np.linspace(0,1, 1000)
