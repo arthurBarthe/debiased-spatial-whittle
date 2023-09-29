@@ -49,7 +49,7 @@ def func(i: int,
     model.sigma = params[1]
     model.nugget = nugget
     
-    quantiles = [0.025,0.975]
+    quantiles = [0.025, 0.975, 0.4, 0.6, 0.5]
     
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
@@ -77,11 +77,11 @@ def func(i: int,
     else:
         adj_post = np.zeros((mcmc_niter, ll.n_params))
         
-    plot_marginals([post, adj_post], truths=params)
+    # plot_marginals([post, adj_post], truths=params)
 
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
-        
+
     probs     = np.sum(post < params, axis=0)/mcmc_niter
     probs_adj = np.sum(adj_post < params, axis=0)/mcmc_niter
     
@@ -98,13 +98,13 @@ def main():
     
     # global start, n_datasets
     
-    likelihood = DeWhittle
-    n1 = 64
-    n_datasets = 10
+    # likelihood = DeWhittle
+    # n1 = 64
+    # n_datasets = 10
     
-    # likelihood_name, n1, n_datasets = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])    # argument for C3? # TODO: make args string?
-    # if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
-        # likelihood = eval(likelihood_name)
+    likelihood_name, n1, n_datasets = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])    # argument for C3? # TODO: make args string?
+    if likelihood_name in {'Gaussian', 'DeWhittle', 'Whittle'}:
+        likelihood = eval(likelihood_name)
         
     n = (n1,n1)
         
@@ -112,9 +112,9 @@ def main():
     
     grid = RectangularGrid(n)
     
-    rho, sigma, nugget = 7., 3., 0.1  # pick smaller rho
+    rho, sigma, nugget = 3., 3., 0.1  # pick smaller rho
     prior_mean = np.array([rho, sigma])    
-    prior_cov = np.array([[1., 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
+    prior_cov = np.array([[0.25, 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
     # prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
      
     model = SquaredExponentialModel() 
@@ -138,7 +138,7 @@ def main():
         idx = text.find('ncpus=')
         nprocesses = int(text[ idx+6 : idx+8 ]) - 2  # TODO: change when ncpus<100!! -2 to not overload error
     
-    nprocesses = 10  # mp.cpu_count()
+    nprocesses = 25  # mp.cpu_count()
     
     with Pool(processes=nprocesses, initializer=init_pool_processes, maxtasksperchild=1) as pool:
     
@@ -164,12 +164,12 @@ def main():
             with open(file_name, 'a+') as f:
                 if new_file:
                     f.write(f'# prior_mean={prior_mean.tolist()}, prior_cov={prior_cov.tolist()}\n')
-                    f.write('quantile adj_quantile prob prob_adj\n')
+                    f.write('parameters quantiles adj_quantiles probs prob_adjs\n')
                 
-                res = np.concatenate([q, q_adj, probs, probs_adj])
+                res = np.concatenate([params, q, q_adj, probs, probs_adj])
                 for i, number in enumerate(res):
                     val = f'{number:f}'
-                    if i+1<12:
+                    if i+1<len(res):
                         f.write(val + ' ')
                     else:
                         f.write(val + '\n')
