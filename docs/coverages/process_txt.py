@@ -44,7 +44,7 @@ q     = arr[:, -8:-6]
 adj_q = arr[:, -6:-4]
 p     = arr[:, -4:-2]
 adj_p = arr[:, -2:]    
-    
+   
 
 prior_label = rf'$\rho \sim N({prior_mean[0]}, {np.diag(prior_cov)[0]})$, $\sigma \sim N({prior_mean[1]}, {np.diag(prior_cov)[1]})$ '
 

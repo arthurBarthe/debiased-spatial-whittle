@@ -9,7 +9,7 @@ from numdifftools import Gradient, Hessian
 from typing import Callable, Union
 from scipy.optimize import minimize, basinhopping
 
-def svd_decomp(M:ndarray) -> ndarray:
+def svd_decomp(M: ndarray) -> ndarray:
     '''
     Singular value decomp of a matrix M = U s V^T.
 
@@ -24,8 +24,16 @@ def svd_decomp(M:ndarray) -> ndarray:
         L = U sqrt(diag(s)) such has L L^T = M.
 
     '''
+    if any(np.linalg.eigvals(M)<0):
+        print(M)
+        raise ValueError('Matrix not positive semi-definite?') 
+        
     U, s, VT = np.linalg.svd(M)
-    return U @ np.diag(np.sqrt(s))
+    L = U @ np.diag(np.sqrt(s))
+    if not np.allclose(M, L @ L.T):
+        raise ValueError('L L^T != M') 
+
+    return L
 
 
 def transform(x: ndarray, inv:bool=True) -> ndarray:

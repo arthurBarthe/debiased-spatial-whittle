@@ -260,8 +260,12 @@ class Likelihood(ABC):
     # def estimate_standard_errors_MLE(self):           # maybe not abstract method
     #     pass
 
-    def compute_C(self):
-        '''compute C matrix for posterior adjustment'''
+    # compute_C is when we have analytic (approx) J matrix
+    
+    # TODO: USE CHOLESKY INSTEAD OF SVD_DECOMP, BETER RESULTS WITH CHOLESKY
+
+    def compute_C2(self):
+        '''Compute C matrix for posterior adjustment with MC estimate of J.'''
         if hasattr(self, 'Hhat'):
             H_ = self.Hhat
         elif hasattr(self, 'H'):
@@ -272,12 +276,39 @@ class Likelihood(ABC):
             Jhat = self.Jhat
         
         M_A = svd_decomp( H_ @ inv(Jhat) @ H_ )
-        M = svd_decomp( H_ )
-        self.C = inv(M) @ M_A
+        M   = svd_decomp( H_ )
+        self.C2 = inv(M) @ M_A
         return
         
+    def compute_C3(self, mle: ndarray):
+        if hasattr(self, 'Hhat'):
+            H_ = self.Hhat
+        elif hasattr(self, 'H'):
+            H_ = self.H
+        
+        # TODO: analytic J?
+        if hasattr(self, 'Jhat'):
+            Jhat = self.Jhat
+        
+        M_A = cholesky( H_ @ inv(Jhat) @ H_ )
+        M   = cholesky(compute_hessian(self, mle))    # observed fisher
+        self.C3 = inv(M) @ M_A
+        return
     
-    def compute_C_old(self, mle: ndarray):
+    def compute_C4(self, mle: ndarray):
+        '''
+        C = M^-1 M_A,
+        M_A = svd(H J^-1 H),
+        M   = svd(H).
+        '''
+        M_A = svd_decomp(inv(self.MLEs_cov))
+        
+        M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
+        self.C4 = inv(M) @ M_A
+        return
+    
+    def compute_C5(self, mle: ndarray):
+        '''First  way of trying the adjustment.'''
         # TODO: change in likelihoods.py!!
 
         B = cholesky(self.MLEs_cov)     # this is inv(H) J inv(H)
@@ -285,40 +316,15 @@ class Likelihood(ABC):
         # TODO: only autograd propcov
         propcov = compute_hessian(self, mle, inv=True)     # this is inv(H), inv of observed fisher
         L_inv = inv(cholesky(propcov))    # propcov only for MLE
-        self.C1 = inv(B @ L_inv)
+        self.C5 = inv(B @ L_inv)
         return
     
-    def compute_C2(self, mle: ndarray):
+    def compute_C5_2(self, mle: ndarray):
         B = svd_decomp(self.MLEs_cov)
         
         propcov = compute_hessian(self, mle, inv=True)
         L_inv = inv(svd_decomp(propcov))    # propcov only for MLE
-        self.C2 = inv(B @ L_inv)
+        self.C5_2 = inv(B @ L_inv)
         return
     
-    def compute_C3(self, mle: ndarray):
-        '''
-        C = M^-1 M_A
-        M_A = svd(H J^-1 H)
-        M   = svd(H)
-        '''
-        M_A = svd_decomp(inv(self.MLEs_cov))
-        
-        M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
-        self.C3 = inv(M) @ M_A
-        return
     
-    def compute_C4(self, mle: ndarray):
-        if hasattr(self, 'Hhat'):
-            H_ = self.Hhat
-        elif hasattr(self, 'H'):
-            H_ = self.H
-        
-        # TODO: analytic J?
-        if hasattr(self, 'Jhat'):
-            Jhat = self.Jhat
-        
-        M_A = svd_decomp( H_ @ inv(Jhat) @ H_ )
-        M = svd_decomp(compute_hessian(self, mle))  # observed fisher
-        self.C4 = inv(M) @ M_A
-        return

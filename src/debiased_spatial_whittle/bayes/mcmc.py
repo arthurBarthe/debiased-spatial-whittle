@@ -81,7 +81,8 @@ class MCMC:
         else:
             def posterior(x): return self.logpost(x, **logpost_kwargs)
             label = self.likelihood.label
-            
+        
+        # TODO: use optimizer propcov!!!
         propcov   = compute_hessian(posterior, 
                                     self.likelihood.res.x, 
                                     approx_grad=approx_grad, 

@@ -27,7 +27,7 @@ from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessi
 import os, sys
 
 start = 1
-n_datasets= 100
+n_datasets= 500
 
 
 def func(i: int, 
@@ -93,6 +93,8 @@ def init_pool_processes():
 
 
 def main():
+
+    # TODO: use sys.argv!!!
     
     global start, n_datasets
     
@@ -106,12 +108,12 @@ def main():
      
     model = SquaredExponentialModel() 
     
-    likelihood = Gaussian
-    
+    likelihood = Gaussian 
+
     file_name = f'{likelihood.__name__}_{n[0]}x{n[1]}_{model.name}.txt'
     
-    mle_niter  = 1000
-    mcmc_niter = 5000
+    mle_niter  = 100
+    mcmc_niter = 1000
 
 
     g = partial(func, 
@@ -128,7 +130,7 @@ def main():
         idx = text.find('ncpus=')
         nprocesses = int(text[ idx+6 : idx+8 ])  # TODO: change when ncpus<100!!
     
-    # nprocesses = 20  # mp.cpu_count()
+    nprocesses = 20  # mp.cpu_count()
     
     with Pool(processes=nprocesses, initializer=init_pool_processes, maxtasksperchild=1) as pool:
     
@@ -141,6 +143,7 @@ def main():
             
             print(probs.round(3), probs_adj.round(3), sep='\n')
             print('')
+            
             
             print(i, file_name)
             if os.path.exists(file_name):
@@ -160,7 +163,13 @@ def main():
                     f.write(f'# prior_mean={prior_mean.tolist()}, prior_cov={prior_cov.tolist()}\n')
                     f.write('quantile adj_quantile prob prob_adj\n')
                 
-                f.write(f'{q} {q_adj} {probs} {probs_adj}\n')
+                res = np.concatenate([q, q_adj, probs, probs_adj])
+                for i, number in enumerate(res):
+                    val = f'{number:f}'
+                    if i+1<12:
+                        f.write(val + ' ')
+                    else:
+                        f.write(val + '\n')
                 
 
 if __name__ == '__main__':
