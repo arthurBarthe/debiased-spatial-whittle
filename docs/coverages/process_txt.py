@@ -34,8 +34,8 @@ adj_q = np.zeros((500,4))
 p = np.zeros((500,2))
 adj_p = np.zeros((500,2))
 
-file_name = f'C2/C2_DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt'
-arr = np.loadtxt(file_name, skiprows=2)
+file_name = f'C5/DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt'
+arr = np.loadtxt(file_name, skiprows=2)[:500]
 
 # stop
 
@@ -61,10 +61,6 @@ ax[1,1].set_xlabel( r'$\sigma$', fontsize=22)
 
 ax[0,0].set_title('debiased Whittle', color='r',fontsize=20, x=1.05, y=1.05)
 ax[1,0].set_title('Adjusted debiased Whittle', color='r',fontsize=20, x=1.05, y=1.05)
-
-# for axis in ax.flatten():
-    # axis.set_xticks([])
-    # axis.set_yticks([])
 
 # fig.subplots_adjust(hspace=0.3, wspace=-1.0)
 fig.tight_layout()

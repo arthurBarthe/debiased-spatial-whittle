@@ -275,8 +275,8 @@ class Likelihood(ABC):
         if hasattr(self, 'Jhat'):
             Jhat = self.Jhat
         
-        M_A = svd_decomp( H_ @ inv(Jhat) @ H_ )
-        M   = svd_decomp( H_ )
+        M_A = cholesky( H_ @ inv(Jhat) @ H_ )
+        M   = cholesky( H_ )
         self.C2 = inv(M) @ M_A
         return
         
@@ -301,9 +301,9 @@ class Likelihood(ABC):
         M_A = svd(H J^-1 H),
         M   = svd(H).
         '''
-        M_A = svd_decomp(inv(self.MLEs_cov))
+        M_A = cholesky(inv(self.MLEs_cov))
         
-        M = svd_decomp(compute_hessian(self, mle))  # this is the observed fisher
+        M = cholesky(compute_hessian(self, mle))  # this is the observed fisher
         self.C4 = inv(M) @ M_A
         return
     
