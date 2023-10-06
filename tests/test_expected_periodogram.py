@@ -5,7 +5,7 @@ from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel, Parameters
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel, Parameters
 from debiased_spatial_whittle.confidence import CovarianceFFT
 
 def test_non_negative():
@@ -132,7 +132,7 @@ def test_gradient_expected_periodogram():
     numerical approximation to that gradient
     :return:
     """
-    g = RectangularGrid((8, 8))
+    g = RectangularGrid((32, 32))
     p = Periodogram()
     ep_op = ExpectedPeriodogram(g, p)
     model = ExponentialModel()
@@ -145,6 +145,26 @@ def test_gradient_expected_periodogram():
     g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
+
+def test_gradient_expected_periodogram_sqExpCov():
+    """
+    This test verifies that the analytical gradient of the expected periodogram is close to a
+    numerical approximation to that gradient, for the squared exponential covariance model.
+    :return:
+    """
+    g = RectangularGrid((32, 32))
+    p = Periodogram()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = SquaredExponentialModel()
+    model.sigma = 3
+    model.rho = 10
+    epsilon = 1e-6
+    ep1 = ep_op(model)
+    model.rho = model.rho.value + epsilon
+    ep2 = ep_op(model)
+    g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
+    g2 = (ep2 - ep1) / epsilon
+    assert_allclose(g, g2, rtol=1e-2)
 
 
 def test_cov_dft_sum():
