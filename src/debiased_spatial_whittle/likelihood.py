@@ -1,6 +1,7 @@
 import warnings
 
 from .backend import BackendManager
+from .samples import SampleOnRectangularGrid
 from .simulation import SamplerOnRectangularGrid
 
 import numpy as np
@@ -102,7 +103,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 #########NEW OOP version
 from .periodogram import Periodogram, ExpectedPeriodogram
 from .models import CovarianceModel, Parameters
-from typing import Callable
+from typing import Callable, Union
 
 
 def whittle_prime(per, e_per, e_per_prime):
@@ -309,7 +310,7 @@ class Estimator:
         self.max_iter = max_iter
         self.use_gradients = use_gradients
 
-    def __call__(self, model: CovarianceModel, z: np.ndarray, opt_callback: Callable = None):
+    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None):
         free_params = model.free_params
 
         # function to be optimized.
