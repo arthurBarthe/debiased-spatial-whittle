@@ -9,7 +9,7 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
-n = (128, 128)
+n = (256, 256)
 rho, sigma = 6, 3
 
 grid = RectangularGrid(n)
@@ -64,6 +64,7 @@ for i in range(n_samples):
     z = sampler()
     model_est = SquaredExponentialModel()
     model_est.nugget = model.nugget.value
+    model_est.sigma.init_guess = 10
     dw(model_est, z)
     print(model_est)
     estimates[i, :] = model_est.params.values

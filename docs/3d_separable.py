@@ -1,5 +1,5 @@
 # We simulate from a 3d exponential covariance model and estimate its parameters from the simulation
-
+import matplotlib.pyplot as plt
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel
@@ -7,12 +7,13 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SamplerSeparable
 from debiased_spatial_whittle.utils import video_plot_3d
 
-n = (64, 64, 20)
+n = (64, 64, 120)
 
 grid = RectangularGrid(n)
 
 model_space = SquaredExponentialModel()
 model_space.rho = 5
+model_space.nugget = 0.01
 model_time = SquaredExponentialModel()
 model_time.rho = 2
 
@@ -24,7 +25,8 @@ sampler = SamplerOnRectangularGrid(model, grid)
 sampler = SamplerSeparable(model, grid)
 z = sampler()
 
-video_plot_3d(z)
+anim = video_plot_3d(z)
+plt.show()
 
 # estimation
 p = Periodogram()
@@ -33,6 +35,7 @@ d = DebiasedWhittle(p, ep)
 e = Estimator(d, use_gradients=False)
 
 model_space = SquaredExponentialModel()
+model_space.nugget = None
 model_time = SquaredExponentialModel()
 model = SeparableModel([model_space, model_time], dims=[(0, 1), (2, )])
 model.merge_parameters(('sigma_0', 'sigma_1'))
