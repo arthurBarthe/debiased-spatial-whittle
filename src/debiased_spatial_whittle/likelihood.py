@@ -113,7 +113,7 @@ def whittle_prime(per, e_per, e_per_prime):
     if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
         out = []
         for i in range(e_per_prime.shape[-1]):
-            out.append(whittle_prime(per, e_per, np.take(e_per_prime, np.array([i, ]), -1)))
+            out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
         return np.stack(out, axis=-1)
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
