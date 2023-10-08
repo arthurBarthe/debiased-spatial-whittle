@@ -174,6 +174,8 @@ class DebiasedWhittle:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
+        if BackendManager.backend_name == 'torch':
+            d_whittle = d_whittle.cpu().numpy()
         return whittle, d_whittle
 
     def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
