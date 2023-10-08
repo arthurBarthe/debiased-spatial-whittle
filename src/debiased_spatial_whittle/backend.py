@@ -30,7 +30,7 @@ class BackendManager:
         if cls.backend_name == 'numpy':
             return numpy.random.randn
         elif cls.backend_name == 'torch':
-            return lambda *args, **kargs: torch.randn(*args, **kargs, dtype=torch.float64)
+            return lambda *args, **kargs: torch.randn(*args, **kargs, dtype=torch.float64, device=cls.device)
         else:
             raise Exception('No backend set')
 
