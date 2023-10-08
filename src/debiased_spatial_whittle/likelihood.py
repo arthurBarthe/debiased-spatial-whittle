@@ -206,8 +206,8 @@ class DebiasedWhittle:
         h = np.zeros((len(params_for_gradient), len(params_for_gradient)))
         for i1, p1_name in enumerate(params_for_gradient.names):
             for i2, p2_name in enumerate(params_for_gradient.names):
-                d_ep1 = np.take(d_ep, i1, -1)
-                d_ep2 = np.take(d_ep, i2, -1)
+                d_ep1 = d_ep[..., i1]
+                d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
         # TODO ugly
         return h / self.expected_periodogram.grid.n_points
