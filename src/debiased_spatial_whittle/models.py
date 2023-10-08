@@ -295,7 +295,6 @@ class ExponentialModel(CovarianceModel):
     def __call__(self, lags: np.ndarray):
         d = np.sqrt(sum((lag**2 for lag in lags)))
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
-        
         acf = self.sigma.value ** 2 * np.exp(- d / self.rho.value) + nugget_effect
         return acf
 

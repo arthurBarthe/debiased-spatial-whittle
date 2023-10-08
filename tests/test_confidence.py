@@ -21,13 +21,13 @@ def test_jmat():
 
 
 def test_mcmc_jmat():
-    g = RectangularGrid((32, 32))
+    g = RectangularGrid((16, 16))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     model = ExponentialModel()
     model.sigma = 1
     model.rho = 5
-    f = np.ones((32, 32))
+    f = np.ones((16, 16))
     mcmc = McmcDiags(model, ep, f, f)
     cov_fft = CovarianceFFT(g)
     s1 = cov_fft.exact_summation1(model, ep, f, f, normalize=True)
