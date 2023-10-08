@@ -169,7 +169,7 @@ class DebiasedWhittle:
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
         if BackendManager.backend_name == 'torch':
-            return whittle.item()
+            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
