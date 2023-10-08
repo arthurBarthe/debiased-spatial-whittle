@@ -15,7 +15,7 @@ model.rho = 35
 model.sigma = 1
 model.nugget = 0.025
 
-shape = (1024 * 2, 1024 * 2)
+shape = (1024 * 1, 1024 * 1)
 mask_france = grids.ImgGrid(shape).get_new()
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france

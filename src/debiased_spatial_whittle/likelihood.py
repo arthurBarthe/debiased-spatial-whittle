@@ -327,7 +327,6 @@ class Estimator:
         init_guess = numpy.array(free_params.init_guesses)
         x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
                       maxiter=self.max_iter, callback=opt_callback)
-        print(d)
         #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
         return model
 
