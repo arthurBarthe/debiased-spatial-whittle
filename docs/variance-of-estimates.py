@@ -9,7 +9,7 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
-n = (256, 256)
+n = (128, 128)
 rho, sigma = 6, 3
 
 grid = RectangularGrid(n)
@@ -25,6 +25,7 @@ ep = ExpectedPeriodogram(grid, per)
 db = DebiasedWhittle(per, ep)
 
 sampler = SamplerOnRectangularGrid(model, grid)
+sampler.n_sims = 300
 z = sampler()
 
 fig = plt.figure()
@@ -44,11 +45,11 @@ print(jmat)
 
 # variance of estimates
 #cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
-cov_mat = db.variance_of_estimates(model, params, jmat)
+cov_mat_sample = db.variance_of_estimates(model, params, jmat)
 
 print('--------------')
 #print(cov_mat_mcmc)
-print(cov_mat)
+print(cov_mat_sample)
 
 if input('Run Monte Carlo simulations to compare with predicted variance (y/n)?') != 'y':
     sys.exit(0)
