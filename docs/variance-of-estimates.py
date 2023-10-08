@@ -10,7 +10,7 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 
 
-n = (256, 256)
+n = (32, 32)
 rho, sigma = 3, 1
 
 grid = RectangularGrid(n)

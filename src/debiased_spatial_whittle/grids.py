@@ -157,7 +157,7 @@ class RectangularGrid:
         shape = self.n
         delta = self.delta
         lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
-        return np.stack(lags)
+        return np.stack(lags, axis=0)
 
     @cached_property
     def lag_matrix(self):
