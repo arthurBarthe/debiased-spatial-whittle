@@ -23,6 +23,7 @@ class BackendManager:
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
             torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, args[0][1] + args[0][0], **kargs)
+            torch.dot = torch.matmul
             return torch
 
     @classmethod
