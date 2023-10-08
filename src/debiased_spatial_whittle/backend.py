@@ -35,6 +35,15 @@ class BackendManager:
             raise Exception('No backend set')
 
     @classmethod
+    def get_arange(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.arange
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.arange(*args, **kargs, device=cls.device)
+        else:
+            raise Exception('No backend set')
+
+    @classmethod
     def get_fft_methods(cls):
         if cls.backend_name == 'numpy':
             return numpy.fft.fftn, numpy.fft.ifftn

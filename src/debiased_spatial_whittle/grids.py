@@ -114,6 +114,7 @@ fftn = np.fft.fftn
 ifftn = np.fft.ifftn
 fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
+arange = BackendManager.get_arange()
 
 class RectangularGrid:
     def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
@@ -160,7 +161,7 @@ class RectangularGrid:
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags, axis=0)
 
     @cached_property
