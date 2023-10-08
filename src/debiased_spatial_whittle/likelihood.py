@@ -16,6 +16,7 @@ from .confidence import CovarianceFFT, McmcDiags
 
 fftn = np.fft.fftn
 inv = np.linalg.inv
+zeros = BackendManager.get_zeros()
 
 def prod_list(l):
     if len(l) == 0:
@@ -203,7 +204,7 @@ class DebiasedWhittle:
         """Provides the expectation of the hessian matrix"""
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = np.zeros((len(params_for_gradient), len(params_for_gradient)))
+        h = zeros((len(params_for_gradient), len(params_for_gradient)))
         for i1, p1_name in enumerate(params_for_gradient.names):
             for i2, p2_name in enumerate(params_for_gradient.names):
                 d_ep1 = d_ep[..., i1]

@@ -26,7 +26,7 @@ z = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-estimator = Estimator(debiased_whittle, use_gradients=False)
+estimator = Estimator(debiased_whittle, use_gradients=True)
 
 model_est = SquaredExponentialModel()
 model_est.nugget = model.nugget.value

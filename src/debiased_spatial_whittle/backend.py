@@ -26,6 +26,13 @@ class BackendManager:
             return torch
 
     @classmethod
+    def get_zeros(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.zeros
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.zeros(*args, **kargs, device=BackendManager.device)
+
+    @classmethod
     def get_randn(cls):
         if cls.backend_name == 'numpy':
             return numpy.random.randn
