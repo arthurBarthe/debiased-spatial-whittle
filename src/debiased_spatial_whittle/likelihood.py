@@ -12,10 +12,10 @@ from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
 from .periodogram import compute_ep_old
 from .confidence import CovarianceFFT, McmcDiags
-from scipy.linalg import inv
+
 
 fftn = np.fft.fftn
-
+inv = np.linalg.inv
 
 def prod_list(l):
     if len(l) == 0:
