@@ -4,6 +4,7 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SamplerSeparable
 from debiased_spatial_whittle.utils import video_plot_3d
 
@@ -22,8 +23,8 @@ model.merge_parameters(('sigma_0', 'sigma_1'))
 model.free_params['sigma_0 and sigma_1'].value = 1
 
 sampler = SamplerOnRectangularGrid(model, grid)
-sampler = SamplerSeparable(model, grid)
 z = sampler()
+z = SampleOnRectangularGrid(grid, z)
 
 anim = video_plot_3d(z)
 plt.show()
