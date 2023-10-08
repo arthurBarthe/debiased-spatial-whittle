@@ -168,9 +168,9 @@ class DebiasedWhittle:
         p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
+        if BackendManager.backend_name == 'torch':
+            return whittle.item()
         if not params_for_gradient:
-            if BackendManager.backend_name == 'torch':
-                return whittle.item()
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
