@@ -3,6 +3,7 @@ import torch
 
 class BackendManager:
     backend_name = 'numpy'
+    device = 'cpu'
     
     @classmethod
     def set_backend(cls, name: str):
@@ -17,7 +18,7 @@ class BackendManager:
             return autograd.numpy
         elif cls.backend_name == 'torch':
             torch.set_default_tensor_type(torch.DoubleTensor)
-            torch.array = lambda x: torch.tensor(x, dtype=torch.float64)
+            torch.array = lambda x: torch.tensor(x, dtype=torch.float64, device=cls.device)
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)

@@ -19,6 +19,9 @@ def autocov(cov_func, shape):
     0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
     when computing the expecting periodogram"""
     xs = np.meshgrid(*(np.arange(-n + 1, n) for n in shape), indexing='ij')
+    if BackendManager.backend_name == 'torch':
+        # TODO this is a temporary solution, not ideal though
+        xs = xs.to(device=BackendManager.device)
     return ifftshift(cov_func(xs))
 
 
