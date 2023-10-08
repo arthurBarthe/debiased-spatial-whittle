@@ -2,6 +2,7 @@ import warnings
 
 from .backend import BackendManager
 np = BackendManager.get_backend()
+import numpy
 
 from .samples import SampleOnRectangularGrid
 from .simulation import SamplerOnRectangularGrid
@@ -323,7 +324,7 @@ class Estimator:
         func = self._get_opt_func(model, free_params, z, self.use_gradients)
 
         bounds = model.free_param_bounds
-        init_guess = np.array(free_params.init_guesses)
+        init_guess = numpy.array(free_params.init_guesses)
         x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
                       maxiter=self.max_iter, callback=opt_callback)
         print(d)
