@@ -120,8 +120,10 @@ def compute_ep_old(cov_func, grid, fold=True):
 
 
 ####NEW OOP VERSION
+from typing import Union
 from .models import CovarianceModel, SeparableModel
 from .grids import RectangularGrid
+from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
 
 class Periodogram:
@@ -134,12 +136,41 @@ class Periodogram:
         #TODO add possibility to not fold?
         #TODO add scaling
         self.fold = True
+        self._version = 0
 
-    def __call__(self, z: np.ndarray):
+    def __hash__(self):
+        return id(self) + self._version
+
+    def __call__(self, z: Union[np.ndarray, SampleOnRectangularGrid]):
         # TODO add tapering
+        if isinstance(z, SampleOnRectangularGrid):
+            if self in z.periodograms:
+                return z.periodograms[self]
+            else:
+                z_values = z.values
+        else:
+            z_values = z
         z_taper = z
-        f = 1 / prod_list(z.shape) * np.abs(fftn(z))**2
+        f = 1 / prod_list(z_values.shape) * np.abs(fftn(z_values))**2
+        if isinstance(z, SampleOnRectangularGrid):
+            z.periodograms[self] = f
         return f
+
+    def __setattr__(self, key, value):
+        """
+        Sets attribute and update version of the object, which will update its hash, so that stored periodogram
+        values are not used if properties of the periodogram are changed.
+
+        Parameters
+        ----------
+        key
+            name of the attribute
+        value
+            value of the attribute
+        """
+        if '_version' in self.__dict__:
+            self.__dict__['_version'] += 1
+        super(Periodogram, self).__setattr__(key, value)
 
 
 class ExpectedPeriodogram:

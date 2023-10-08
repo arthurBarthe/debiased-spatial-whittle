@@ -1,17 +1,34 @@
-import numpy as np
 import matplotlib.pyplot as plt
-import scipy.linalg
 
-from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
 import debiased_spatial_whittle.grids as grids
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
-cov = sq_exp_cov
+model = SquaredExponentialModel()
+model.rho = 35
+model.sigma = 1
+model.nugget = 0.025
+
 shape = (620 * 1, 620 * 1)
-cov_func = lambda lags: cov(lags, rho=32.)
-img = grids.ImgGrid(shape).get_new()
-z = sim_circ_embedding(cov_func, shape)[0] * img
-est = fit(z, img, cov, [1., ])
-print(est)
+mask_france = grids.ImgGrid(shape).get_new()
+grid_france = RectangularGrid(shape)
+grid_france.mask = mask_france
+sampler = SamplerOnRectangularGrid(model, grid_france)
+
+z = sampler()
+
+periodogram = Periodogram()
+expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
+debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
+estimator = Estimator(debiased_whittle, use_gradients=True)
+
+model_est = SquaredExponentialModel()
+model_est.nugget = None
+estimate = estimator(model_est, z)
+print(estimate)
 
 plt.imshow(z, origin='lower', cmap='Spectral')
 plt.show()

@@ -29,8 +29,8 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     if m == (0, 0):
         f = np.abs(fftn(g, two_n))**2
         cg = ifftn(f)
-        cg /= np.sum(g ** 2)
-        return cg
+        cg /= n[0] * n[1]
+        return np.real(cg)
     # TODO only works in 2d right now
     m1, m2 = m
     n1, n2 = n

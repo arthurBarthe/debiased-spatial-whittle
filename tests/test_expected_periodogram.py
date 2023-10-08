@@ -5,7 +5,7 @@ from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel, Parameters
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel, Parameters
 from debiased_spatial_whittle.confidence import CovarianceFFT
 
 def test_non_negative():
@@ -41,17 +41,27 @@ def test_autocov_2():
 
 
 def test_compare_to_mean():
-    m, n = 128, 64
-    cov_func = lambda lags: exp_cov(lags, rho=15.)
-    mean_per = np.zeros((m, n))
-    grid = np.ones((m, n))
-    n_samples = 50
+    """
+    Compare the sample average of periodograms computed over independent
+    realizations to the expected periodogram.
+    """
+    shape = (32, 32)
+    grid = RectangularGrid(shape)
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
     for i in range(n_samples):
-        z, _ = sim_circ_embedding(cov_func, (m, n))
-        per = periodogram(z, grid)
+        z = sampler()
+        per = periodogram(z)
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
-    e_per = compute_ep_old(cov_func, grid)
-    assert_allclose(mean_per, e_per, rtol=1)
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
 
 
 def test_compare_to_mean2():
@@ -67,6 +77,33 @@ def test_compare_to_mean2():
     e_per = compute_ep_old(cov_func, grid)
     print(mean_per / e_per)
     assert_allclose(mean_per, e_per, rtol=0.1)
+
+
+def test_compare_to_average_masked_grid():
+    """
+    Compare the sample average of periodograms over independent realizations
+    to the expected periodogram, in the case of a grid with missing observations.
+    """
+    shape = (32, 32)
+    grid = RectangularGrid(shape)
+    mask = np.ones(shape)
+    mask[:10, :40] = 0
+    grid.mask = mask
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
+    for i in range(n_samples):
+        z = sampler()
+        per = periodogram(z)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
 
 
 def test_separable_expected_periodogram():
@@ -132,7 +169,7 @@ def test_gradient_expected_periodogram():
     numerical approximation to that gradient
     :return:
     """
-    g = RectangularGrid((8, 8))
+    g = RectangularGrid((32, 32))
     p = Periodogram()
     ep_op = ExpectedPeriodogram(g, p)
     model = ExponentialModel()
@@ -145,6 +182,26 @@ def test_gradient_expected_periodogram():
     g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
+
+def test_gradient_expected_periodogram_sqExpCov():
+    """
+    This test verifies that the analytical gradient of the expected periodogram is close to a
+    numerical approximation to that gradient, for the squared exponential covariance model.
+    :return:
+    """
+    g = RectangularGrid((32, 32))
+    p = Periodogram()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = SquaredExponentialModel()
+    model.sigma = 3
+    model.rho = 10
+    epsilon = 1e-6
+    ep1 = ep_op(model)
+    model.rho = model.rho.value + epsilon
+    ep2 = ep_op(model)
+    g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
+    g2 = (ep2 - ep1) / epsilon
+    assert_allclose(g, g2, rtol=1e-2)
 
 
 def test_cov_dft_sum():
