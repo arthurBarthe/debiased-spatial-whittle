@@ -198,7 +198,8 @@ class CovarianceModel(ABC):
         g = self._gradient(x)
         for i, p in enumerate(self.params):
             if p in params.param_dict.values():
-                gradient[p.name] += np.take(g, i, axis=-1)
+                #gradient[p.name] += np.take(g, i, axis=-1)
+                gradient[p.name] += g[..., i]
         return gradient
 
     @abstractmethod

@@ -1,5 +1,4 @@
 from .backend import BackendManager
-BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
 from itertools import product
@@ -188,7 +187,7 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        self._taper = value.taper(self.grid)
+        #self._taper = value.taper(self.grid)
 
     @property
     def taper(self):

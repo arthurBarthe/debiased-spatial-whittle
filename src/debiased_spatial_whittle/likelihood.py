@@ -1,10 +1,11 @@
 import warnings
 
 from .backend import BackendManager
+np = BackendManager.get_backend()
+
 from .samples import SampleOnRectangularGrid
 from .simulation import SamplerOnRectangularGrid
 
-import numpy as np
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
@@ -108,10 +109,10 @@ from typing import Callable, Union
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
-    if e_per.ndim != e_per_prime.ndim:
+    if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
         out = []
         for i in range(e_per_prime.shape[-1]):
-            out.append(whittle_prime(per, e_per, np.take(e_per_prime, i, axis=-1)))
+            out.append(whittle_prime(per, e_per, np.take(e_per_prime, np.array([i, ]), -1)))
         return np.stack(out, axis=-1)
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
@@ -167,6 +168,8 @@ class DebiasedWhittle:
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
         if not params_for_gradient:
+            if BackendManager.backend_name == 'torch':
+                return whittle.item()
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
@@ -321,8 +324,9 @@ class Estimator:
 
         bounds = model.free_param_bounds
         init_guess = np.array(free_params.init_guesses)
-        fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
+        x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
                       maxiter=self.max_iter, callback=opt_callback)
+        print(d)
         #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
         return model
 
