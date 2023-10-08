@@ -246,7 +246,10 @@ class ExpectedPeriodogram:
         # now we need to "fold"
         if fold:
             # TODO: check if working
-            result = np.zeros(shape, dtype=np.complex128)
+            if BackendManager.backend_name == 'torch':
+                result = np.zeros(shape, dtype=np.complex128, device=BackendManager.device)
+            else:
+                result = np.zeros(shape, dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i*shape[0]: (i+1)*shape[0]]
