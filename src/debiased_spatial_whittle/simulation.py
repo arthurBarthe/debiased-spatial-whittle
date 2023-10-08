@@ -10,6 +10,7 @@ from typing import List
 
 fftn, ifftn = BackendManager.get_fft_methods()
 randn = BackendManager.get_randn()
+arange = BackendManager.get_arange()
 
 def prod_list(l: List[int]):
     l = list(l)
@@ -111,7 +112,7 @@ class SamplerOnRectangularGrid:
             z = np.sqrt(np.maximum(f, np.zeros_like(f))) * e
             z_inv = 1 / np.sqrt(np.array(prod_list(self.sampling_grid.n))) * np.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
             for i, n in enumerate(self.grid.n):
-                z_inv = np.take(z_inv, np.arange(n), i)
+                z_inv = np.take(z_inv, arange(n), i)
             self._z = z_inv * np.expand_dims(self.grid.mask, -1)
         result =  self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
