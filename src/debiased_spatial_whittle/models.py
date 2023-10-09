@@ -507,9 +507,12 @@ class MaternCovarianceModel(CovarianceModel):
         term1 = 2 ** (1 - nu) / gamma(nu)
         term2 = (np.sqrt(np.array(2 * nu)) * d / rho) ** nu
         # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
-        term3 = kv(nu, numpy.sqrt(2 * nu) * d / rho)
+
         if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu() / rho)
             term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
