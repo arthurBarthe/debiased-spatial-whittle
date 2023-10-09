@@ -255,7 +255,8 @@ class DebiasedWhittle:
                 jmat[i, j] = 1 / (n1 * n2) ** 2 * (s1 + s2)
         return jmat
 
-    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000) -> np.ndarray:
+    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000,
+                       block_size: int = 100) -> np.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
         simulated realisations.
@@ -268,6 +269,10 @@ class DebiasedWhittle:
             Parameters with respect to which we take the gradient
         n_sims
             Number of samples used for the estimate covariance matrix
+        block_size
+            Number of samples per simulations. A higher number should improve
+            computational efficiency, but for large grids this may cause
+            Out Of Memory issues.
 
         Returns
         -------
@@ -276,7 +281,7 @@ class DebiasedWhittle:
         """
         # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
-        sampler.n_sims = 100
+        sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
