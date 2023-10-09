@@ -500,12 +500,12 @@ class MaternCovarianceModel(CovarianceModel):
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         if nu==1.5:
-            K = np.sqrt(3) * d / rho
+            K = np.sqrt(np.array(3)) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
         term1 = 2 ** (1 - nu) / gamma(nu)
-        term2 = (np.sqrt(2 * nu) * d / rho) ** nu
+        term2 = (np.sqrt(np.array(2 * nu)) * d / rho) ** nu
         # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
-        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
+        term3 = kv(nu, np.sqrt(np.array(2 * nu)) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
