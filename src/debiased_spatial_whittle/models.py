@@ -497,7 +497,6 @@ class MaternCovarianceModel(CovarianceModel):
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         if nu==1.5:
