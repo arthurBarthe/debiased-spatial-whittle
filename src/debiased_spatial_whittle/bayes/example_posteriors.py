@@ -14,7 +14,7 @@ inv = np.linalg.inv
 
 np.random.seed(53252331)
 
-n=(512,512)
+n=(64,64)
 grid = RectangularGrid(n)
 
 
@@ -52,6 +52,7 @@ grads = dw.sim_J_matrix(dw.res.x, niter=nsims)
 
 dw.compute_C2()
 dw.compute_C3(dw.res.x)
+dw.compute_C6(dw.res.x)
 
 mcmc_niter=10000
 acceptance_lag = 1000
@@ -64,6 +65,7 @@ adj3_dw_post  = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptan
 adj4_dw_post  = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C4)
 adj5_dw_post  = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C5)
 adj52_dw_post = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C5_2)
+adj6_dw_post = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C6)
 
 if False:
     gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
@@ -72,7 +74,7 @@ if False:
     
 
 title = f'Posterior comparisons, {n=}'
-density_labels = ['deWhittle', 'adj2 deWhittle', 'adj3 deWhittle', 'adj4 deWhittle', 'adj5 deWhittle', 'adj52 deWhittle']
-posts = [dw_post_draws, adj2_dw_post, adj3_dw_post, adj4_dw_post, adj5_dw_post, adj52_dw_post]
+density_labels = ['deWhittle', 'adj2 deWhittle', 'adj3 deWhittle', 'adj4 deWhittle', 'adj5 deWhittle', 'adj52 deWhittle', 'adj6 deWhittle']
+posts = [dw_post_draws, adj2_dw_post, adj3_dw_post, adj4_dw_post, adj5_dw_post, adj52_dw_post, adj6_dw_post]
 plot_marginals(posts, params, title, [r'$\rho$', r'$\sigma$'], density_labels, shape=(1,2),  cmap='hsv')
 

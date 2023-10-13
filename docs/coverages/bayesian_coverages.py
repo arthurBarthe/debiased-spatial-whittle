@@ -61,9 +61,10 @@ def func(i: int,
     ll.fit(x0=params, print_res=False, approx_grad = approx_grad)
     
     # MCMC
+    burin = 1000
     mcmc = MCMC(ll, prior)
     acceptance_lag = mcmc_niter+1
-    post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag, approx_grad=approx_grad)
+    post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag, approx_grad=approx_grad)[burnin:]
         
     if name in {'DeWhittle', 'Whittle'}:
         
@@ -73,7 +74,7 @@ def func(i: int,
         ll.compute_C3(ll.res.x)   # TODO: change C # TODO: for C3 can get singular matrix error!!
         
         adj_post = mcmc.RW_MH(mcmc_niter, adjusted=True, 
-                              acceptance_lag=acceptance_lag, C=ll.C3)
+                              acceptance_lag=acceptance_lag, C=ll.C3)[burin:]
     else:
         adj_post = np.zeros((mcmc_niter, ll.n_params))
         

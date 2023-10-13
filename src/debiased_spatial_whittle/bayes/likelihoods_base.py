@@ -327,4 +327,15 @@ class Likelihood(ABC):
         self.C5_2 = inv(B @ L_inv)
         return
     
+    def compute_C6(self, mle: ndarray):
+        # TODO: change in likelihoods.py!!
+        H = self.H
+        B = cholesky(inv(H) @ self.Jhat @ inv(H))     # this is inv(H) J inv(H)
+        
+        # TODO: only autograd propcov
+        propcov = compute_hessian(self, mle, inv=True)     # this is inv(H), inv of observed fisher
+        L_inv = inv(cholesky(propcov))    # propcov only for MLE
+        self.C6 = inv(B @ L_inv)
+        return
+    
     
