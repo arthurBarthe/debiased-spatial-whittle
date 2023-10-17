@@ -1,6 +1,14 @@
 import numpy
 import torch
 
+def func(x):
+    n = len(x)
+    res = ()
+    for i in range(n):
+        res += x[-i - 1]
+    return res
+
+
 class BackendManager:
     backend_name = 'numpy'
     device = 'cpu'
@@ -22,7 +30,7 @@ class BackendManager:
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
-            torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, sum(args[0][::-1]), **kargs)
+            torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, func(args[0]), **kargs)
             torch.dot = torch.matmul
             return torch
 
