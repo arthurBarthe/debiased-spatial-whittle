@@ -16,7 +16,7 @@ def get_file_name(n: int, C: str = 'C5') -> str:
     print(n)
     return f'{C}/{C}_DeWhittle_{n}x{n}_SquaredExponentialModel.txt'
 
-C = 'C4'
+C = 'C5'
 ns = (64, 128, 256, 512)
 # ns = [(n,)*2 for n in (64, 128, 256, 512)]
 d = {n: np.loadtxt(get_file_name(n, C=C), skiprows=2, max_rows=500) for n in ns}
@@ -70,3 +70,65 @@ for i in range(2):
 
 fig.tight_layout()
 plt.show()
+
+
+
+#### coverages ####
+
+def get_coverages(arr: np.ndarray) -> None:
+    '''
+    Prints the coverages of the posteriors from 
+    the output of bayesian_coverages.py.
+    '''
+    n = len(arr)
+    quantiles = [0.025, 0.975, 0.4, 0.6, 0.5]
+    nq = len(quantiles)
+    idxs = [2,7,12,17,22]
+    params, q_rhos, q_sigmas, q_adj_rhos, q_adj_sigmas, _ = np.split(arr, idxs, axis=1)
+    
+    params = {'rhos': params[:,0], 'sigmas': params[:,1]}
+    q_rhos     = {q: q_rho for q, q_rho in zip(quantiles, q_rhos.T)}
+    adj_q_rhos = {q: q_rho for q, q_rho in zip(quantiles, q_adj_rhos.T)}
+    
+    q_sigmas     = {q: q_adj_rhos for q, q_adj_rhos in zip(quantiles, q_sigmas.T)}
+    adj_q_sigmas = {q: q_adj_sigmas for q, q_adj_sigmas in zip(quantiles, q_adj_sigmas.T)}
+    
+    rhos = params['rhos']
+    sigmas = params['sigmas']
+    
+    dewhittle = {}
+    adj_dewhittle= {}
+    for q in np.sort(quantiles)[:nq//2+1]:
+        # print(q)
+        alpha = round((1-2*q)*100)
+        
+        if q==0.5:
+            alpha = 'q50'   # this is just a quantile
+            rhos_    = np.sum(q_rhos[q] < rhos)
+            adj_rhos = np.sum(adj_q_rhos[q] < rhos)
+            
+            sigmas_    = np.sum(q_sigmas[q] < sigmas)
+            adj_sigmas = np.sum(adj_q_sigmas[q] < sigmas)
+            
+        else:
+            rhos_    = np.sum((q_rhos[q] < rhos) & ( rhos < q_rhos[1-q]))
+            adj_rhos = np.sum((adj_q_rhos[q] < rhos) & ( rhos < adj_q_rhos[1-q]))
+            
+            sigmas_    = np.sum((q_sigmas[q] < sigmas) & ( sigmas < q_sigmas[1-q]))
+            adj_sigmas = np.sum((adj_q_sigmas[q] < sigmas) & ( sigmas < adj_q_sigmas[1-q]))
+        
+        dewhittle[alpha]     = {'rho':round(rhos_/n,2), 'sigma':round(sigmas_/n,2)}
+        adj_dewhittle[alpha] = {'rho':round(adj_rhos/n,2), 'sigma':round(adj_sigmas/n,2)}
+     
+    label = ['DeWhittle', 'adjusted_DeWhittle']
+    for i, dic in enumerate([dewhittle, adj_dewhittle]):
+        print(label[i])
+        for key, value in dic.items():
+            print(f'{key}% {value}')
+            
+    return
+            
+for n, arr in d.items():
+    print(n)
+    get_coverages(arr)
+    print()

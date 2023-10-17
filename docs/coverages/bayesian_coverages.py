@@ -61,7 +61,7 @@ def func(i: int,
     ll.fit(x0=params, print_res=False, approx_grad = approx_grad)
     
     # MCMC
-    burin = 1000
+    burnin = 1000
     mcmc = MCMC(ll, prior)
     acceptance_lag = mcmc_niter+1
     post = mcmc.RW_MH(mcmc_niter, acceptance_lag=acceptance_lag, approx_grad=approx_grad)[burnin:]
@@ -74,7 +74,7 @@ def func(i: int,
         ll.compute_C3(ll.res.x)   # TODO: change C # TODO: for C3 can get singular matrix error!!
         
         adj_post = mcmc.RW_MH(mcmc_niter, adjusted=True, 
-                              acceptance_lag=acceptance_lag, C=ll.C3)[burin:]
+                              acceptance_lag=acceptance_lag, C=ll.C3)[burnin:]
     else:
         adj_post = np.zeros((mcmc_niter, ll.n_params))
         
@@ -147,7 +147,7 @@ def main():
                 
             params, q, q_adj, probs, probs_adj = result   # TODO: save parameters as well!!!
                         
-            print(q.round(3), q_adj.round(3), params.round(3), sep='\n')
+            print(params.round(3), q.round(3), q_adj.round(3), sep='\n')
             print('')
             
             print(probs.round(3), probs_adj.round(3), sep='\n')

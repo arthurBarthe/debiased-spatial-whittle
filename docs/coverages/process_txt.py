@@ -11,9 +11,9 @@ mpl.rcParams['axes.spines.top']   = False
 mpl.rcParams['axes.spines.right'] = False
 
 
-# n = (64,64)
+n = (64,64)
 # n = (128,128)
-n = (256,256)
+# n = (256,256)
 # n = (512,512)
 rho, sigma, nugget = 7., 3., 0.1  # pick smaller rho
 
@@ -34,7 +34,7 @@ adj_q = np.zeros((500,4))
 p = np.zeros((500,2))
 adj_p = np.zeros((500,2))
 
-file_name = f'C5/DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt'
+file_name = f'C5/C5_DeWhittle_{n[0]}x{n[1]}_SquaredExponentialModel.txt'
 arr = np.loadtxt(file_name, skiprows=2)[:500]
 
 # stop
