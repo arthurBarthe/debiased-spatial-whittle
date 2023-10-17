@@ -22,7 +22,7 @@ class BackendManager:
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
-            torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, sum(k for k in args[0][::-1]), **kargs)
+            torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, sum(args[0][::-1]), **kargs)
             torch.dot = torch.matmul
             return torch
 
