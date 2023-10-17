@@ -25,11 +25,12 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
         Spatial kernel
     """
     n = g.shape
+    normalization = np.exp(np.sum(np.log(n)))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         f = np.abs(fftn(g, two_n))**2
         cg = ifftn(f)
-        cg /= n[0] * n[1]
+        cg /= normalization
         return np.real(cg)
     # TODO only works in 2d right now
     m1, m2 = m
