@@ -16,7 +16,7 @@ def get_file_name(n: int, C: str = 'C5') -> str:
     print(n)
     return f'{C}/{C}_DeWhittle_{n}x{n}_SquaredExponentialModel.txt'
 
-C = 'C5'
+C = 'C6'
 ns = (64, 128, 256, 512)
 # ns = [(n,)*2 for n in (64, 128, 256, 512)]
 d = {n: np.loadtxt(get_file_name(n, C=C), skiprows=2, max_rows=500) for n in ns}
@@ -34,7 +34,7 @@ prior_label = rf'$\rho \sim N({prior_mean[0]}, {np.diag(prior_cov)[0]})$, $\sigm
 
 from scipy import stats
 unif = stats.uniform(0,1)
-qs = np.linspace(0,1, 1000)
+qs = np.linspace(0,1, 100)
 theory_quants = unif.ppf(qs)
 
 cm1 = plt.get_cmap('Blues')
@@ -46,9 +46,9 @@ for i, n in enumerate(ns):
     p     = d[n][:, -4:-2]
     adj_p = d[n][:, -2:]
     ax[0].plot(theory_quants, np.quantile(p[:,0], qs), 
-               '.', c=cm1(i/len(ns)+0.2), markersize=10, label=f'{n=}', zorder=i)
+                c=cm1(i/len(ns)+0.2), linewidth=3, label=f'{n=}', zorder=i)
     ax[0].plot(theory_quants, np.quantile(adj_p[:,0], qs), 
-               '.', c=cm2(i/len(ns)+0.2), markersize=10, label=f'{n=}', zorder=i)
+                c=cm2(i/len(ns)+0.2), linewidth=3, label=f'{n=}', zorder=i)
     
 ax[0].legend(fontsize=18)
 
@@ -57,9 +57,9 @@ for i, n in enumerate(ns):
     p     = d[n][:, -4:-2]
     adj_p = d[n][:, -2:]
     ax[1].plot(theory_quants, np.quantile(p[:,1], qs), 
-               '.', c=cm1(i/len(ns)+0.1), markersize=10., label=f'{n=}')
+                c=cm1(i/len(ns)+0.1), linewidth=3., label=f'{n=}')
     ax[1].plot(theory_quants, np.quantile(adj_p[:,1], qs), 
-               '.', c=cm2(i/len(ns)+0.2), markersize=10., label=f'{n=}')
+               c=cm2(i/len(ns)+0.2), linewidth=3., label=f'{n=}')
 # ax[1].legend()
 
 ax[0].set_xlabel( r'$\rho$', fontsize=26)
