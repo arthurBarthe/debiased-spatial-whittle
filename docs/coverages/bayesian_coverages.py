@@ -83,8 +83,8 @@ def func(i: int,
     q     = np.quantile(post, quantiles, axis=0).T.flatten()
     q_adj = np.quantile(adj_post, quantiles, axis=0).T.flatten()
 
-    probs     = np.sum(post < params, axis=0)/mcmc_niter
-    probs_adj = np.sum(adj_post < params, axis=0)/mcmc_niter
+    probs     = np.sum(post < params, axis=0)/len(post)
+    probs_adj = np.sum(adj_post < params, axis=0)/len(adj_post)
     
     return params, q, q_adj, probs, probs_adj
 
@@ -113,9 +113,9 @@ def main():
     
     grid = RectangularGrid(n)
     
-    rho, sigma, nugget = 3., 3., 0.1  # pick smaller rho
+    rho, sigma, nugget = 7., 3., 0.1  # pick smaller rho
     prior_mean = np.array([rho, sigma])    
-    prior_cov = np.array([[0.25, 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
+    prior_cov = np.array([[1., 0.], [0., .1]])  # TODO: PRIOR (VARIANCE) VERY IMPORTANT FOR COVERAGES/QUANTILES
     # prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
      
     model = SquaredExponentialModel() 
