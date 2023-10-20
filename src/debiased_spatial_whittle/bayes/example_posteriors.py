@@ -26,7 +26,6 @@ prior = GaussianPrior(prior_mean, prior_cov)   # make sure sigma not negative
 params = prior.sim()
 print(f'params={params.round(3)}')
 
-nugget=0.1
 model = SquaredExponentialModel()   # TODO: try exponential model
 model.rho = params[0]
 model.sigma = params[1]

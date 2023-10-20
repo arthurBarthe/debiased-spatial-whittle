@@ -6,7 +6,7 @@ import types
 from numpy import ndarray
 from autograd import grad, hessian
 from numdifftools import Gradient, Hessian
-from typing import Callable, Union
+from typing import Callable, Union, List
 from scipy.optimize import minimize, basinhopping
 
 def svd_decomp(M: ndarray) -> ndarray:
@@ -155,6 +155,7 @@ def fit(func: Callable,
         basin_hopping:bool = False,
         approx_grad:bool=False,
         transform_params: Union[None,Callable] = None,
+        bounds: Union[None, List] = None,
         included_prior: str = False,
         print_res:bool = True,
         save_res:bool=True,
@@ -178,19 +179,26 @@ def fit(func: Callable,
     if x0 is None and not is_func:
         x0 = transform_params(np.ones(func.n_params), inv=False)
     
+    # havent properly tested bounds statements     
+    if not is_func and not func.transform_flag and bounds is None:   # assumes func has .transform_lag property
+        # print('sdfsdfa')
+        bounds = func.model.param_bounds[:len(x0)]       # assumes func has .model.param_bounds method/property
+    else:
+        bounds=None
+    
     if loglik_kwargs is None:
         loglik_kwargs = dict()
         
     def obj(x):     return -func(x, **loglik_kwargs)  # minimize negative
         
     gradient = False if approx_grad else grad(obj)
-    
+    print(x0)
     if basin_hopping:          # for global optimization
-        minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient}
+        minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient, 'bounds': bounds}
         res = basinhopping(obj, x0, minimizer_kwargs=minimizer_kwargs, **opt_kwargs)   # niter!!
         success = res.lowest_optimization_result['success']
     else:            
-        res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', **opt_kwargs)
+        res = minimize(x0=x0, fun=obj, jac=gradient, method='L-BFGS-B', bounds=bounds, **opt_kwargs)
         success = res['success']
         
     if not success:

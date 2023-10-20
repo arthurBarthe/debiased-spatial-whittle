@@ -1,5 +1,3 @@
-from typing import Optional, Callable
-
 from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
@@ -10,14 +8,14 @@ from autograd import grad, hessian
 from numdifftools import Hessian
 from autograd.scipy import stats
 from autograd.numpy import ndarray
-from scipy.optimize import minimize
+from scipy.optimize import minimize, basinhopping
 
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
-from debiased_spatial_whittle.bayes.funcs import transform, compute_gradient, compute_hessian, svd_decomp, fit
-from typing import Union
+from debiased_spatial_whittle.bayes.funcs import transform, compute_gradient, compute_hessian, svd_decomp
+from typing import Union, Optional, Callable
 
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
@@ -59,7 +57,7 @@ class Likelihood(ABC):
         self._free_params = model.free_params
         self._n_params = len(self._free_params)
         
-        if transform_func is None:             # TODO: make a separate class
+        if transform_func is None:             # TODO: include in Parameter class
             self.transform = self._transform
             self._transform_flag = False
         else:
@@ -132,9 +130,65 @@ class Likelihood(ABC):
         self.update_model_params(params)
         return self.model(np.stack(lags), **cov_args)
     
-    def fit(self, **fit_kwargs):
-        # TODO: copy docstring and kwargs over from fit
-        return fit(self, **fit_kwargs)
+    def fit(self,  
+            x0: Union[None, ndarray]=None,
+            basin_hopping:bool = False,
+            approx_grad:bool=False,
+            print_res:bool = True,
+            save_res:bool=True,
+            loglik_kwargs: Union[None,Callable]=None,
+            **opt_kwargs):
+
+        '''
+        A general optimizer of the log-likelihood. Includes optional
+        global optimizer.
+        '''
+        # TODO: test this!
+        
+        attribute = 'MLE'
+        
+        if x0 is None:
+            x0 = self.transform(np.ones(self.n_params), inv=False)        
+            
+        if not self.transform_flag:
+            bounds = self.model.param_bounds[:len(x0)]
+        else:
+            bounds = None
+        
+        if loglik_kwargs is None:
+            loglik_kwargs = dict()
+            
+        def obj(x):     return -self(x, **loglik_kwargs)  # minimize negative
+            
+        gradient = False if approx_grad else grad(obj)
+        
+        if basin_hopping:          # for global optimization
+            minimizer_kwargs = {'method': 'L-BFGS-B', 'jac': gradient, 'bounds': bounds}
+            res = basinhopping(obj, x0, minimizer_kwargs=minimizer_kwargs, **opt_kwargs)   # niter!!
+            success = res.lowest_optimization_result['success']
+        else:            
+            res = minimize(x0=x0, 
+                           fun=obj,
+                           jac=gradient,
+                           method='L-BFGS-B',
+                           bounds=bounds,
+                           **opt_kwargs)
+            
+            success = res['success']
+            
+        if not success:
+            print('Optimizer failed!')
+            # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
+            
+        res['type'] = attribute
+        res['BIC']  = len(x0) * np.log(self.n_points) - 2*self(res.x)
+        if print_res:
+            print(f'{self.label} {attribute}:  {self.transform(res.x).round(3)}')
+            
+        if save_res:
+            setattr(self, 'res', res)
+            
+        return res
     
     def adj_loglik(self, x: ndarray, C, **loglikargs) -> float: 
         return self(self.res.x + C @ (x - self.res.x), **loglikargs)
@@ -163,7 +217,6 @@ class Likelihood(ABC):
                 
             loglik_kwargs = {'z':z}
             res = self.fit(x0=params,
-                           included_prior=False, 
                            print_res=False, 
                            save_res=False, 
                            loglik_kwargs=loglik_kwargs, 
@@ -177,6 +230,7 @@ class Likelihood(ABC):
                 plt.show()
                 
             if not res['success'] or np.linalg.norm(res.x - params)>1000:
+                print('failed out fit method')
                 continue
 
             if print_res:
