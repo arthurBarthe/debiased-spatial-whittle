@@ -15,7 +15,7 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, TSampl
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
 from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.bayes.funcs import transform, compute_gradient, compute_hessian, svd_decomp
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, List
 
 fftn = np.fft.fftn
 fftshift = np.fft.fftshift
@@ -120,7 +120,7 @@ class Likelihood(ABC):
        all_params.update_values(updates)
        return
    
-    def cov_func(self, params: ndarray, lags: Optional[list[ndarray, ...]] =None, **cov_args) -> list[ndarray, ...]:
+    def cov_func(self, params: ndarray, lags: Union[None,List[ndarray]] =None, **cov_args) -> List[ndarray]:
         '''compute covariance func on a grid of lags given parameters'''
         
         # TODO: only for dewhittle and whittle

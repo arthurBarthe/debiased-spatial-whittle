@@ -6,6 +6,7 @@ from scipy import stats
 from autograd.scipy import stats as ag_stats
 
 from abc import ABC, abstractmethod
+from typing import Union
 
 class Prior(ABC):
     # TODO: do on regular parameter space!! add inv_transform to prior and likelihood class!!
@@ -62,7 +63,7 @@ class GaussianPrior(Prior):
         '''pdf (autograd)'''
         return ag_stats.multivariate_normal.pdf(x, mean=self.mean, cov=self.cov)
         
-    def sim(self, size: int|ndarray=1) -> ndarray:
+    def sim(self, size: Union[int,ndarray]=1) -> ndarray:
         return self._dist.rvs(size)
 
 

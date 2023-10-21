@@ -38,7 +38,7 @@ z = sampler()
 # TODO: try on log-scale, transform_func!!!!
 nsims = 2000
 dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
-# dw.constant = np.prod(n)
+# dw.constant = 1/np.prod(n)
 
 dw.fit(x0=params)
 MLEs = dw.sim_MLEs(dw.res.x, niter=nsims, print_res=False)
@@ -67,7 +67,7 @@ adj52_dw_post = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptan
 adj6_dw_post = dw_post.RW_MH(mcmc_niter, adjusted=True, acceptance_lag=acceptance_lag, C=dw.C6)
 
 if False:
-    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
+    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)
     gauss.fit(x0=params, included_prior=False, approx_grad=True)
     gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=True), acceptance_lag=100)
     

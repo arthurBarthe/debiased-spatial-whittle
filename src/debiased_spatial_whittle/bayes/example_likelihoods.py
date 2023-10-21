@@ -11,18 +11,20 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle
 
 from autograd import grad, hessian
 
-np.random.seed(53252336)
+# np.random.seed(53252336)
 
 inv = np.linalg.inv
 
-params = np.array([7.,2.])
+params = np.array([7.,3.])
+nugget = 0.1
 model = SquaredExponentialModel()
 model.rho = params[0]
 model.sigma = params[1]
-model.nugget=0.1
+model.nugget=nugget
 
 n=(64,64)
 grid = RectangularGrid(n)
+# taper = np.outer(np.blackman(n[0]), np.blackman(n[1]))
 
 sampler = SamplerOnRectangularGrid(model, grid)
 z = sampler()
@@ -30,10 +32,11 @@ z = sampler()
 # TODO: try on log-scale, transform_func!!!!
 
 mle_niter=2000
-dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
+dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)
 
 dw.fit(x0=params)
 MLEs = dw.sim_MLEs(dw.res.x, niter=mle_niter, print_res=False)
+
 dw.compute_C4(dw.res.x)
 dw.compute_C5(dw.res.x)
 dw.compute_C5_2(dw.res.x)
@@ -56,7 +59,7 @@ adj52_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.ad
 adj6_dw_post = RW_MH(mcmc_niter, dw.res.x, dw.adj_loglik, compute_hessian(dw.adj_loglik, dw.res.x, inv=True, C=dw.C6), C=dw.C6)
 
 if False:
-    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1, transform_func=None)
+    gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=nugget, transform_func=None)
     gauss.fit(x0=params, included_prior=False, approx_grad=True)
     gauss_post  = RW_MH(mcmc_niter//5, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, approx_grad=True, inv=True), acceptance_lag=100)
     
