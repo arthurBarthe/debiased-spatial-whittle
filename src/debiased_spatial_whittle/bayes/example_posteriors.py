@@ -12,7 +12,7 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle
 from autograd import grad, hessian
 inv = np.linalg.inv
 
-np.random.seed(53252331)
+# np.random.seed(53252331)
 
 n=(64,64)
 grid = RectangularGrid(n)

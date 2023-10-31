@@ -158,7 +158,7 @@ class Likelihood(ABC):
         if loglik_kwargs is None:
             loglik_kwargs = dict()
             
-        def obj(x):     return -self(x, **loglik_kwargs)  # minimize negative
+        def obj(x):     return -1 / (self.n_points * self.constant) * self(x, **loglik_kwargs)  # minimize rescaled negative loglik
             
         gradient = False if approx_grad else grad(obj)
         
@@ -176,7 +176,7 @@ class Likelihood(ABC):
             
             success = res['success']
             
-        if not success:
+        if not success or obj(res.x)>obj(x0):
             print('Optimizer failed!')
             # warnings.warn("Optimizer didn't converge")    # when all warnings are ignored
             
@@ -251,6 +251,11 @@ class Likelihood(ABC):
         Estimate via simulation J(x) matrix, var[ grad(ll) ].
         '''
         # TODO: more testing!
+        # TODO: Jhat now on 1/n scale!
+        
+        def obj(x, **loglik_kwargs):
+            '''rescaled log-lik'''
+            return -1 / (self.n_points * self.constant) * self(x, **loglik_kwargs) 
     
         i = 0
         self.grad_at_params = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -260,7 +265,7 @@ class Likelihood(ABC):
             loglik_kwargs = {'z':z}
             
             # TODO: func kwargs?
-            grad_at_params = compute_gradient(self, params, approx_grad=approx_grad, **loglik_kwargs)   
+            grad_at_params = compute_gradient(obj, params, approx_grad=approx_grad, **loglik_kwargs)   
            
             if not np.all(np.isfinite(grad_at_params)):
                 continue
@@ -284,6 +289,10 @@ class Likelihood(ABC):
         fisher (H) cannot be computed analyitcally (e.g. Matern).
         '''
         # TODO: more testing!
+        def obj(x, **loglik_kwargs):
+            '''rescaled log-lik'''
+            return -1 / (self.n_points * self.constant) * self(x, **loglik_kwargs) 
+    
     
         i = 0
         self.grad_at_params = np.zeros((niter, self.n_params), dtype=np.float64)
@@ -293,8 +302,8 @@ class Likelihood(ABC):
             z = self.sim_z(params)
             loglik_kwargs = {'z':z}
             
-            grad_at_params = compute_gradient(self, params, approx_grad=approx_grad, **loglik_kwargs)   # TODO: func kwargs?
-            hess_at_params = compute_hessian(self, params, approx_grad=approx_grad, **loglik_kwargs)
+            grad_at_params = compute_gradient(obj, params, approx_grad=approx_grad, **loglik_kwargs)   # TODO: func kwargs?
+            hess_at_params = compute_hessian(obj, params, approx_grad=approx_grad, **loglik_kwargs)
            
             if not np.all(np.isfinite(grad_at_params)) or np.all(np.isfinite(hess_at_params)):
                 continue
@@ -331,7 +340,7 @@ class Likelihood(ABC):
         
         M_A = cholesky( H_ @ inv(Jhat) @ H_ )
         M   = cholesky( H_ )
-        self.C2 = inv(M) @ M_A
+        self.C2 = inv(M) @ M_A / np.sqrt(self.n_points / 2)   # re-adjusting to 1/2 scale!
         return
         
     def compute_C3(self, mle: ndarray):

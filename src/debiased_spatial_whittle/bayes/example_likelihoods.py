@@ -11,7 +11,7 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle
 
 from autograd import grad, hessian
 
-# np.random.seed(53252336)
+np.random.seed(53252336)
 
 inv = np.linalg.inv
 

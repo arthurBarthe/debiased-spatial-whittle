@@ -106,7 +106,8 @@ class DeWhittle(Likelihood):
             for j in range(d):
                 H[i,j] = np.sum( d_ep[i] * d_ep[j] / ep ** 2 )
          
-        self.H = self.constant * H 
+        # TODO: H on 1/n scale!
+        self.H = 1 / self.n_points * H     # not using self.constant. Always rescaling to make consistent with Jhat
         return self.H
         
     
