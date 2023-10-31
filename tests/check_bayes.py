@@ -5,7 +5,7 @@ from debiased_spatial_whittle.models import ExponentialModel, SquaredExponential
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SquaredSamplerOnRectangularGrid
-
+from debiased_spatial_whittle.bayes.funcs import transform, RW_MH, compute_hessian
 
 np.random.seed(1523483)
 
@@ -21,7 +21,7 @@ def dewhittle_test():
     
     dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
     dw.fit(None, prior=False)
-    MLEs = dw.sim_MLEs(params, niter=50)
+    MLEs = dw.sim_MLEs(np.exp(dw.res.x), niter=50)    # TODO: why is this params?
     plot_marginals([MLEs], np.log(params))
 
 def dewhittle_matern_conditional_nu_test():
@@ -39,7 +39,7 @@ def dewhittle_matern_conditional_nu_test():
     model.nu =3/2
     dw = DeWhittle(z, grid, model, nugget=0.1)
     dw.fit(None, prior=False)
-    MLEs = dw.sim_MLEs(params, niter=50)
+    MLEs = dw.sim_MLEs(params, niter=50)      # TODO: why is this params?
     plot_marginals([MLEs], np.log(params))
     
 def dewhittle_matern_test():
@@ -79,7 +79,7 @@ def whittle_test():
     
     
 def whittle_matern_test():    # TODO: wrong spectral density
-    sim_model = MaternModel()
+    sim_model = MaternCovarianceModel()
     sim_model.rho = 10
     sim_model.sigma = 1
     sim_model.nu = 3/2
@@ -89,7 +89,7 @@ def whittle_matern_test():    # TODO: wrong spectral density
     z = sampler()
     
     params = np.array([10.,1.,3/2])
-    model = MaternModel()
+    model = MaternCovarianceModel()
     # model.nu =3/2
     whittle = Whittle(z, grid, model, nugget=0.1)
     whittle.fit(np.log(params), prior=False, approx_grad=True)
@@ -154,36 +154,35 @@ def dewhittle_squaredmodel_full_bayes():
     plot_marginals([dewhittle_post, adj_dewhittle_post], np.log(params), title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
 def gauss_posterior_test():
+    params = np.array([7.,1.])
+    
     model = SquaredExponentialModel()
-    model.rho = 8
-    model.sigma = 1
+    model.rho = params[0]
+    model.sigma = params[1]
     model.nugget=0.1
     grid = RectangularGrid((32,32))
     
-    params = np.array([8.,1.])
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
     
-    niter = 1000
+    niter = 5000
     gauss = Gaussian(z, grid, SquaredExponentialModel(), nugget=0.1)
-    gauss.fit(None, prior=False, approx_grad=False)
-    gauss_post, A = gauss.RW_MH(niter)
+    gauss.fit(x0=None, included_prior=False, approx_grad=False)
+    gauss_post  = RW_MH(niter, gauss.res.x, gauss, compute_hessian(gauss, gauss.res.x, inv=True))
     # MLEs = gauss.sim_MLEs(params, niter=10)
     
     dw = DeWhittle(z, grid, SquaredExponentialModel(), nugget=0.1)
-    dw.fit(None, prior=False)
-    dewhittle_post, A = dw.RW_MH(niter)
+    dw.fit(x0=None, included_prior=False)
+    dw_post  = RW_MH(niter, dw.res.x, dw, compute_hessian(dw, dw.res.x, inv=True))
     
     whittle = Whittle(z, grid, SquaredExponentialModel(), nugget=0.1)
-    whittle.fit(None, prior=False)
-    whittle_post, A = whittle.RW_MH(niter)
+    whittle.fit(x0=None, included_prior=False)
+    whittle_post  = RW_MH(niter, whittle.res.x, whittle, compute_hessian(whittle, whittle.res.x, inv=True))
     
     title = 'posterior comparisons'
     legend_labels = ['gaussian', 'deWhittle', 'whittle']
-    plot_marginals([gauss_post, dewhittle_post, whittle_post], np.log(params), title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+    plot_marginals([gauss_post, dw_post, whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
 
-gauss_posterior_test()
-stop
 def main():
     dewhittle_full_bayes()
     whittle_matern_test()

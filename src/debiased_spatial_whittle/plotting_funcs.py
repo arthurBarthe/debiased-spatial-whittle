@@ -17,7 +17,7 @@ def plot_marginals(list_draws: List[ndarray],
                                cmap:Union[str, None]=None, **plotargs):
     
     '''draws: list of arrays of samples to plot'''
-    
+    # TODO: fix single 1-d case, make some tests!
     dims   = [draws.shape[1] if draws.ndim>1 else 1 for draws in list_draws]
     nplots = max(dims)
     if nplots==1:

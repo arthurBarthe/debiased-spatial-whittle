@@ -99,7 +99,7 @@ class Parameters:
 
     def free_params(self):
         list_free = list(filter(lambda p: p.free, self))
-        return Parameters(list(set(list_free)))
+        return Parameters(list_free)
 
     def __getitem__(self, item):
         return self.param_dict[item]
@@ -306,6 +306,17 @@ class ExponentialModel(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         d_nugget = 1. * (d == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transformed, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d = np.sqrt(sum((lag ** 2 for lag in lags)))
+        d_rho = (sigma**2 / rho) * d * np.exp(- d / rho)
+        d_sigma = 2 * sigma**2 * np.exp(- d / rho)
+        d_nugget = 1 * (d == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+
 
 
 class ExponentialModelUniDirectional(CovarianceModel):
@@ -402,7 +413,7 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
         # set a default value to zero for the nugget
-        self.nugget = 0.
+        # self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
         
@@ -432,6 +443,16 @@ class SquaredExponentialModel(CovarianceModel):
         d2 = sum((lag ** 2 for lag in lags))
         d_rho =  self.rho.value ** (-3) * d2 * self.sigma.value ** 2 * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
+        d_nugget = 1 * (d2 == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transform, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d2 = sum((lag ** 2 for lag in lags))
+        d_rho = (sigma / rho) ** 2 * d2 * np.exp( -0.5 * d2 / rho ** 2 )
+        d_sigma = 2 * sigma ** 2 * np.exp( -0.5 * d2 / rho ** 2 )
         d_nugget = 1 * (d2 == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 
@@ -489,16 +510,20 @@ class ChiSquaredModel(CovarianceModel):
 
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
         nu = Parameter('nu', (0.01, 100))
-        parameters = Parameters([sigma, nu, rho])
+        parameters = Parameters([rho, sigma, nu])
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        
+        if np.all(lags == 0):
+            return sigma ** 2   # return variance at zeroth lag
+        
         lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
-        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         if nu==1.5:
             K = np.sqrt(3) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
@@ -511,6 +536,7 @@ class MaternCovarianceModel(CovarianceModel):
         return val
 
     def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        # TODO: include infinite sum grid
         freq_grid = np.stack(freq_grid, axis=0)
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         pi = np.pi
