@@ -1,33 +1,41 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit, matern15_cov_func
 import debiased_spatial_whittle.grids as grids
-
-
-cov = sq_exp_cov
-init_guess = np.array([1., ])
-
-
-
-
-# probability of each point
-p_obs = 0.5
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
 shape = (620 * 1, 620 * 1)
 
-# make map from france image
-img = grids.ImgGrid(shape).get_new()
+model = SquaredExponentialModel()
+model.rho = 8
+model.sigma = 1
+model.nugget = 0.025
 
-cov_func = lambda lags: cov(lags, rho=15.)
-z = sim_circ_embedding(cov_func, shape)[0]
-est = fit(z, np.ones_like(z), cov, init_guess, fold=False)
-print(est)
+p_obs = 0.05
+mask_bernoulli = np.random.rand(*shape) <= p_obs
 
-g = (np.random.rand(*shape) <= p_obs) * img
-z2 = z * g
-est = fit(z2, g, cov, init_guess, fold=False)
-print(est)
+mask_france = grids.ImgGrid(shape).get_new() * mask_bernoulli
+print(f'Number of observations: {np.sum(mask_france)}')
+grid_france = RectangularGrid(shape)
+grid_france.mask = mask_france
+sampler = SamplerOnRectangularGrid(model, grid_france)
 
-plt.imshow(z2, cmap='coolwarm')
+z = sampler()
+
+periodogram = Periodogram()
+expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
+debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
+estimator = Estimator(debiased_whittle, use_gradients=True)
+
+model_est = SquaredExponentialModel()
+model_est.nugget = None
+estimate = estimator(model_est, z)
+print(estimate)
+
+z[mask_france == 0] = np.nan
+plt.imshow(z, origin='lower', cmap='Spectral')
 plt.show()

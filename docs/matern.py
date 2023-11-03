@@ -19,7 +19,7 @@ est = fit(z, np.ones_like(z), cov, init_guess, fold=True)
 print(est)
 
 
-def run_experiment(sim_params, est_params, n_samples=10):
+def run_experiment(sim_params, est_params, n_samples=2):
     est = np.zeros((n_samples, 3))
     for i in range(n_samples):
         print(i, end=': ')

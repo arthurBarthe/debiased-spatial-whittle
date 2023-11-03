@@ -1,18 +1,22 @@
 import warnings
 
 from .backend import BackendManager
+np = BackendManager.get_backend()
+import numpy
+
+from .samples import SampleOnRectangularGrid
 from .simulation import SamplerOnRectangularGrid
 
-import numpy as np
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
-from .periodogram import compute_ep
+from .periodogram import compute_ep_old
 from .confidence import CovarianceFFT, McmcDiags
-from scipy.linalg import inv
+
 
 fftn = np.fft.fftn
-
+inv = np.linalg.inv
+zeros = BackendManager.get_zeros()
 
 def prod_list(l):
     if len(l) == 0:
@@ -72,8 +76,8 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 
     if cov_func_prime is not None:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
-            e_per_prime = compute_ep(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per_prime = compute_ep_old(lambda lags: (cov_func_prime(lags, *x))[0], grid, fold=fold)
             return whittle(per, e_per), whittle_prime(per, e_per, e_per_prime)
 
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
@@ -83,7 +87,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
                                          callback=opt_callback)
     else:
         def opt_func(x):
-            e_per = compute_ep(lambda lags: cov_func(lags, *x), grid, fold=fold)
+            e_per = compute_ep_old(lambda lags: cov_func(lags, *x), grid, fold=fold)
             return whittle(per, e_per)
         est_, fval, info = fmin_l_bfgs_b(lambda x: opt_func(x),
                                          init_guess,
@@ -102,7 +106,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 #########NEW OOP version
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from .models import CovarianceModel, Parameters
-from typing import Callable
+from typing import Callable, Union
 
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
 from numpy.linalg import slogdet, inv
@@ -110,10 +114,10 @@ from numpy.linalg import slogdet, inv
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
-    if e_per.ndim != e_per_prime.ndim:
+    if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
         out = []
         for i in range(e_per_prime.shape[-1]):
-            out.append(whittle_prime(per, e_per, np.take(e_per_prime, i, axis=-1)))
+            out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
         return np.stack(out, axis=-1)
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
@@ -150,28 +154,92 @@ class DebiasedWhittle:
     def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
+        self.frequency_mask = None
+
+    @property
+    def frequency_mask(self):
+        if self._frequency_mask is None:
+            return 1
+        else:
+            return self._frequency_mask
+
+    @frequency_mask.setter
+    def frequency_mask(self, value: np.ndarray):
+        """
+        Define a mask in the spectral domain to fit only certain frequencies
+
+        Parameters
+        ----------
+        value
+            mask of zeros and ones
+        """
+        if value is not None:
+            assert value.shape == self.expected_periodogram.grid.n, "shape mismatch between mask and grid"
+        self._frequency_mask = value
+
+    def whittle(self, p: np.ndarray, ep: np.ndarray):
+        """
+        Compute the Whittle distance between a periodogram p and a spectral density function ep
+
+        Parameters
+        ----------
+        p
+            periodogram of the data
+        ep
+            spectral density
+        Returns
+        -------
+
+        """
+        n_points = self.expected_periodogram.grid.n_points
+        return 1 / n_points * np.sum((np.log(ep) + p / ep) * self.frequency_mask)
 
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
-        p = self.periodogram(z)
+        p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
-        whittle = 1 / z.shape[0] / z.shape[1] * np.sum(np.log(ep) + p / ep)
+        whittle = self.whittle(p, ep)
+        if BackendManager.backend_name == 'torch':
+            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
+        if BackendManager.backend_name == 'torch':
+            d_whittle = d_whittle.cpu().numpy()
         return whittle, d_whittle
+
+    def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
+        """
+        Evaluate the expectation of the Debiased Whittle likelihood estimator for a given
+        parameter.
+
+        Parameters
+        ----------
+        true_model
+            Covariance model of the process
+        eval_model
+            Covariance model for which we evaluate the likelihood
+
+        Returns
+        -------
+            Expectation of the Debiased Whittle likelihood under true_model, evaluated at
+            eval_model
+        """
+        ep_true = self.expected_periodogram(true_model)
+        ep_eval = self.expected_periodogram(eval_model)
+        return np.sum(np.log(ep_eval) + ep_true / ep_eval)
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
         """Provides the expectation of the hessian matrix"""
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = np.zeros((len(params_for_gradient), len(params_for_gradient)))
+        h = zeros((len(params_for_gradient), len(params_for_gradient)))
         for i1, p1_name in enumerate(params_for_gradient.names):
             for i2, p2_name in enumerate(params_for_gradient.names):
-                d_ep1 = np.take(d_ep, i1, -1)
-                d_ep2 = np.take(d_ep, i2, -1)
+                d_ep1 = d_ep[..., i1]
+                d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
         # TODO ugly
         return h / self.expected_periodogram.grid.n_points
@@ -218,7 +286,8 @@ class DebiasedWhittle:
                 jmat[i, j] = 1 / (n1 * n2) ** 2 * (s1 + s2)
         return jmat
 
-    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000) -> np.ndarray:
+    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000,
+                       block_size: int = 100) -> np.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
         simulated realisations.
@@ -231,6 +300,10 @@ class DebiasedWhittle:
             Parameters with respect to which we take the gradient
         n_sims
             Number of samples used for the estimate covariance matrix
+        block_size
+            Number of samples per simulations. A higher number should improve
+            computational efficiency, but for large grids this may cause
+            Out Of Memory issues.
 
         Returns
         -------
@@ -239,6 +312,7 @@ class DebiasedWhittle:
         """
         # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
+        sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
@@ -280,7 +354,7 @@ class Estimator:
         self.max_iter = max_iter
         self.use_gradients = use_gradients
 
-    def __call__(self, model: CovarianceModel, z: np.ndarray, opt_callback: Callable = None):
+    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None):
         free_params = model.free_params
 
         # function to be optimized.
@@ -289,8 +363,8 @@ class Estimator:
         func = self._get_opt_func(model, free_params, z, self.use_gradients)
 
         bounds = model.free_param_bounds
-        init_guess = np.array(free_params.init_guesses)
-        fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
+        init_guess = numpy.array(free_params.init_guesses)
+        x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
                       maxiter=self.max_iter, callback=opt_callback)
         #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
         return model

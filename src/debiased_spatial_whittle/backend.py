@@ -1,29 +1,83 @@
+import numpy
+import torch
+
+def func(x):
+    n = len(x)
+    res = ()
+
+    for i in range(n):
+        res += x[-i - 1]
+    return res
+
+
 class BackendManager:
     backend_name = 'numpy'
-    backend = None
-
+    device = 'cpu'
+    
+    @classmethod
+    def set_backend(cls, name: str):
+        cls.backend_name = name
+    
     @classmethod
     def get_backend(cls):
         if cls.backend_name == 'numpy':
-            import numpy
-            cls.backend = numpy
             return numpy
+        elif cls.backend_name == 'autograd':
+            import autograd.numpy
+            return autograd.numpy
         elif cls.backend_name == 'torch':
-            import torch
-            cls.backend = torch
-            torch.array = torch.tensor
+            torch.set_default_tensor_type(torch.DoubleTensor)
+            torch.array = lambda x: torch.tensor(x, dtype=torch.float64, device=cls.device)
             torch.ndarray = torch.Tensor
-            torch.concatenate = torch.cat
             torch.expand_dims = torch.unsqueeze
-            torch.take = lambda x, y, z: torch.index_select(x, z, y)
-            torch.transpose = lambda x, y: torch.transpose(x, -1, -2)
+            torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
+            torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, func(args[0]), **kargs)
+            torch.dot = torch.matmul
             return torch
 
     @classmethod
-    def import_function(cls, *func_names):
-        return [getattr(cls.backend, func_name) for func_name in func_names]
+    def get_zeros(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.zeros
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.zeros(*args, **kargs, device=BackendManager.device)
 
     @classmethod
-    def set_backend(cls, name):
-        print(f'Backend set to {name}')
-        cls.backend_name = name
+    def get_randn(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.random.randn
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.randn(*args, **kargs, dtype=torch.float64, device=cls.device)
+        else:
+            raise Exception('No backend set')
+
+    @classmethod
+    def get_arange(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.arange
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.arange(*args, **kargs, device=cls.device)
+        else:
+            raise Exception('No backend set')
+
+    @classmethod
+    def get_fft_methods(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.fft.fftn, numpy.fft.ifftn
+        elif cls.backend_name == 'torch':
+            def new_fftn(a, *args, **kargs):
+                kargs['dim'] = kargs['axes']
+                del kargs['axes']
+                return torch.fft.fftn(a, *args, **kargs)
+            fftn = cls._changes_keyword(torch.fft.fftn, 'axes', 'dim')
+            ifftn = cls._changes_keyword(torch.fft.ifftn, 'axes', 'dim')
+            return fftn, ifftn
+
+    @classmethod
+    def _changes_keyword(cls, func, old_keyword, new_keyword):
+        def new_func(*args, **kargs):
+            if old_keyword in kargs:
+                kargs[new_keyword] = kargs[old_keyword]
+                del kargs[old_keyword]
+            return func(*args, **kargs)
+        return new_func

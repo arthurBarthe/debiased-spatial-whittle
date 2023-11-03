@@ -1,11 +1,13 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
+import numpy
+
 # In this file we define covariance models
 from abc import ABC, abstractmethod
-from debiased_spatial_whittle.backend import BackendManager
 
-from scipy.special import gamma, kv
+from autograd.scipy.special import gamma # , kv
 from typing import Tuple, List, Dict, Union
-
-np = BackendManager.get_backend()
 
 class Parameter:
     """
@@ -205,7 +207,8 @@ class CovarianceModel(ABC):
         g = self._gradient(x)
         for i, p in enumerate(self.params):
             if p in params.param_dict.values():
-                gradient[p.name] += np.take(g, i, axis=-1)
+                #gradient[p.name] += np.take(g, i, axis=-1)
+                gradient[p.name] += g[..., i]
         return gradient
 
     @abstractmethod
@@ -308,17 +311,23 @@ class SeparableModel(CovarianceModel):
         return 'SeparableModel(\n' + '\n'.join([m.__repr__() for m in self.models]) + '\n)'
 
 
+
 class ExponentialModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
-        rho = Parameter('rho', (0.01, 1000))
-        parameters = Parameters([rho, sigma])
+        sigma = Parameter('sigma', (1e-30, 1000))
+        rho = Parameter('rho', (1e-30, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
+        
+        parameters = Parameters([rho, sigma, nugget])
         super(ExponentialModel, self).__init__(parameters)
+        # set a default value to zero for the nugget
+        self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
-        d = np.sqrt(np.sum(lags**2, axis=0))
-        return self.sigma.value**2 * np.exp(- d / self.rho.value)
+        d = np.sqrt(sum((lag**2 for lag in lags)))
+        nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
+        acf = self.sigma.value ** 2 * np.exp(- d / self.rho.value) + nugget_effect
+        return acf
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
@@ -326,7 +335,8 @@ class ExponentialModel(CovarianceModel):
         d = np.sqrt(sum((lag ** 2 for lag in lags)))
         d_rho = (self.sigma.value / self.rho.value) ** 2 * d * np.exp(- d / self.rho.value)
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
-        return np.stack((d_rho, d_sigma), axis=-1)
+        d_nugget = 1. * (d == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 
 
 class ExponentialModelUniDirectional(CovarianceModel):
@@ -350,28 +360,160 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         return np.stack((d_rho, d_sigma), axis=-1)
 
+import scipy
+from scipy.special import kv
+from autograd.scipy.special import gamma, iv
+from autograd.extend import primitive, defvjp, defjvp
+# kv = primitive(scipy.special.kv)
+# defvjp(kv, None, lambda ans, n, x: lambda g: -g * (kv(n - 1, x) + kv(n + 1, x)) / 2.0)
+
+def kv_(nu, z):
+    if nu % 1 == 0:
+        nu +=1e-6
+    return (np.pi/2) * (iv(-nu,z) - iv(nu, z)) / np.sin(nu*np.pi)
+
+
+class MaternModel(CovarianceModel):
+    #  TODO: needs more testing!
+    def __init__(self):
+        rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
+        nu = Parameter('nu', (0.01, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
+        
+        parameters = Parameters([rho, sigma, nu, nugget])
+        super(MaternModel, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        rho, sigma, v = self.rho.value, self.sigma.value, self.nu.value
+        
+        d = np.sqrt(sum((lag**2 for lag in lags)))
+        mask = (d==0)
+        nugget_effect = (sigma**2 + self.nugget.value)
+        
+        # TODO: add specific cases for nu=1/2, 3/2, 5/2, inf
+        const = 2 ** (1 - v) / gamma(v)
+        args  = np.sqrt(2 * v) * d / rho
+        term2 = (args) ** v
+        term3 = kv_(v, args + mask)          # TODO: bad solution
+        acf = sigma**2 * const * term2 * term3
+        acf += (nugget_effect-acf)*mask
+        return acf #sdfsadffasdf
+    
+    def f(self, freq_grid:Union[List, np.ndarray], infsum_grid:Union[List, np.ndarray], d:int=2):
+        '''aliased spectral density, should match with the acf'''
+        
+        rho, sigma, v = self.rho.value, self.sigma.value, self.nu.value
+        
+        shape  = freq_grid[0].shape
+        d = len(shape)
+        N = np.prod(shape)
+        
+        # TODO: wrong spectral density?
+        args   = (np.tile(infsum_grid[i], (N,1,1)) + freq_grid[i].reshape(N,1,1) for i in range(d))
+        omega2 = np.sum((arg**2 for arg in args))
+        
+        term1 = 2**(d) * np.pi**(d/2) * gamma(v + d/2) * (2*v)**v
+        term2 = 1 / (gamma(v) * rho**(2*v))
+        term3 = ( 2*v/rho**2 + 4*np.pi**2 * omega2 )**(-v - d/2)      
+        f = sigma**2 * term1 * term2 * term3
+            
+        return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
+
+    def _gradient(self):
+        pass
+
 
 class SquaredExponentialModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        parameters = Parameters([rho, sigma])
+        sigma = Parameter('sigma', (0.01, 1000))
+        nugget = Parameter('nugget', (1e-30, 1000))
+        
+        parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
+        # set a default value to zero for the nugget
+        self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
-        d2 = np.sum(lags ** 2, axis=0)
-        result = self.sigma.value ** 2 * np.exp(- d2 / self.rho.value ** 2)
-        result[np.all(lags == 0, axis=0)] += 0.0001
-        return result
+        d2 = sum((lag**2 for lag in lags))
+        nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
+        acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
+        return acf
+    
+    def f(self, freq_grid:Union[list, np.ndarray], infsum_grid:Union[list, np.ndarray], d:int=2):
+        '''aliased spectral density, should match with the acf'''
+        
+        shape  = freq_grid[0].shape
+        N = np.prod(shape)
+        
+        args   = (np.tile(infsum_grid[i], (N,1,1)) + freq_grid[i].reshape(N,1,1) for i in range(d))
+        omega2 = np.sum((arg**2 for arg in args))
+        
+        # f = sigma2*(2*np.pi*rho**2)**(d/2)*np.exp(-2*(np.pi*rho)**2 * omega2) #+ nugget/(2*np.pi)**2
+        f = self.sigma.value**2*self.rho.value**2*(2*np.pi)**(d/2)*np.exp(-.5*(self.rho.value**2*omega2))#/(2*np.pi)**2
+        return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
         the model's parameters"""
+        # TODO: include nugget
         d2 = sum((lag ** 2 for lag in lags))
-        d_rho =  2 / self.rho.value ** 3 * d2 * self.sigma.value ** 2 * np.exp(-d2 / self.rho.value ** 2)
-        d_sigma = 2 * self.sigma.value * np.exp(- d2 / self.rho.value ** 2)
-        return np.stack((d_rho, d_sigma), axis=-1)
+        d_rho =  self.rho.value ** (-3) * d2 * self.sigma.value ** 2 * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
+        d_sigma = 2 * self.sigma.value * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
+        d_nugget = 1 * (d2 == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+
+
+# TODO this should not be just a covariance model. Create more general class for model with parameters
+class TMultivariateModel(CovarianceModel):
+    """
+    Model corresponding to a t-multivariate distribution.
+    """
+    def __init__(self, covariance_model: CovarianceModel):
+        self.covariance_model = covariance_model
+        nu = Parameter('nu', (1, 1000))
+        parameters = ParametersUnion([covariance_model.params, Parameters([nu, ])])
+        super(TMultivariateModel, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        acv_gaussian = self.covariance_model(lags)
+        return acv_gaussian * self.nu_1.value / (self.nu_1.value - 2)
+
+    def _gradient(self, lags: np.ndarray):
+        return self.covariance_model._gradient(lags) * self.nu.value / (self.nu.value - 2)
+
+
+class SquaredModel(CovarianceModel):
+    """
+    Covariance model for a process defined pointwise as the square of a Gaussian process
+    """
+    def __init__(self, latent_model: CovarianceModel):
+        self.latent_model = latent_model
+        super(SquaredModel, self).__init__(self.latent_model.params)
+
+    def __call__(self, lags: np.ndarray):
+        return 2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+class ChiSquaredModel(CovarianceModel):
+    """
+    Covariance model for a Chi-Squared random field
+    """
+    def __init__(self, latent_model: CovarianceModel):
+        self.latent_model = latent_model
+        dof = Parameter('dof', (1, 1000))
+        super(ChiSquaredModel, self).__init__(ParametersUnion([self.latent_model.params, Parameters([dof, ])]))
+
+    def __call__(self, lags: np.ndarray):
+        return (self.dof_1.value * (2 * self.latent_model(lags) ** 2 + self.latent_model.sigma ** 2)
+        + self.dof_1.value * (self.dof_1.value - 1) * self.latent_model.sigma ** 2)
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
 
 
 class BivariateUniformCorrelation(CovarianceModel):
@@ -496,25 +638,43 @@ class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
-        nu = Parameter('nu', (0.5, 100))
+        nu = Parameter('nu', (0.01, 100))
         parameters = Parameters([rho, sigma, nu])
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         if nu == 0.5:
             return sigma ** 2 * np.exp(- d / rho)
         if nu==1.5:
-            K = np.sqrt(3) * d / rho
+            K = np.sqrt(np.array(3)) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
         term1 = 2 ** (1 - nu) / gamma(nu)
-        term2 = (np.sqrt(2 * nu) * d / rho) ** nu
-        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
+        term2 = (np.sqrt(np.array(2 * nu)) * d / rho) ** nu
+        # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
+
+        if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu() / rho)
+            term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
+
+    def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        freq_grid = np.stack(freq_grid, axis=0)
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        pi = np.pi
+        s = np.sqrt(np.sum(np.power(freq_grid, 2), axis=0)) / (2 * pi)
+        if nu != np.inf:
+            sdf = sigma ** 2 / (4 * pi ** 2) * 4 * pi * gamma(nu + 1) * \
+                  (2 * nu) ** nu / (gamma(nu) * rho ** (2 * nu)) * \
+                  (2 * nu / rho ** 2 + 4 * pi ** 2 * s ** 2) ** (-(nu + 1))
+        else:
+            sdf = 1/(4 * pi ** 2)* sigma ** 2 * 2 * pi * rho ** 2 * np.exp(-2 * pi ** 2 * rho ** 2 * s ** 2)
+        return sdf
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()

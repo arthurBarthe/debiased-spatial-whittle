@@ -17,8 +17,7 @@ snakeviz = "^2.1.1"
 autograd = "^1.5"
 seaborn = "^0.12.2"
 numdifftools = "^0.9.41"
-torch = "1.13"
-
+torch = "2.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.3.1"

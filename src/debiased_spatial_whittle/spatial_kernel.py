@@ -1,11 +1,12 @@
-from debiased_spatial_whittle.backend import BackendManager
+from .backend import BackendManager
 np = BackendManager.get_backend()
+
+from typing import Tuple
+# TODO: have to adjust imports from backend
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
-
-from typing import Tuple
-
+# ifftshift = np.fft.ifftshift
 
 def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
@@ -24,12 +25,13 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
         Spatial kernel
     """
     n = g.shape
+    normalization = np.exp(np.sum(np.log(np.array(n))))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         f = np.abs(fftn(g, two_n))**2
         cg = ifftn(f)
-        cg /= np.sum(g ** 2)
-        return cg
+        cg /= normalization
+        return np.real(cg)
     # TODO only works in 2d right now
     m1, m2 = m
     n1, n2 = n

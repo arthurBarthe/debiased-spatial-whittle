@@ -1,5 +1,10 @@
+from .backend import BackendManager
+np = BackendManager.get_backend()
+
+from functools import cached_property
 from abc import ABC, abstractmethod
 from pathlib import Path
+from functools import cached_property
 from typing import Tuple
 import matplotlib.pyplot as plt
 
@@ -80,6 +85,7 @@ class ImgGrid(Grid):
         super().__init__(shape)
         self.img_path = img_path
         img = plt.imread(self.img_path)
+        img = np.array(img)
         img = (img[110:-110, 110:-110, 0] == 0) * 1.
         self.img = np.flipud(img)
 
@@ -94,8 +100,8 @@ class ImgGrid(Grid):
     def interpolate(self):
         m_0, n_0 = self.img.shape
         m, n = self.shape
-        x = np.asarray(np.arange(n) / n * n_0, np.int64)
-        y = np.asarray(np.arange(m) / m * m_0, np.int64)
+        x = np.asarray(np.arange(n) / n * n_0, dtype=np.int64)
+        y = np.asarray(np.arange(m) / m * m_0, dtype=np.int64)
         xx, yy = np.meshgrid(x, y, indexing='xy')
         return self.img[yy, xx]
 
@@ -106,13 +112,13 @@ class ImgGrid(Grid):
 
 ###NEW OOP VERSION
 from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
-
-ifftshift = np.fft.ifftshift
 from typing import List, Tuple
 
-
-# TODO add non-orthogonal grids and lattices
-
+fftn = np.fft.fftn
+ifftn = np.fft.ifftn
+fftshift = np.fft.fftshift
+ifftshift = np.fft.ifftshift
+arange = BackendManager.get_arange()
 
 class RectangularGrid:
     def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
@@ -149,7 +155,7 @@ class RectangularGrid:
 
     @property
     def n_points(self):
-        """Total number of points, irrespective of the mask"""
+        """Total number of points of the grid, irrespective of the mask"""
         p = 1
         for ni in self.n:
             p *= ni
@@ -191,17 +197,18 @@ class RectangularGrid:
         mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
         return np.stack(mesh, axis=-1)
 
-    @property
+    @cached_property
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
-        return np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        return np.stack(lags, axis=0)
 
     @property
     def grid_points(self):
         return tuple([np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)])
 
-    @property
+    @cached_property
     def lag_matrix(self):
         """
         Matrix of lags between the points of the grids ordered according to their coordinates.
@@ -215,7 +222,7 @@ class RectangularGrid:
         grid = np.meshgrid(*xs, indexing='ij')
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
-        return lags
+        return np.array(lags)
 
     @property
     def spatial_kernel(self):
