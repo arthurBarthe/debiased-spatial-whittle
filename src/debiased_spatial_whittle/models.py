@@ -527,7 +527,7 @@ class MaternCovarianceModel(CovarianceModel):
         raise NotImplementedError()
 
 
-class MaternCovarianceModel(CovarianceModel):
+class MaternCovarianceModelFrederik(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
