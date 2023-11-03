@@ -13,7 +13,7 @@ model.sigma = 2
 model.nu = 1.5
 #model.nugget = 0.025
 
-shape = (512 * 1, 512 * 1)
+shape = (1024 * 1, 1024 * 1)
 mask_france = grids.ImgGrid(shape).get_new()
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france
@@ -27,6 +27,7 @@ debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle, use_gradients=False)
 
 model_est = MaternCovarianceModel()
+model_est.nu = 1.5
 #model_est.nugget = None
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kargs: print(args))
 print(estimate)
