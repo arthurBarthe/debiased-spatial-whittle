@@ -318,10 +318,11 @@ class DebiasedWhittle:
 
 
 class Estimator:
-    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100):
+    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=None):
         self.likelihood = likelihood
         self.max_iter = max_iter
         self.use_gradients = use_gradients
+        self.optim_options = optim_options
 
     def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None):
         free_params = model.free_params
@@ -334,7 +335,7 @@ class Estimator:
         bounds = model.free_param_bounds
         init_guess = numpy.array(free_params.init_guesses)
         x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
-                      maxiter=self.max_iter, callback=opt_callback)
+                      maxiter=self.max_iter, callback=opt_callback, **self.optim_options)
         #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
         return model
 
