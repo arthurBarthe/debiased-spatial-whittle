@@ -318,7 +318,7 @@ class DebiasedWhittle:
 
 
 class Estimator:
-    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=None):
+    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=dict()):
         self.likelihood = likelihood
         self.max_iter = max_iter
         self.use_gradients = use_gradients
