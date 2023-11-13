@@ -146,6 +146,8 @@ class MultivariateDebiasedWhittle:
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
         whittle = 1 / z.shape[0] / z.shape[1] * np.sum((term1 + term2))
         whittle = np.real(whittle)
+        if BackendManager.backend_name == 'torch':
+            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         raise NotImplementedError('Gradient not implemented for multivariate')
