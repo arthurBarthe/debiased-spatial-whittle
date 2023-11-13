@@ -35,7 +35,7 @@ class Parameter:
         if self._value is None:
             return None
         if self.log_scale:
-            return np.exp(self._value)
+            return numpy.exp(self._value)
         return self._value
 
     @value.setter
