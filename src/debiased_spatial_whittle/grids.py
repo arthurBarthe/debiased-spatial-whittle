@@ -195,7 +195,8 @@ class RectangularGrid:
 
         """
         mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
-        return np.stack(mesh, axis=-1)
+        out = np.stack(mesh, axis=-1)
+        return BackendManager.convert(out)
 
     @cached_property
     def lags_unique(self) -> List[np.ndarray]:
