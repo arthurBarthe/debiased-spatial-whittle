@@ -535,6 +535,7 @@ class BivariateUniformCorrelation(CovarianceModel):
         # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
         acv12 = acv11 * self.r_0.value
         out = np.zeros(acv11.shape + (2, 2))
+        out = BackendManager.convert(out)
         out[..., 0, 0] = acv11
         out[..., 1, 1] = acv11 * self.f_0.value ** 2
         out[..., 0, 1] = acv12 * self.f_0.value
