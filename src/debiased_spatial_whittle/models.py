@@ -1,3 +1,5 @@
+import torch
+
 from .backend import BackendManager
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
@@ -593,7 +595,7 @@ class NewTransformedModel(CovarianceModel):
         if BackendManager.backend_name == 'numpy':
             transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         elif BackendManager.backend_name == 'torch':
-            transform_transpose = np.transpose(transform, -1, -2)
+            transform_transpose = np.transpose(transform, -1, -2).to(dtype=torch.complex128)
         term1 = np.matmul(f, transform_transpose)
         return ifftn(np.matmul(transform, term1), axes=(0, 1))
 
