@@ -143,7 +143,7 @@ class MultivariateDebiasedWhittle:
         if BackendManager.backend_name == 'numpy':
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == 'torch':
-            term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-1), -1)
+            term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
         whittle = 1 / z.shape[0] / z.shape[1] * np.sum((term1 + term2))
         whittle = np.real(whittle)
         if not params_for_gradient:
