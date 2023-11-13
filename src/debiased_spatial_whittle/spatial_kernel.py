@@ -1,6 +1,8 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
 
+import numpy as np_
+
 from typing import Tuple
 # TODO: have to adjust imports from backend
 
@@ -25,7 +27,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
         Spatial kernel
     """
     n = g.shape
-    normalization = np.exp(np.sum(np.log(np.array(n))))
+    normalization = np_.exp(np_.sum(np_.log(np_.array(n))))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         f = np.abs(fftn(g, two_n))**2
