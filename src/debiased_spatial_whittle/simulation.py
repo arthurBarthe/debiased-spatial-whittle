@@ -268,6 +268,7 @@ class SamplerBUCOnRectangularGrid:
         print(f'np is {np}')
         f = np.expand_dims(self.f, -1)
         e = self.e_dist.rvs(size=f.shape + (2,))
+        e = BackendManager.convert(e)
         e[..., -1] *= self.model.f_0.value
         e = e[..., 0, :] + 1j * e[..., 1, :]
         z = np.sqrt(f) * e

@@ -39,6 +39,11 @@ class BackendManager:
             return torch
 
     @classmethod
+    def convert(cls, a):
+        if BackendManager.backend_name == 'torch':
+            return torch.tensor(a).to(device=BackendManager.device)
+
+    @classmethod
     def get_zeros(cls):
         if cls.backend_name == 'numpy':
             return numpy.zeros
