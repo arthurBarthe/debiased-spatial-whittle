@@ -18,6 +18,18 @@ class Periodogram:
         pass
 
     def __call__(self, z: List[np.ndarray], return_fft: bool = False):
+        """
+        Compute the multivariate periodogram. The data z is expected to be a list
+        of p arrays with the same shape, where p is the number of variates.
+        Parameters
+        ----------
+        z
+        return_fft
+
+        Returns
+        -------
+
+        """
         n_spatial_dims = z[0].ndim
         z = np.stack(z, axis=-1)
         j_vec = 1 / np.sqrt(np.array(z.shape[0] * z.shape[1])) * fftn(z, None, list(range(n_spatial_dims)))
@@ -28,19 +40,3 @@ class Periodogram:
         j_vec_transpose = np.conj(np.transpose(j_vec, (0, 1, -1, -2)))
         p = np.matmul(j_vec, j_vec_transpose)
         return p
-
-"""
-class TransformedExpectedPeriodogram:
-    def __init__(self, grid: RectangularGrid, periodogram: Periodogram, ep: ExpectedPeriodogram):
-        self.grid = grid
-        self.periodogram = periodogram
-        self.e_periodogram = ep
-
-    def __call__(self, model: TransformedModel):
-        input_model = model.input_model
-        input_ep = self.e_periodogram(input_model)
-        transform = model.transform_on_grid(self.grid.fourier_frequencies)
-        transform_transpose = np.transpose(transform, (0, 1, -1, -2))
-        term1 = np.matmul(input_ep, transform_transpose)
-        return np.matmul(transform, term1)
-"""

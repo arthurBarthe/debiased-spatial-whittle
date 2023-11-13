@@ -6,7 +6,6 @@ import numpy
 # In this file we define covariance models
 from abc import ABC, abstractmethod
 
-from autograd.scipy.special import gamma # , kv
 from typing import Tuple, List, Dict, Union
 
 class Parameter:
@@ -360,12 +359,12 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         return np.stack((d_rho, d_sigma), axis=-1)
 
-import scipy
 from scipy.special import kv
-from autograd.scipy.special import gamma, iv
-from autograd.extend import primitive, defvjp, defjvp
-# kv = primitive(scipy.special.kv)
-# defvjp(kv, None, lambda ans, n, x: lambda g: -g * (kv(n - 1, x) + kv(n + 1, x)) / 2.0)
+try:
+    from autograd.scipy.special import gamma, iv
+    from autograd.extend import primitive, defvjp, defjvp
+except ModuleNotFoundError:
+    from scipy.special import gamma
 
 def kv_(nu, z):
     if nu % 1 == 0:

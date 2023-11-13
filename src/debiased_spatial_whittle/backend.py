@@ -1,5 +1,8 @@
 import numpy
-import torch
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
 
 def func(x):
     n = len(x)

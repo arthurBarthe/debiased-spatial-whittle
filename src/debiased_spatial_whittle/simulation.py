@@ -3,7 +3,6 @@ from typing import Union
 
 from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
-print(f'np is {np}')
 
 import warnings
 from .periodogram import autocov
@@ -39,11 +38,7 @@ def sim_circ_embedding(cov_func, shape):
 
 ####NEW OOP VERSION
 from typing import Tuple
-<<<<<<< HEAD
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, BivariateUniformCorrelation
-=======
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, ChiSquaredModel
->>>>>>> pytorch
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, ChiSquaredModel, BivariateUniformCorrelation
 from debiased_spatial_whittle.grids import RectangularGrid
 
 
@@ -100,19 +95,6 @@ class SamplerOnRectangularGrid:
         return self._f
 
     # TODO make this work for 1-d and 3-d
-<<<<<<< HEAD
-    def __call__(self, periodic: bool = False):
-        f = self.f
-        e = (np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape))
-        z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(prod_list(self.grid.n)) * np.real(fftn(z))
-        if periodic:
-            return z_inv
-        for i, n in enumerate(self.grid.n):
-            z_inv = np.take(z_inv, np.arange(n), i)
-        z_inv = np.reshape(z_inv, self.grid.n)
-        return z_inv * self.grid.mask
-=======
     def __call__(self):
         """
         Samples nsims independent realizations of a Gaussian Process specified by
@@ -183,7 +165,6 @@ class ChiSquaredSamplerOnRectangularGrid:
             zs.append(self.latent_sampler())
         zs = np.stack(zs, axis=0)
         return np.sum(zs**2, axis=0)
->>>>>>> pytorch
 
 
 class SamplerSeparable:
