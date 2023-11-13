@@ -291,7 +291,7 @@ class ExpectedPeriodogram:
 
         if d == (0, 0):
             # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-            return fftn(result, axes=list(range(n_dim)))
+            return fftn(result, None, list(range(n_dim)))
         return fftn(result)
 
     def gradient(self, model: CovarianceModel, params: Parameters) -> np.ndarray:
