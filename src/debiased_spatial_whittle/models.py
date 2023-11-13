@@ -596,6 +596,7 @@ class NewTransformedModel(CovarianceModel):
             transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         elif BackendManager.backend_name == 'torch':
             transform_transpose = np.transpose(transform, -1, -2).to(dtype=torch.complex128)
+            transform = transform.to(dtype=torch.complex128)
         term1 = np.matmul(f, transform_transpose)
         return ifftn(np.matmul(transform, term1), axes=(0, 1))
 
