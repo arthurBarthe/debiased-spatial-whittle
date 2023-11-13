@@ -1,5 +1,6 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
+fftn, ifftn = BackendManager.get_fft_methods()
 
 import numpy
 
@@ -583,7 +584,6 @@ class NewTransformedModel(CovarianceModel):
         return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, self.logz2_0.value, ks)
 
     def call_on_rectangular_grid(self, grid):
-        from numpy.fft import fftn, ifftn
         # periodic covariance of the input model
         acv = grid.autocov(self.input_model)
         # to spectral domain
