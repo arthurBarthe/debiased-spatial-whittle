@@ -64,6 +64,24 @@ class BackendManager:
             raise Exception('No backend set')
 
     @classmethod
+    def get_slogdet(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.linalg.slogdet
+        elif cls.backend_name == 'torch':
+            return torch.linalg.slogdet
+        else:
+            raise Exception('No backend set')
+
+    @classmethod
+    def get_inv(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.linalg.inv
+        elif cls.backend_name == 'torch':
+            return torch.linalg.inv
+        else:
+            raise Exception('No backend set')
+
+    @classmethod
     def get_fft_methods(cls):
         if cls.backend_name == 'numpy':
             return numpy.fft.fftn, numpy.fft.ifftn

@@ -109,8 +109,8 @@ from .models import CovarianceModel, Parameters
 from typing import Callable, Union
 
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
-from numpy.linalg import slogdet, inv
-
+slogdet = BackendManager.get_slogdet()
+inv = BackendManager.get_inv()
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
