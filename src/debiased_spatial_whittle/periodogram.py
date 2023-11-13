@@ -244,7 +244,8 @@ class ExpectedPeriodogram:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering
         # we allow for multivariate, but currently mask same for both grids
-        cg = np.expand_dims(cg, (-2, -1))
+        #cg = np.expand_dims(cg, (-2, -1))
+        cg = np.reshape(cg, cg.shape + (1, 1))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
