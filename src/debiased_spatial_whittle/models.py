@@ -545,7 +545,7 @@ class MaternCovarianceModelAnisotropic(CovarianceModel):
 
     def __call__(self, lags: np.ndarray):
         sigma, rho1, rho2, nu = self.sigma.value, self.rho1.value, self.rho2.value, self.nu.value
-        rho = np.array([rho1, rho2]).reshape((1, 1, 2))
+        rho = np.array([rho1, rho2]).reshape((2, 1, 1))
         d = np.sqrt(np.sum(lags ** 2 / rho ** 2, axis=0))
         if nu==1.5:
             K = np.sqrt(np.array(3)) * d
