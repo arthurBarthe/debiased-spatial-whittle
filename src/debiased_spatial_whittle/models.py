@@ -408,7 +408,6 @@ class SquaredExponentialModel(CovarianceModel):
         self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        
         d2 = sum((lag**2 for lag in lags))
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
@@ -542,7 +541,7 @@ class MaternCovarianceModelAnisotropic(CovarianceModel):
         rho2 = Parameter('rho2', (0.01, 1000))
         nu = Parameter('nu', (0.01, 100))
         parameters = Parameters([sigma, nu, rho1, rho2])
-        super(MaternCovarianceModel, self).__init__(parameters)
+        super(MaternCovarianceModelAnisotropic, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
         sigma, rho1, rho2, nu = self.sigma.value, self.rho.value, self.rho2.value, self.nu.value
