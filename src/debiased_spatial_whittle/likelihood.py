@@ -337,7 +337,7 @@ class Estimator:
         x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
                       maxiter=self.max_iter, callback=opt_callback, **self.optim_options)
         #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
-        model.params.update_values(dict([p.name for p in free_params], x))
+        #model.params.update_values(dict([p.name for p in free_params], x))
         return model
 
     def _get_opt_func(self, model, free_params, z, use_gradients):
