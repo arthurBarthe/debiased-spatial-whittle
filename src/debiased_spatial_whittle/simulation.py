@@ -265,7 +265,6 @@ class SamplerBUCOnRectangularGrid:
 
     # TODO make this work for 1-d and 3-d
     def __call__(self, periodic: bool = False, return_spectral: bool = False):
-        print(f'np is {np}')
         f = np.expand_dims(self.f, -1)
         e = self.e_dist.rvs(size=f.shape + (2,))
         e = BackendManager.convert(e)
