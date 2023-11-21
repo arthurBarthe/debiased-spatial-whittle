@@ -348,7 +348,11 @@ class Estimator:
             opt_result = getattr(scipy.optimize, self.method)(opt_func, bounds=bounds, callback=opt_callback,
                                                               **self.optim_options)
         else:
-            opt_result = minimize(opt_func, init_guess, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
+            if self.use_gradients:
+                opt_result = minimize(opt_func, init_guess, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
+                                  options=self.optim_options)
+            else:
+                opt_result = minimize(opt_func, init_guess, method=self.method, bounds=bounds, callback=opt_callback,
                                   options=self.optim_options)
         model.params.update_values(dict(zip([p.name for p in free_params], opt_result.x)))
         self.opt_result = opt_result
