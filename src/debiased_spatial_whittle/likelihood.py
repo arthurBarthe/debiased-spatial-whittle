@@ -335,15 +335,14 @@ class Estimator:
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
         func = self._get_opt_func(model, free_params, z, self.use_gradients)
-        opt_func = lambda x: func(x)[0]
-        jac = lambda x: func(x)[1]
+        if self.use_gradients:
+            opt_func = lambda x: func(x)[0]
+            jac = lambda x: func(x)[1]
+        else:
+            opt_func = func
 
         bounds = model.free_param_bounds
         init_guess = numpy.array(free_params.init_guesses)
-        #x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
-        #              maxiter=self.max_iter, callback=opt_callback, **self.optim_options)
-        #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
-        #model.params.update_values(dict(zip([p.name for p in free_params], x)))
         if self.method in ('shgo', 'direct', 'differential_evolution', 'dual_annealing'):
             import scipy
             opt_result = getattr(scipy.optimize, self.method)(opt_func, bounds=bounds, callback=opt_callback,
