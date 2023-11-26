@@ -1,6 +1,8 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
 
+import numpy
+
 # In this file we define covariance models
 from abc import ABC, abstractmethod
 
@@ -198,7 +200,8 @@ class CovarianceModel(ABC):
         g = self._gradient(x)
         for i, p in enumerate(self.params):
             if p in params.param_dict.values():
-                gradient[p.name] += np.take(g, i, axis=-1)
+                #gradient[p.name] += np.take(g, i, axis=-1)
+                gradient[p.name] += g[..., i]
         return gradient
 
     @abstractmethod
@@ -416,7 +419,6 @@ class SquaredExponentialModel(CovarianceModel):
         # self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        
         d2 = sum((lag**2 for lag in lags))
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
@@ -517,20 +519,19 @@ class MaternCovarianceModel(CovarianceModel):
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
-        
-        if np.all(lags == 0):
-            return sigma ** 2   # return variance at zeroth lag
-        
-        lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         if nu==1.5:
-            K = np.sqrt(3) * d / rho
+            K = np.sqrt(np.array(3)) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
         term1 = 2 ** (1 - nu) / gamma(nu)
-        term2 = (np.sqrt(2 * nu) * d / rho) ** nu
+        term2 = (np.sqrt(np.array(2 * nu)) * d / rho) ** nu
         # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
-        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
+
+        if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu() / rho)
+            term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
@@ -552,6 +553,53 @@ class MaternCovarianceModel(CovarianceModel):
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()
 
+
+
+class MaternCovarianceModelAnisotropic(CovarianceModel):
+    def __init__(self):
+        sigma = Parameter('sigma', (0.01, 1000))
+        rho1 = Parameter('rho1', (0.01, 1000))
+        rho2 = Parameter('rho2', (0.01, 1000))
+        nu = Parameter('nu', (0.01, 100))
+        parameters = Parameters([sigma, nu, rho1, rho2])
+        super(MaternCovarianceModelAnisotropic, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        sigma, rho1, rho2, nu = self.sigma.value, self.rho1.value, self.rho2.value, self.nu.value
+        lags[0, ...] /= rho1
+        lags[1, ...] /= rho2
+        d = np.sqrt(np.sum(lags ** 2, axis=0))
+        if nu==1.5:
+            K = np.sqrt(np.array(3)) * d
+            return (1.0 + K) * np.exp(-K) * sigma**2
+        term1 = 2 ** (1 - nu) / gamma(nu)
+        term2 = (np.sqrt(np.array(2 * nu)) * d) ** nu
+        # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
+
+        if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu())
+            term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d)
+        val = sigma ** 2 * term1 * term2 * term3
+        val[d == 0] = sigma ** 2
+        return val
+
+    def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        freq_grid = np.stack(freq_grid, axis=0)
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        pi = np.pi
+        s = np.sqrt(np.sum(np.power(freq_grid, 2), axis=0)) / (2 * pi)
+        if nu != np.inf:
+            sdf = sigma ** 2 / (4 * pi ** 2) * 4 * pi * gamma(nu + 1) * \
+                  (2 * nu) ** nu / (gamma(nu) * rho ** (2 * nu)) * \
+                  (2 * nu / rho ** 2 + 4 * pi ** 2 * s ** 2) ** (-(nu + 1))
+        else:
+            sdf = 1/(4 * pi ** 2)* sigma ** 2 * 2 * pi * rho ** 2 * np.exp(-2 * pi ** 2 * rho ** 2 * s ** 2)
+        return sdf
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
 
 
 def test_gradient_cov():

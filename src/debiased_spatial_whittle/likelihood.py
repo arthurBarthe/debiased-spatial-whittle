@@ -1,19 +1,22 @@
 import warnings
 
 from .backend import BackendManager
+np = BackendManager.get_backend()
+import numpy
+
 from .samples import SampleOnRectangularGrid
 from .simulation import SamplerOnRectangularGrid
 
-import numpy as np
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
 from .periodogram import compute_ep_old
 from .confidence import CovarianceFFT, McmcDiags
-from scipy.linalg import inv
+
 
 fftn = np.fft.fftn
-
+inv = np.linalg.inv
+zeros = BackendManager.get_zeros()
 
 def prod_list(l):
     if len(l) == 0:
@@ -108,10 +111,10 @@ from typing import Callable, Union
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
-    if e_per.ndim != e_per_prime.ndim:
+    if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
         out = []
         for i in range(e_per_prime.shape[-1]):
-            out.append(whittle_prime(per, e_per, np.take(e_per_prime, i, axis=-1)))
+            out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
         return np.stack(out, axis=-1)
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
 
@@ -166,10 +169,14 @@ class DebiasedWhittle:
         p = self.periodogram(z)                # you are recomputing I for each iteration i think
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
+        if BackendManager.backend_name == 'torch':
+            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_whittle = whittle_prime(p, ep, d_ep)
+        if BackendManager.backend_name == 'torch':
+            d_whittle = d_whittle.cpu().numpy()
         return whittle, d_whittle
 
     def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
@@ -197,11 +204,11 @@ class DebiasedWhittle:
         """Provides the expectation of the hessian matrix"""
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = np.zeros((len(params_for_gradient), len(params_for_gradient)))
+        h = zeros((len(params_for_gradient), len(params_for_gradient)))
         for i1, p1_name in enumerate(params_for_gradient.names):
             for i2, p2_name in enumerate(params_for_gradient.names):
-                d_ep1 = np.take(d_ep, i1, -1)
-                d_ep2 = np.take(d_ep, i2, -1)
+                d_ep1 = d_ep[..., i1]
+                d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
         # TODO ugly
         return h / self.expected_periodogram.grid.n_points
@@ -248,7 +255,8 @@ class DebiasedWhittle:
                 jmat[i, j] = 1 / (n1 * n2) ** 2 * (s1 + s2)
         return jmat
 
-    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000) -> np.ndarray:
+    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 1000,
+                       block_size: int = 100) -> np.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
         simulated realisations.
@@ -261,6 +269,10 @@ class DebiasedWhittle:
             Parameters with respect to which we take the gradient
         n_sims
             Number of samples used for the estimate covariance matrix
+        block_size
+            Number of samples per simulations. A higher number should improve
+            computational efficiency, but for large grids this may cause
+            Out Of Memory issues.
 
         Returns
         -------
@@ -269,7 +281,7 @@ class DebiasedWhittle:
         """
         # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
-        sampler.n_sims = 100
+        sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
@@ -306,10 +318,15 @@ class DebiasedWhittle:
 
 
 class Estimator:
-    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100):
+    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=dict(),
+                 method='L-BFGS-B'):
         self.likelihood = likelihood
         self.max_iter = max_iter
         self.use_gradients = use_gradients
+        self.optim_options = optim_options
+        self.method = method
+        self.f_opt = None
+        self.f_info = None
 
     def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None):
         free_params = model.free_params
@@ -318,12 +335,27 @@ class Estimator:
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
         func = self._get_opt_func(model, free_params, z, self.use_gradients)
+        if self.use_gradients:
+            opt_func = lambda x: func(x)[0]
+            jac = lambda x: func(x)[1]
+        else:
+            opt_func = func
 
         bounds = model.free_param_bounds
-        init_guess = np.array(free_params.init_guesses)
-        fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
-                      maxiter=self.max_iter, callback=opt_callback)
-        #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
+        init_guess = numpy.array(free_params.init_guesses)
+        if self.method in ('shgo', 'direct', 'differential_evolution', 'dual_annealing'):
+            import scipy
+            opt_result = getattr(scipy.optimize, self.method)(opt_func, bounds=bounds, callback=opt_callback,
+                                                              **self.optim_options)
+        else:
+            if self.use_gradients:
+                opt_result = minimize(opt_func, init_guess, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
+                                  options=self.optim_options)
+            else:
+                opt_result = minimize(opt_func, init_guess, method=self.method, bounds=bounds, callback=opt_callback,
+                                  options=self.optim_options)
+        model.params.update_values(dict(zip([p.name for p in free_params], opt_result.x)))
+        self.opt_result = opt_result
         return model
 
     def _get_opt_func(self, model, free_params, z, use_gradients):

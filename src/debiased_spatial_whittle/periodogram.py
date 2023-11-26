@@ -1,5 +1,4 @@
 from .backend import BackendManager
-BackendManager.set_backend('autograd')
 np = BackendManager.get_backend()
 
 from itertools import product
@@ -20,6 +19,9 @@ def autocov(cov_func, shape):
     0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
     when computing the expecting periodogram"""
     xs = np.meshgrid(*(np.arange(-n + 1, n) for n in shape), indexing='ij')
+    if BackendManager.backend_name == 'torch':
+        # TODO this is a temporary solution, not ideal though
+        xs = xs.to(device=BackendManager.device)
     return ifftshift(cov_func(xs))
 
 
@@ -188,7 +190,7 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        self._taper = value.taper(self.grid)
+        #self._taper = value.taper(self.grid)
 
     @property
     def taper(self):
@@ -244,7 +246,10 @@ class ExpectedPeriodogram:
         # now we need to "fold"
         if fold:
             # TODO: check if working
-            result = np.zeros(shape, dtype=np.complex128)
+            if BackendManager.backend_name == 'torch':
+                result = np.zeros(shape, dtype=np.complex128, device=BackendManager.device)
+            else:
+                result = np.zeros(shape, dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i*shape[0]: (i+1)*shape[0]]

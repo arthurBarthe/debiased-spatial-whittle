@@ -81,6 +81,7 @@ class ImgGrid(Grid):
         super().__init__(shape)
         self.img_path = img_path
         img = plt.imread(self.img_path)
+        img = np.array(img)
         img = (img[110:-110, 110:-110, 0] == 0) * 1.
         self.img = np.flipud(img)
 
@@ -95,8 +96,8 @@ class ImgGrid(Grid):
     def interpolate(self):
         m_0, n_0 = self.img.shape
         m, n = self.shape
-        x = np.asarray(np.arange(n) / n * n_0, np.int64)
-        y = np.asarray(np.arange(m) / m * m_0, np.int64)
+        x = np.asarray(np.arange(n) / n * n_0, dtype=np.int64)
+        y = np.asarray(np.arange(m) / m * m_0, dtype=np.int64)
         xx, yy = np.meshgrid(x, y, indexing='xy')
         return self.img[yy, xx]
 
@@ -107,9 +108,13 @@ class ImgGrid(Grid):
 
 ###NEW OOP VERSION
 from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
-from numpy.fft import ifftshift
 from typing import List, Tuple
 
+fftn = np.fft.fftn
+ifftn = np.fft.ifftn
+fftshift = np.fft.fftshift
+ifftshift = np.fft.ifftshift
+arange = BackendManager.get_arange()
 
 class RectangularGrid:
     def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
@@ -156,7 +161,7 @@ class RectangularGrid:
     def lags_unique(self) -> List[np.ndarray]:
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(*(np.arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags, axis=0)
 
     @cached_property

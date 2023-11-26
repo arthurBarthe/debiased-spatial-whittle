@@ -1,12 +1,16 @@
 import sys
 from typing import Union
-import numpy as np
+
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 import warnings
 from .periodogram import autocov
 from typing import List
 
-fftn = np.fft.fftn
-ifftn = np.fft.ifftn
+fftn, ifftn = BackendManager.get_fft_methods()
+randn = BackendManager.get_randn()
+arange = BackendManager.get_arange()
 
 def prod_list(l: List[int]):
     l = list(l)
@@ -82,11 +86,12 @@ class SamplerOnRectangularGrid:
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
+            f = np.real(f)
             min_ = np.min(f)
             if min_ <= -1e-5:
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
                 
-            self._f = np.maximum(f, 0)
+            self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
     # TODO make this work for 1-d and 3-d
@@ -102,12 +107,12 @@ class SamplerOnRectangularGrid:
         if self._i_sim % self.n_sims == 0:
             f = self.f
             shape = f.shape + (self.n_sims, )
-            e = (np.random.randn(*shape) + 1j * np.random.randn(*shape))
+            e = (randn(*shape) + 1j * randn(*shape))
             f = np.expand_dims(f, -1)
-            z = np.sqrt(np.maximum(f, 0)) * e
-            z_inv = 1 / np.sqrt(prod_list(self.sampling_grid.n)) * np.real(fftn(z, axes=range(self.sampling_grid.ndim)))
+            z = np.sqrt(np.maximum(f, np.zeros_like(f))) * e
+            z_inv = 1 / np.sqrt(np.array(prod_list(self.sampling_grid.n))) * np.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
             for i, n in enumerate(self.grid.n):
-                z_inv = np.take(z_inv, np.arange(n), i)
+                z_inv = np.take(z_inv, arange(n), i)
             self._z = z_inv * np.expand_dims(self.grid.mask, -1)
         result =  self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
