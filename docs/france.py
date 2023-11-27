@@ -26,10 +26,12 @@ z = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-estimator = Estimator(debiased_whittle, use_gradients=True)
+estimator = Estimator(debiased_whittle, use_gradients=True, optim_options=dict(maxfun=100, maxiter=5, no_local_search=False), method='dual_annealing')
 
 model_est = SquaredExponentialModel()
 model_est.nugget = model.nugget.value
+model_est.rho.bounds = (1., 100)
+model_est.sigma.bounds = (0.1, 10)
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kargs: print(args, kargs))
 print(estimate)
 
