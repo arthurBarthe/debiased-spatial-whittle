@@ -47,11 +47,12 @@ est_params = Parameters((model.rho, model.sigma))
 model.rho = 14
 model.sigma = 2
 
-shape = (1000, 1000)
+shape = (256, 256)
 mask_france = grids.ImgGrid(shape).get_new()
 grid_france = RectangularGrid(shape)
-grid_france.mask = torch.ones(shape, device=DEVICE)
-# grid_france.mask = mask_france
+# grid_france.mask = torch.ones(shape, device=DEVICE)
+# TODO: using FRANCE GRID!!
+grid_france.mask = mask_france
 sampler = SamplerOnRectangularGrid(model, grid_france)
 sampler.n_sims = 50
 
@@ -62,18 +63,16 @@ options = dict(ftol=np.finfo(float).eps * 10, gtol=1e-20)  # for extreme precisi
 estimator = Estimator(debiased_whittle, use_gradients=True, optim_options=options)
 
 
-
-
-prior = multivariate_normal([12., 1.2], np.array([[1.5, 0.], [0., 0.25]]))
+prior = multivariate_normal([12., 1.2], np.array([[1.5, 0.], [0., 0.0625]]))
 ADJUSTED = True
-C = 'C5'
+C = 'C2'
 
 # number of independent samples
 n_datasets = 250
 # number of mcmc steps
 n_mcmc = 4000
 # number of mle samples
-n_sims = 100
+n_sims = 1000
 
 filename = make_filename(model,prior, grid_france.n, ADJUSTED, C)
 print(filename)
@@ -181,7 +180,7 @@ for i_dataset in range(n_datasets):
                 continue
             
         elif C == 'C5':
-            mles = sim_MLEs(rho_hat, sigma_hat, model, grid_france,  debiased_whittle,  nsims=n_sims)
+            mles = sim_MLEs(rho_hat, sigma_hat, model, grid_france,  debiased_whittle,  nsims=n_sims, print_res=False)
             hessian_inv = estimator.opt_result.hess_inv.todense()     
             C5 = compute_C5(mles, hessian_inv)
             
