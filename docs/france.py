@@ -4,16 +4,17 @@ BackendManager.set_backend('torch')
 import matplotlib.pyplot as plt
 
 import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternCovarianceModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
-model = SquaredExponentialModel()
+model = MaternCovarianceModel()
 model.rho = 35
-model.sigma = 1
-model.nugget = 0.025
+model.sigma = 2
+model.nu = 1.5
+#model.nugget = 0.025
 
 shape = (1024 * 1, 1024 * 1)
 mask_france = grids.ImgGrid(shape).get_new()

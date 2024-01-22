@@ -40,5 +40,6 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     g2 = g * a
     f = fftn(g, two_n) * np.conj(fftn(g2, two_n))
     cg = ifftn(f)
+    # TODO check normalization is consistent
     cg /= np.sum(g**2)
     return cg
