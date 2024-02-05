@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
@@ -23,7 +23,7 @@ fftshift = np.fft.fftshift
 
 n = (75, 75)
 grid = RectangularGrid(n)
-model = MaternModel()
+
 z = np.loadtxt('sst_data.txt')
 
 fig = plt.figure()
@@ -32,14 +32,15 @@ ax.imshow(z, origin='lower', cmap='Spectral')
 plt.show()
 
 
-params = np.log([10,1])
-
-model.nu = 0.733
+params = np.log([10, 1., 0.733])
+model = MaternCovarianceModel()
+# model.nu = 0.733
 
 dw = DeWhittle(z, grid, model, nugget=1e-10)
 dw.fit(params, prior=False, approx_grad=True)
+
 niter=1000
-dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=100)
+dewhittle_post, A = dw.RW_MH(niter, acceptance_lag=1000)
 
 # stop
 
@@ -50,7 +51,7 @@ adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True, acceptance_lag=100)
 
 title = 'posterior comparisons'
 legend_labels = ['deWhittle', 'adj deWhittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+plot_marginals([dewhittle_post, adj_dewhittle_post], None, title, [r'log$\rho$', r'log$\sigma$', r'log$\nu$'], legend_labels, shape=(1,3))
 
 
 sim_z = dw.sim_z(np.exp(dw.res.x))

@@ -106,7 +106,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 #########NEW OOP version
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from .models import CovarianceModel, Parameters
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
 slogdet = BackendManager.get_slogdet()
@@ -355,24 +355,48 @@ class DebiasedWhittle:
 
 
 class Estimator:
-    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100):
+    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=dict(),
+                 method='L-BFGS-B'):
         self.likelihood = likelihood
         self.max_iter = max_iter
         self.use_gradients = use_gradients
+        self.optim_options = optim_options
+        self.method = method
+        self.f_opt = None
+        self.f_info = None
 
-    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None):
+    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
         free_params = model.free_params
 
         # function to be optimized.
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
         func = self._get_opt_func(model, free_params, z, self.use_gradients)
+        if self.use_gradients:
+            opt_func = lambda x: func(x)[0]    # this is inefficient, can change jac= in scipy.optimize
+            jac = lambda x: func(x)[1]
+        else:
+            opt_func = func
 
         bounds = model.free_param_bounds
-        init_guess = numpy.array(free_params.init_guesses)
-        x, f, d = fmin_l_bfgs_b(func, init_guess, bounds=bounds, approx_grad=not self.use_gradients,
-                      maxiter=self.max_iter, callback=opt_callback)
-        #minimize(func, init_guess, bounds=bounds, callback=opt_callback)
+        if x0 is None:
+            init_guess = numpy.array(free_params.init_guesses)
+        else:
+            init_guess = x0.copy()
+            
+        if self.method in ('shgo', 'direct', 'differential_evolution', 'dual_annealing'):
+            import scipy
+            opt_result = getattr(scipy.optimize, self.method)(opt_func, bounds=bounds, callback=opt_callback,
+                                                              **self.optim_options)
+        else:
+            if self.use_gradients:
+                opt_result = minimize(opt_func, init_guess, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
+                                  options=self.optim_options)
+            else:
+                opt_result = minimize(opt_func, init_guess, method=self.method, bounds=bounds, callback=opt_callback,
+                                  options=self.optim_options)
+        model.params.update_values(dict(zip([p.name for p in free_params], opt_result.x)))
+        self.opt_result = opt_result
         return model
 
     def _get_opt_func(self, model, free_params, z, use_gradients):
