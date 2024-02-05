@@ -26,8 +26,8 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     cg
         Spatial kernel
     """
-    n = np.array(g.shape)
-    normalization_factor = np.exp(np.sum(np.log(n)))
+    n = g.shape
+    normalization_factor = np.exp(np.sum(np.log(np.array(n))))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         f = np.abs(fftn(g, two_n))**2
