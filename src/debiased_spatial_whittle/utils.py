@@ -30,8 +30,8 @@ def video_plot_3d(y: np.ndarray, vmin=-2, vmax=2, cmap='inferno', interval=100, 
             ax.imshow(y[..., 0], vmin=vmin, vmax=vmax, cmap=cmap)  # show an initial one first
         ims.append([im])
 
-    ani = animation.ArtistAnimation(fig, ims, interval=100, blit=True,
-                                    repeat_delay=1000)
+    ani = animation.ArtistAnimation(fig, ims, interval=interval, blit=True,
+                                    repeat_delay=repeat_delay)
 
     # To save the animation, use e.g.
     #
