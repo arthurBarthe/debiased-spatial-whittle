@@ -9,7 +9,7 @@ def prod_list(l):
     else:
         return l[0] * prod_list(l[1:])
 
-def video_plot_3d(y: np.ndarray):
+def video_plot_3d(y: np.ndarray, vmin=-2, vmax=2, cmap='inferno', interval=100, repeat_delay=1000):
     """
     Produces an animated plot to show the 3 dimensional array
     Parameters
@@ -25,9 +25,9 @@ def video_plot_3d(y: np.ndarray):
     # each frame
     ims = []
     for i in range(y.shape[-1]):
-        im = ax.imshow(y[..., i], vmin=-2, vmax=2, cmap='inferno', animated=True)
+        im = ax.imshow(y[..., i], vmin=vmin, vmax=vmax, cmap=cmap, animated=True)
         if i == 0:
-            ax.imshow(y[..., 0], vmin=-2, vmax=2, cmap='inferno')  # show an initial one first
+            ax.imshow(y[..., 0], vmin=vmin, vmax=vmax, cmap=cmap)  # show an initial one first
         ims.append([im])
 
     ani = animation.ArtistAnimation(fig, ims, interval=100, blit=True,
