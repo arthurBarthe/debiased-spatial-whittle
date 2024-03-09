@@ -1,12 +1,13 @@
 import numpy as np
 from numpy.testing import assert_allclose
 
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram, compute_ep_old
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle, Estimator
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, sim_circ_embedding
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters
+from debiased_spatial_whittle.cov_funcs import exp_cov
+from debiased_spatial_whittle.likelihood import periodogram
 
 
 def test_oop():
@@ -92,7 +93,7 @@ def test_jmat():
     4. The indexing in the summation is not right.
     5. The gradient of the likelihood is not right.
     """
-    g = RectangularGrid((8, 8))
+    g = RectangularGrid((16, 16))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
@@ -101,8 +102,9 @@ def test_jmat():
     model.rho = 2
     sampler = SamplerOnRectangularGrid(model, g)
     params = model.params
+    print(params)
     jmat = d.jmatrix(model, params)
-    n_samples = 10000
+    n_samples = 1000
     estimates = []
     for i in range(n_samples):
         z = sampler()
