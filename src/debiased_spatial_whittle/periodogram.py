@@ -133,9 +133,8 @@ class Periodogram:
 
     def __init__(self, taper = None, scaling='ortho'):
         if taper is None:
-            self.taper = lambda x: np.ones_like(x)
+            self.taper = lambda shape: np.ones(shape)
         self.scaling = scaling
-        #TODO add possibility to not fold?
         #TODO add scaling
         self.fold = True
         self._version = 0
@@ -144,15 +143,13 @@ class Periodogram:
         return id(self) + self._version
 
     def __call__(self, z: Union[np.ndarray, SampleOnRectangularGrid]):
-        # TODO add tapering
         if isinstance(z, SampleOnRectangularGrid):
             if self in z.periodograms:
                 return z.periodograms[self]
             else:
-                z_values = z.values
+                z_values = z.values * self.taper(z.grid.n)
         else:
-            z_values = z
-        z_taper = z
+            z_values = z * self.taper(z.shape)
         f = 1 / prod_list(z_values.shape) * np.abs(fftn(z_values))**2
         if isinstance(z, SampleOnRectangularGrid):
             z.periodograms[self] = f
@@ -175,6 +172,16 @@ class Periodogram:
         super(Periodogram, self).__setattr__(key, value)
 
 
+class HashableArray:
+    def __init__(self, values: np.array):
+        self.values = values
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self.values == other.values
+
 class ExpectedPeriodogram:
     """Class to obtain the expected periodogram when no assumptions are made about the form of the covariance
     model (e.g. separability)."""
@@ -190,7 +197,7 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        #self._taper = value.taper(self.grid)
+        self._taper = HashableArray(value.taper(self.grid.n))
 
     @property
     def taper(self):
@@ -236,9 +243,9 @@ class ExpectedPeriodogram:
         grid = self.grid
         shape = grid.n
         n_dim = grid.ndim
-        # In the case of a complete grid, cg takes a closed form given by the triangle kernel
+        # TODO In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
-            cg = grid.spatial_kernel
+            cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering

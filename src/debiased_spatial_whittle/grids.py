@@ -1,10 +1,9 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
 
-from functools import cached_property
 from abc import ABC, abstractmethod
 from pathlib import Path
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
 
@@ -180,11 +179,9 @@ class RectangularGrid:
         lags = [g - g.T for g in grid_vec]
         return np.array(lags)
 
-    @property
-    def spatial_kernel(self):
-        if not hasattr(self, '_spatial_kernel'):
-            self._spatial_kernel = spatial_kernel(self.mask)
-        return self._spatial_kernel
+    @lru_cache(maxsize=5)
+    def spatial_kernel(self, taper_values):
+        return spatial_kernel(self.mask * taper_values.values)
 
     def covariance_matrix(self, model: CovarianceModel):
         """
@@ -202,7 +199,6 @@ class RectangularGrid:
         In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
         0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
         when computing the expecting periodogram"""
-        #TODO check that the ifftshift "trick" works for odd sizes
         return ifftshift(model(self.lags_unique))
 
     def autocov_separable(self, model: SeparableModel):
