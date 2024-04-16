@@ -56,6 +56,7 @@ class BackendManager:
             torch.dot = torch.matmul
             torch.digitize = torch.bucketize
             torch.ravel_multi_index = ravel_multi_index
+            torch.Tensor.astype = lambda self, type: self.to(dtype=type)
             return torch
 
     @classmethod
