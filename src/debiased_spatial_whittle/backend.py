@@ -91,6 +91,7 @@ class BackendManager:
             return func(*args, **kargs)
         return new_func
 
+    @classmethod
     def ensure_array(cls, a):
         if cls.backend_name == 'torch':
             if not isinstance(a, torch.Tensor):
