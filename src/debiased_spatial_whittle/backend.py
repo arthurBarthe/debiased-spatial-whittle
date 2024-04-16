@@ -33,6 +33,7 @@ class BackendManager:
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
             torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, func(args[0]), **kargs)
             torch.dot = torch.matmul
+            torch.digitize = torch.bucketize
             return torch
 
     @classmethod
