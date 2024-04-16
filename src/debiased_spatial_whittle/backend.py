@@ -55,7 +55,7 @@ class BackendManager:
             torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, func(args[0]), **kargs)
             torch.dot = torch.matmul
             torch.digitize = torch.bucketize
-            torch.ravel_multi_index = ravel_multi_index()
+            torch.ravel_multi_index = ravel_multi_index
             return torch
 
     @classmethod
