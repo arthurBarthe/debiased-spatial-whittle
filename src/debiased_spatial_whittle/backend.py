@@ -24,7 +24,7 @@ def ravel_multi_index(coords: torch.Tensor, shape: torch.Size) -> torch.Tensor:
     Author: Francois Rozet
     (https://github.com/pytorch/pytorch/issues/35674)
     """
-    coords = torch.stack(coords, dim=0)
+    coords = torch.stack(coords, dim=1)
     shape = coords.new_tensor((*shape, 1))
     coefs = shape[1:].flipud().cumprod(dim=0).flipud()
 
