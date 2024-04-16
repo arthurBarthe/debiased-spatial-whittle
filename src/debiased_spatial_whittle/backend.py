@@ -74,6 +74,15 @@ class BackendManager:
             return fftn, ifftn
 
     @classmethod
+    def get_fftshift_methods(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.fft.fftshift, numpy.fft.ifftshift
+        elif cls.backend_name == 'torch':
+            fftshift = cls._changes_keyword(torch.fft.fftshift, 'axes', 'dim')
+            ifftshift = cls._changes_keyword(torch.fft.ifftshift, 'axes', 'dim')
+            return fftshift, ifftshift
+
+    @classmethod
     def _changes_keyword(cls, func, old_keyword, new_keyword):
         def new_func(*args, **kargs):
             if old_keyword in kargs:
