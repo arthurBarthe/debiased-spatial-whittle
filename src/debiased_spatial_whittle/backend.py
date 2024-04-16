@@ -9,6 +9,27 @@ def func(x):
         res += x[-i - 1]
     return res
 
+def ravel_multi_index(coords: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+    r"""Converts a tensor of coordinate vectors into a tensor of flat indices.
+
+    This is a `torch` implementation of `numpy.ravel_multi_index`.
+
+    Args:
+        coords: A tensor of coordinate vectors, (*, D).
+        shape: The source shape.
+
+    Returns:
+        The raveled indices, (*,).
+
+    Author: Francois Rozet
+    (https://github.com/pytorch/pytorch/issues/35674)
+    """
+
+    shape = coords.new_tensor((*shape, 1))
+    coefs = shape[1:].flipud().cumprod(dim=0).flipud()
+
+    return (coords * coefs).sum(dim=-1)
+
 
 class BackendManager:
     backend_name = 'numpy'
@@ -34,6 +55,7 @@ class BackendManager:
             torch.pad = lambda a, *args, **kargs: torch.nn.functional.pad(a, func(args[0]), **kargs)
             torch.dot = torch.matmul
             torch.digitize = torch.bucketize
+            torch.ravel_multi_index = ravel_multi_index()
             return torch
 
     @classmethod
