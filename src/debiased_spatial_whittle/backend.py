@@ -90,3 +90,11 @@ class BackendManager:
                 del kargs[old_keyword]
             return func(*args, **kargs)
         return new_func
+
+    def ensure_array(cls, a):
+        if cls.backend_name == 'torch':
+            if not isinstance(a, torch.Tensor):
+                a = torch.tensor(a)
+            return a.to(device=cls.device)
+        else:
+            return a
