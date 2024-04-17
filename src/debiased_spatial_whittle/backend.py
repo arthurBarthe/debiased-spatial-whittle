@@ -110,7 +110,7 @@ class BackendManager:
     def get_fftshift_methods(cls):
         if cls.backend_name == 'numpy':
             return numpy.fft.fftshift, numpy.fft.ifftshift
-        elif cls.backend_name.name == 'cupy':
+        elif cls.backend_name == 'cupy':
             return cupy.fft.fftshift, cupy.fft.ifftshift
         elif cls.backend_name == 'torch':
             fftshift = cls._changes_keyword(torch.fft.fftshift, 'axes', 'dim')
