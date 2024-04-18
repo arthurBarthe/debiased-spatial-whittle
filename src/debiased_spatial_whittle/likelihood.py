@@ -166,11 +166,9 @@ class DebiasedWhittle:
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
-        p = self.periodogram(z)                # you are recomputing I for each iteration i think
+        p = self.periodogram(z)
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
-        if BackendManager.backend_name == 'torch':
-            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
