@@ -66,6 +66,8 @@ class BackendManager:
     def get_zeros(cls):
         if cls.backend_name == 'numpy':
             return numpy.zeros
+        if cls.backend_name == 'cupy':
+            return cupy.zeros
         elif cls.backend_name == 'torch':
             return lambda *args, **kargs: torch.zeros(*args, **kargs, device=BackendManager.device)
 

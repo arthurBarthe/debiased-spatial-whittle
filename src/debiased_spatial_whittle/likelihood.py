@@ -367,12 +367,13 @@ class Estimator:
             def func(param_values):
                 updates = dict(zip(free_params.names, param_values))
                 free_params.update_values(updates)
-                return self.likelihood(z, model)
+                return self.likelihood(z, model).item()
         else:
             def func(param_values):
                 updates = dict(zip(free_params.names, param_values))
                 free_params.update_values(updates)
-                return self.likelihood(z, model, params_for_gradient=free_params)
+                lkh, grad = self.likelihood(z, model, params_for_gradient=free_params)
+                return lkh.item(), grad
         return func
 
     def covmat(self, model: CovarianceModel, params: Parameters = None):
