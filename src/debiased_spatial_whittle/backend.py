@@ -73,7 +73,7 @@ class BackendManager:
     def get_randn(cls):
         if cls.backend_name == 'numpy':
             return numpy.random.randn
-        elif cls.backend_name.name == 'cupy':
+        elif cls.backend_name == 'cupy':
             return cupy.random.randn
         elif cls.backend_name == 'torch':
             return lambda *args, **kargs: torch.randn(*args, **kargs, dtype=torch.float64, device=cls.device)
@@ -84,7 +84,7 @@ class BackendManager:
     def get_arange(cls):
         if cls.backend_name == 'numpy':
             return numpy.arange
-        elif cls.backend_name.name == 'cupy':
+        elif cls.backend_name == 'cupy':
             return cupy.arange
         elif cls.backend_name == 'torch':
             return lambda *args, **kargs: torch.arange(*args, **kargs, device=cls.device)
@@ -95,7 +95,7 @@ class BackendManager:
     def get_fft_methods(cls):
         if cls.backend_name == 'numpy':
             return numpy.fft.fftn, numpy.fft.ifftn
-        elif cls.backend_name.name == 'cupy':
+        elif cls.backend_name == 'cupy':
             return cupy.fft.fftn, cupy.fft.ifftn
         elif cls.backend_name == 'torch':
             def new_fftn(a, *args, **kargs):
