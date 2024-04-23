@@ -419,7 +419,7 @@ class SquaredExponentialModel(CovarianceModel):
         # self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        d2 = sum((lag**2 for lag in lags))
+        d2 = np.sum(lags ** 2, axis=0)
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
         return acf
