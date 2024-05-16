@@ -1,5 +1,4 @@
 import numpy
-import torch
 import cupy
 
 def func(x):
@@ -52,6 +51,7 @@ class BackendManager:
             import autograd.numpy
             return autograd.numpy
         elif cls.backend_name == 'torch':
+            import torch
             torch.to_cpu = lambda x: x.cpu()
             torch.set_default_tensor_type(torch.DoubleTensor)
             torch.array = lambda x: torch.tensor(x, dtype=torch.float64, device=cls.device)
