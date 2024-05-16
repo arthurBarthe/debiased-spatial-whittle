@@ -9,7 +9,7 @@ def func(x):
         res += x[-i - 1]
     return res
 
-def ravel_multi_index(coords: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+def ravel_multi_index(coords, shape):
     r"""Converts a tensor of coordinate vectors into a tensor of flat indices.
 
     This is a `torch` implementation of `numpy.ravel_multi_index`.
