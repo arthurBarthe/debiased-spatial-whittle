@@ -1,5 +1,4 @@
 import numpy
-import cupy
 
 def func(x):
     n = len(x)
@@ -45,6 +44,7 @@ class BackendManager:
             numpy.to_cpu = lambda x: x
             return numpy
         elif cls.backend_name == 'cupy':
+            import cupy
             cupy.to_cpu = lambda x: x.get()
             return cupy
         elif cls.backend_name == 'autograd':
