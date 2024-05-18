@@ -343,9 +343,7 @@ class ExponentialModelUniDirectional(CovarianceModel):
         return np.stack((d_rho, d_sigma), axis=-1)
 
 import scipy
-from scipy.special import kv
-from autograd.scipy.special import gamma, iv
-from autograd.extend import primitive, defvjp, defjvp
+from scipy.special import kv, gamma
 # kv = primitive(scipy.special.kv)
 # defvjp(kv, None, lambda ans, n, x: lambda g: -g * (kv(n - 1, x) + kv(n + 1, x)) / 2.0)
 
