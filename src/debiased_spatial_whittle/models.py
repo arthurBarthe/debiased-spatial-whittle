@@ -6,7 +6,6 @@ import numpy
 # In this file we define covariance models
 from abc import ABC, abstractmethod
 
-from autograd.scipy.special import gamma # , kv
 from typing import Tuple, List, Dict, Union
 
 class Parameter:
