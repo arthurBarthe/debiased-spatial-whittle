@@ -159,6 +159,13 @@ class RectangularGrid:
 
     @cached_property
     def lags_unique(self) -> List[np.ndarray]:
+        """
+
+        Returns
+        -------
+        Unique lags corresponding to the grids
+            shape (2 * n1 + 1, 2 * n2 + 1, ..., 2 * nd + 1, d)
+        """
         shape = self.n
         delta = self.delta
         lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
@@ -201,7 +208,12 @@ class RectangularGrid:
         """Compute the covariance function on a grid of lags determined by the passed shape.
         In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
         0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
-        when computing the expecting periodogram"""
+        when computing the expecting periodogram
+
+        Returns
+        ...
+            shape (2 * n1 + 1, 2 * n2 +2, ..., 2 * nd +d)
+        """
         #TODO check that the ifftshift "trick" works for odd sizes
         return ifftshift(model(self.lags_unique))
 
