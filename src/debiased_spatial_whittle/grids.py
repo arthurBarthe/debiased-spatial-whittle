@@ -244,10 +244,9 @@ class RectangularGrid:
 
     def autocov(self, model: CovarianceModel):
         """Compute the covariance function on a grid of lags determined by the passed shape.
-        In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
+        In d=1 the lags would be -(n-1)...n-1, but then a ifftshit is applied so that the lags are
         0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
         when computing the expecting periodogram"""
-        #TODO check that the ifftshift "trick" works for odd sizes
         if hasattr(model, 'call_on_rectangular_grid'):
             return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique), list(range(self.ndim)))

@@ -263,7 +263,7 @@ class SamplerBUCOnRectangularGrid:
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
-    # TODO make this work for 1-d and 3-d
+    # TODO allow block simulations for increased computational efficiency
     def __call__(self, periodic: bool = False, return_spectral: bool = False):
         f = np.expand_dims(self.f, -1)
         e = self.e_dist.rvs(size=f.shape + (2,))

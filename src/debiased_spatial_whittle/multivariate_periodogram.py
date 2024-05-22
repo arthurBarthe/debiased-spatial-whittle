@@ -15,7 +15,9 @@ class Periodogram:
     This class defines a periodogram for a multivariate random field.
     """
     def __init__(self):
-        pass
+        # TODO allow for tapering in multivariate case
+        self.fold = True
+        self.taper = lambda x: np.ones_like(x)
 
     def __call__(self, z: List[np.ndarray], return_fft: bool = False):
         """

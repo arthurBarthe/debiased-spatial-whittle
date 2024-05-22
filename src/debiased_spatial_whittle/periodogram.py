@@ -315,7 +315,7 @@ class ExpectedPeriodogram:
         d_acv = model.gradient(lags, params)
         d_ep = []
         for p_name in params.names:
-            aux = ifftshift(d_acv[p_name])
+            aux = ifftshift(d_acv[p_name], axes=list(range(lags.shape[0])))
             d_ep.append(self.compute_ep(aux, self.periodogram.fold))
         return np.stack(d_ep, axis=-1)
 

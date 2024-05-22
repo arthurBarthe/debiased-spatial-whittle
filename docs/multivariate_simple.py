@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle.backend import BackendManager
-BackendManager.set_backend('torch')
+BackendManager.set_backend('numpy')
 
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, BivariateUniformCorrelation
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
@@ -15,15 +15,16 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = - 0.5
+corr = 0.
 
-g = RectangularGrid((256, 256))
+g = RectangularGrid((64, 64))
 m = ExponentialModel()
-m.rho = 12
+m.rho = 8
 m.sigma = 1
+m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)
 bvm.r_0 = corr
-bvm.f_0 = 2
+bvm.f_0 = 1.5
 print(bvm)
 
 s = SamplerBUCOnRectangularGrid(bvm, g)
@@ -69,4 +70,14 @@ bvm.f_0 = None
 bvm.sigma_1 = None
 print(e(bvm, data))
 
+# we now carry out a test whose null hypothesis is that of zero-correlation
+from debiased_spatial_whittle.hypothesis_tests import FixedParametersHT
+
+bvm.r_0 = None
+bvm.rho_1 = None
+bvm.f_0 = None
+bvm.sigma_1 = None
+hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.), db)
+test_result = hypothesis_test(z=data)
+print(test_result)
 

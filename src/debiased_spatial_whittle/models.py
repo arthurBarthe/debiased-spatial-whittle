@@ -205,7 +205,7 @@ class CovarianceModel(ABC):
     def gradient(self, x: np.ndarray, params: Parameters):
         """Provides the gradient of the covariance functions at the passed lags with respect to
         the passed parameters"""
-        gradient = dict([(p.name, np.zeros_like(x[0], dtype=np.float64)) for p in params.param_dict.values()])
+        gradient = dict([(p.name, 0) for p in params.param_dict.values()])
         g = self._gradient(x)
         for i, p in enumerate(self.params):
             if p in params.param_dict.values():
@@ -552,19 +552,59 @@ class BivariateUniformCorrelation(CovarianceModel):
         super(BivariateUniformCorrelation, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
+        """
+        Evaluates the covariance model at the passed lags. Since the model is bivariate,
+        the returned array has two extra dimensions compared to the array lags, both of size
+        two.
+
+        Parameters
+        ----------
+        lags
+            lag array with shape (ndim, m1, m2, ..., mk)
+        Returns
+            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
+        -------
+
+        """
         acv11 = self.base_model(lags)
         # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
-        acv12 = acv11 * self.r_0.value
         out = np.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11
         out[..., 1, 1] = acv11 * self.f_0.value ** 2
-        out[..., 0, 1] = acv12 * self.f_0.value
-        out[..., 1, 0] = acv12 * self.f_0.value
+        out[..., 0, 1] = acv11 * self.r_0.value * self.f_0.value
+        out[..., 1, 0] = acv11 * self.r_0.value * self.f_0.value
         return out
 
     def _gradient(self, x: np.ndarray):
-        raise NotImplementedError('The gradient has not been implemented for this model')
+        """
+
+        Parameters
+        ----------
+        x
+            shape (ndim, m1, ..., mk)
+        Returns
+        -------
+        gradient
+            shape (m1, ..., mk, 2, 2, p + 2)
+            where p is the number of parameters of the base model.
+        """
+        acv11 = self.base_model(x)
+        gradient_base_model = self.base_model._gradient(x)
+        # gradient 11
+        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
+        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
+        # gradient 12
+        temp = np.stack((acv11 * self.f_0.value, acv11 * self.r_0.value), axis=-1)
+        gradient_12 = np.concatenate((temp, gradient_base_model * self.r_0.value * self.f_0.value), axis=-1)
+        # gradient 21
+        gradient_21 = gradient_12
+        # gradient 22
+        temp = np.stack((np.zeros_like(acv11), 2 * self.f_0.value * acv11), axis=-1)
+        gradient_22 = np.concatenate((temp, gradient_base_model * self.f_0.value ** 2), axis=-1)
+        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
+        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
+        return np.stack((row1, row2), axis=x.ndim - 1)
 
 
 class TransformedModel(CovarianceModel):

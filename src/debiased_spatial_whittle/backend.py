@@ -42,6 +42,8 @@ class BackendManager:
     def convert(cls, a):
         if BackendManager.backend_name == 'torch':
             return torch.tensor(a).to(device=BackendManager.device)
+        else:
+            return a
 
     @classmethod
     def get_zeros(cls):

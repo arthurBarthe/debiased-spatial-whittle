@@ -4,13 +4,13 @@ BackendManager.set_backend('numpy')
 np = BackendManager.get_backend()
 
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters
+from debiased_spatial_whittle.models import BivariateUniformCorrelation
 
 
 def test_gradient_cov():
@@ -41,6 +41,7 @@ def test_gradient_sqExpCov():
     model = SquaredExponentialModel()
     model.sigma = 1
     model.rho = 25
+    model.nugget = 0.01
     epsilon = 1e-7
     acv1 = model(g.lags_unique)
     model.rho = model.rho.value + epsilon
@@ -54,6 +55,34 @@ def test_gradient_sqExpCov():
     g3 = (acv3 - acv1) / epsilon
     assert_allclose(g_rho, g2, rtol=1e-5)
     assert_allclose(g_sigma, g3)
+
+
+def test_gradient_bivariate():
+    """
+    This test checks that the gradient has the right shape in the case of a bivariate model.
+    Returns
+    -------
+
+    """
+    g = RectangularGrid((32, 32))
+    model = SquaredExponentialModel()
+    model.rho = 3
+    model.sigma = 2
+    model.nugget = 0.2
+    bvm = BivariateUniformCorrelation(model)
+    bvm.r_0 = 0.2
+    bvm.f_0 = 1.5
+    lags = g.lags_unique
+    gradient = bvm.gradient(lags, bvm.params)
+    epsilon = 1e-5
+    cov = bvm(lags)
+    for i, p in enumerate(bvm.params):
+        print(p)
+        p.value = p.value + epsilon
+        cov2 = bvm(lags)
+        gradient_num = (cov2 - cov) / epsilon
+        assert_allclose(gradient[p.name], gradient_num, rtol=0.01)
+        p.value = p.value - epsilon
 
 """
 def test_gradient_cov_separable():
