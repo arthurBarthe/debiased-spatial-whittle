@@ -121,10 +121,11 @@ ifftshift = np.fft.ifftshift
 arange = BackendManager.get_arange()
 
 class RectangularGrid:
-    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
+    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
         self.n = shape
-        self._delta = delta
-        self._mask = mask
+        self.delta = delta
+        self.nvars = nvars
+        self.mask = mask
 
     @property
     def ndim(self):
@@ -142,6 +143,16 @@ class RectangularGrid:
         self._delta = value
 
     @property
+    def nvars(self):
+        return self._nvars
+
+    @nvars.setter
+    def nvars(self, value: int):
+        assert isinstance(value, int), "The number of components must be integer-valued."
+        assert value > 0, "The number of components must be positive."
+        self._nvars = value
+
+    @property
     def mask(self):
         if self._mask is None:
             return np.ones(self.n)
@@ -150,16 +161,16 @@ class RectangularGrid:
 
     @mask.setter
     def mask(self, value: np.ndarray):
-        assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+        if self.nvars == 1:
+            assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+        else:
+            assert value.shape == self.n + (self.nvars, ), "Invalid shape of grid mask."
         self._mask = value
 
     @property
     def n_points(self):
         """Total number of points of the grid, irrespective of the mask"""
-        p = 1
-        for ni in self.n:
-            p *= ni
-        return p
+        return np.prod(self.n)
 
     @property
     def extent(self):
@@ -188,7 +199,7 @@ class RectangularGrid:
     @property
     def fourier_frequencies2(self):
         """
-        Grid of Fourier frequencies corresponding to the spatial grid.
+        Grid of Fourier frequencies corresponding to the spatial grid, without folding.
 
         Returns
         -------

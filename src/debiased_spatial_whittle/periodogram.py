@@ -198,7 +198,6 @@ class ExpectedPeriodogram:
 
     def __call__(self, model: CovarianceModel) -> np.ndarray:
         """
-
         Parameters
         ----------
         model
