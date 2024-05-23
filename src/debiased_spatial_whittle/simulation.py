@@ -279,7 +279,7 @@ class SamplerBUCOnRectangularGrid:
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
         z_inv = np.reshape(z_inv, self.grid.n + (2,))
-        return z_inv * np.expand_dims(self.grid.mask, -1)
+        return z_inv * self.grid.mask
 
 
 

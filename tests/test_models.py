@@ -64,7 +64,7 @@ def test_gradient_bivariate():
     -------
 
     """
-    g = RectangularGrid((32, 32))
+    g = RectangularGrid((32, 32), nvars=2)
     model = SquaredExponentialModel()
     model.rho = 3
     model.sigma = 2

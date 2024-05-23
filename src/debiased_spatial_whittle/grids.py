@@ -1,4 +1,4 @@
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
 from functools import cached_property
@@ -8,8 +8,6 @@ from functools import cached_property
 from typing import Tuple
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.backend import BackendManager
-np = BackendManager.get_backend()
 
 fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
@@ -133,13 +131,14 @@ class RectangularGrid:
 
     @property
     def delta(self):
-        if self._delta is None:
-            return [1, ] * len(self.n)
         return self._delta
 
     @delta.setter
     def delta(self, value):
+        if value is None:
+            value = [1., ] * len(self.n)
         assert len(value) == len(self.n), "The length of delta should be equal to the number of dimensions"
+        value = tuple([float(v) for v in value])
         self._delta = value
 
     @property
@@ -154,13 +153,14 @@ class RectangularGrid:
 
     @property
     def mask(self):
-        if self._mask is None:
-            return np.ones(self.n)
-        else:
-            return self._mask
+        return self._mask
 
     @mask.setter
     def mask(self, value: np.ndarray):
+        if value is None:
+            value = np.ones(self.n)
+            if self.nvars > 1:
+                value = np.ones(self.n + (self.nvars,))
         if self.nvars == 1:
             assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
         else:
@@ -211,6 +211,13 @@ class RectangularGrid:
 
     @cached_property
     def lags_unique(self) -> List[np.ndarray]:
+        """
+
+        Returns
+        -------
+        Unique lags corresponding to the grids
+            shape (2 * n1 + 1, 2 * n2 + 1, ..., 2 * nd + 1, d)
+        """
         shape = self.n
         delta = self.delta
         lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
@@ -239,7 +246,7 @@ class RectangularGrid:
     @property
     def spatial_kernel(self):
         if not hasattr(self, '_spatial_kernel'):
-            self._spatial_kernel = spatial_kernel(self.mask)
+            self._spatial_kernel = spatial_kernel(self.mask, n_spatial_dim=self.ndim)
         return self._spatial_kernel
 
     def covariance_matrix(self, model: CovarianceModel):

@@ -209,7 +209,7 @@ def test_gradient_expected_periodogram():
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
 from debiased_spatial_whittle.models import BivariateUniformCorrelation
 def test_gradient_expected_periodogram_bivariate():
-    g = RectangularGrid((32, 32))
+    g = RectangularGrid((32, 32), nvars=2)
     p = PeriodogramMulti()
     ep_op = ExpectedPeriodogram(g, p)
     model = ExponentialModel()

@@ -1,4 +1,7 @@
-import torch
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
 
 from .backend import BackendManager
 np = BackendManager.get_backend()
@@ -373,6 +376,7 @@ class ExponentialModelUniDirectional(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         return np.stack((d_rho, d_sigma), axis=-1)
 
+import scipy
 from scipy.special import kv
 try:
     from autograd.scipy.special import gamma, iv
@@ -446,10 +450,10 @@ class SquaredExponentialModel(CovarianceModel):
         parameters = Parameters([rho, sigma, nugget])
         super(SquaredExponentialModel, self).__init__(parameters)
         # set a default value to zero for the nugget
-        # self.nugget = 0.
+        self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        d2 = sum((lag**2 for lag in lags))
+        d2 = np.sum(lags ** 2, axis=0)
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
         return acf

@@ -7,7 +7,7 @@ from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
 
 def test_fixed_parameters_ht():
-    grid = RectangularGrid((64, 64))
+    grid = RectangularGrid((64, 64), nvars=2)
     model = ExponentialModel()
     model.rho = 1
     model.sigma = 1

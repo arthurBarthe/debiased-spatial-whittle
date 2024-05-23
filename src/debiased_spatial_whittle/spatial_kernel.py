@@ -10,7 +10,7 @@ fftn = np.fft.fftn
 ifftn = np.fft.ifftn
 # ifftshift = np.fft.ifftshift
 
-def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
+def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None) -> np.ndarray:
     """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
 
     Parameters
@@ -18,6 +18,9 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     g
         mask of observations, or more generally pointwise modulation e.g. a taper or the product of a taper with an
         observation mask
+    n_spatial_dim
+        Number of dimensions that are spatial dimensions. In the multivariate case, the last dimension is used for the
+        different variates.
     m
         offset in frequency indices
 
@@ -26,14 +29,26 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0)) -> np.ndarray:
     cg
         Spatial kernel
     """
-    n = g.shape
-    normalization_factor = np.exp(np.sum(np.log(np.array(n))))
+    if n_spatial_dim is None:
+        n_spatial_dim = g.ndim
+    n = g.shape[:n_spatial_dim]
+    normalization_factor = np.prod(n)
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
-        f = np.abs(fftn(g, two_n))**2
-        cg = ifftn(f)
-        cg /= normalization_factor
-        return np.real(cg)
+        if n_spatial_dim == g.ndim:
+            # univariate case
+            f = np.abs(fftn(g, two_n))**2
+            cg = ifftn(f)
+            cg /= normalization_factor
+            return np.real(cg)
+        else:
+            # multivariate case
+            g = np.expand_dims(g, -1)
+            f1 = fftn(g, two_n, axes=tuple(range(n_spatial_dim)))
+            f2 = np.transpose(f1, tuple(range(n_spatial_dim)) + (-1, -2))
+            cg = ifftn(np.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
+            cg /= normalization_factor
+            return np.real(cg)
     # TODO only works in 2d right now
     m1, m2 = m
     n1, n2 = n

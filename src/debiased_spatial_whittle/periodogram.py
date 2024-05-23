@@ -235,16 +235,16 @@ class ExpectedPeriodogram:
         grid = self.grid
         shape = grid.n
         n_dim = grid.ndim
-        p = acv.shape[-1]
+        p = grid.nvars
         # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
             cg = grid.spatial_kernel
         else:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering
-        # we allow for multivariate, but currently mask same for both grids
-        #cg = np.expand_dims(cg, (-2, -1))
-        cg = np.reshape(cg, cg.shape + (1, 1))
+        if grid.nvars == 1:
+            cg = np.expand_dims(cg, (-1, -2))
+            acv = np.expand_dims(acv, (-1, -2))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
@@ -272,7 +272,7 @@ class ExpectedPeriodogram:
                             res = cbar[i*shape[0]: (i+1)*shape[0],
                                        j*shape[1]: (j+1)*shape[1],
                                        k*shape[2]: (k+1)*shape[2]]    
-                            result += np.pad(res, ((i,0), (j,0), (k,0)), mode='constant')
+                            result += np.pad(res, ((i,0), (j,0), (k,0), (0, 0), (0, 0)), mode='constant')
         
 
             # else:
@@ -289,9 +289,14 @@ class ExpectedPeriodogram:
             result[:m, n + 1:] = cbar[:m, n:]
 
         if d == (0, 0):
-            # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-            return fftn(result, None, list(range(n_dim)))
-        return fftn(result)
+            out = fftn(result, None, list(range(n_dim)))
+            if grid.nvars == 1:
+                out = np.real(np.reshape(out, grid.n))
+            return out
+        out = fftn(result)
+        if grid.nvars == 1:
+            out = np.reshape(out, grid.n)
+        return out
 
     def gradient(self, model: CovarianceModel, params: Parameters) -> np.ndarray:
         """Provides the gradient of the expected periodogram with respect to the parameters of the model

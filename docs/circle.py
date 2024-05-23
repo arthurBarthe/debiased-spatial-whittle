@@ -14,7 +14,7 @@ model.rho = 20
 model.sigma = 2
 model.nugget = 0.025
 
-m = 1024
+m = 256
 shape = (m * 1, m * 1)
 
 x_0, y_0, diameter = m // 2, m // 2, m

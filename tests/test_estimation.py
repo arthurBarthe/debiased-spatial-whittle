@@ -1,11 +1,11 @@
 import numpy as np
 from numpy.testing import assert_almost_equal
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
+from debiased_spatial_whittle.cov_funcs import exp_cov
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit, whittle
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram, compute_ep_old
+from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit, whittle, periodogram
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, sim_circ_embedding
 from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel
 
 

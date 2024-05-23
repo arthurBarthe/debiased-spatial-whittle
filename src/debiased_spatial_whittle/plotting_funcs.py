@@ -1,7 +1,10 @@
 from math import prod
 import numpy as np
 from numpy import ndarray
-import seaborn as sns
+try:
+    import seaborn as sns
+except:
+    pass
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 from typing import Union, List
