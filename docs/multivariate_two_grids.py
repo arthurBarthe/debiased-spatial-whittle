@@ -15,7 +15,7 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = 0.25
+corr = 0.5
 
 g = RectangularGrid((256, 256), nvars=2)
 g.mask = np.random.rand(*g.mask.shape) > 0.2
@@ -24,7 +24,7 @@ g.mask[..., 0] = np.mod(x, 40) <= 20
 g.mask[..., 1] = np.mod(x, 40) > 20
 
 m = SquaredExponentialModel()
-m.rho = 8
+m.rho = 12
 m.sigma = 1
 m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)

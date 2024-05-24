@@ -15,9 +15,9 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = 0.
+corr = 0.9
 
-g = RectangularGrid((64, 64))
+g = RectangularGrid((64, 64), nvars=2)
 m = ExponentialModel()
 m.rho = 8
 m.sigma = 1
