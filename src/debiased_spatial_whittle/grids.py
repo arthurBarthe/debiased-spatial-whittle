@@ -1,3 +1,5 @@
+__docformat__ = "numpydoc"
+
 from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
@@ -119,6 +121,24 @@ ifftshift = np.fft.ifftshift
 arange = BackendManager.get_arange()
 
 class RectangularGrid:
+    """
+    Generic class for hypercubic grids.
+
+    Attributes
+    ----------
+    n: tuple[int]
+        spatial dimensions of the grid
+
+    delta: tuple[float]
+        step sizes of the grid along all dimensions
+
+    nvars: int
+        number of variates observed on the grid
+
+    mask: ndarray
+        array of 0's (missing) and 1's (observed) indicating for each point of the grid whether the random field is
+        observed at that location.
+    """
     def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
         self.n = shape
         self.delta = delta
@@ -127,10 +147,16 @@ class RectangularGrid:
 
     @property
     def ndim(self):
+        """
+        int: number of spatial dimensions of the grid.
+        """
         return len(self.n)
 
     @property
     def delta(self):
+        """
+        step sizes of the grid along all dimensions
+        """
         return self._delta
 
     @delta.setter
@@ -143,6 +169,9 @@ class RectangularGrid:
 
     @property
     def nvars(self):
+        """
+        int: number of variates
+        """
         return self._nvars
 
     @nvars.setter
@@ -153,6 +182,7 @@ class RectangularGrid:
 
     @property
     def mask(self):
+        """ndarray: observation mask"""
         return self._mask
 
     @mask.setter
@@ -169,11 +199,12 @@ class RectangularGrid:
 
     @property
     def n_points(self):
-        """Total number of points of the grid, irrespective of the mask"""
+        """int: Total number of points of the grid, irrespective of the mask"""
         return np.prod(self.n)
 
     @property
     def extent(self):
+        """tuple[float]: spatial extent of the grid in spatial units"""
         return tuple([n_i * delta_i for n_i, delta_i in zip(self.n, self.delta)])
 
     @property
@@ -186,25 +217,13 @@ class RectangularGrid:
 
     @property
     def fourier_frequencies(self):
-        """
-        Grid of Fourier frequencies corresponding to the spatial grid.
-
-        Returns
-        -------
-
-        """
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid."""
         mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
         return np.stack(mesh, axis=-1)
 
     @property
     def fourier_frequencies2(self):
-        """
-        Grid of Fourier frequencies corresponding to the spatial grid, without folding.
-
-        Returns
-        -------
-
-        """
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
         mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
         out = np.stack(mesh, axis=-1)
         return BackendManager.convert(out)
@@ -220,7 +239,7 @@ class RectangularGrid:
         """
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(arange(-n + 1, n, dtype=np.float64) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags, axis=0)
 
     @property

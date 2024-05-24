@@ -212,7 +212,8 @@ class MultivariateDebiasedWhittle:
             _, grad = self(z, model, params_for_gradient)
             gradients.append(grad)
         gradients = np.array(gradients)
-        return np.cov(gradients.T)
+        # enforce real values
+        return np.real(np.cov(gradients.T))
 
 
 class DebiasedWhittle:
@@ -381,7 +382,8 @@ class DebiasedWhittle:
             _, grad = self(z, model, params_for_gradient)
             gradients.append(grad)
         gradients = np.array(gradients)
-        return np.cov(gradients.T)
+        # enforce real values
+        return np.real(np.cov(gradients.T))
 
 
     def variance_of_estimates(self, model: CovarianceModel, params: Parameters, jmat: np.ndarray = None):
