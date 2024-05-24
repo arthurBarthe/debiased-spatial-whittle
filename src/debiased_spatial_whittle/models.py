@@ -1,10 +1,17 @@
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
+
 from .backend import BackendManager
 np = BackendManager.get_backend()
+fftn, ifftn = BackendManager.get_fft_methods()
+
+import numpy
 
 # In this file we define covariance models
 from abc import ABC, abstractmethod
 
-from autograd.scipy.special import gamma # , kv
 from typing import Tuple, List, Dict, Union
 
 class Parameter:
@@ -20,7 +27,10 @@ class Parameter:
         self.name = name
         self.bounds = bounds
         self.value = None
-        self.init_guess = 1.
+        self.init_guess = 0.9
+        # fixme log scale not expected to work with gradients right now
+        # might need a whole new class LogParameter
+        self.log_scale = False
 
     #TODO add property name and make it point to if adequate
 
@@ -28,6 +38,10 @@ class Parameter:
     def value(self):
         if self.point_to is not None:
             return self.point_to.value
+        if self._value is None:
+            return None
+        if self.log_scale:
+            return numpy.exp(self._value)
         return self._value
 
     @value.setter
@@ -99,7 +113,7 @@ class Parameters:
 
     def free_params(self):
         list_free = list(filter(lambda p: p.free, self))
-        return Parameters(list(set(list_free)))
+        return Parameters(list_free)
 
     def __getitem__(self, item):
         return self.param_dict[item]
@@ -194,15 +208,18 @@ class CovarianceModel(ABC):
     def gradient(self, x: np.ndarray, params: Parameters):
         """Provides the gradient of the covariance functions at the passed lags with respect to
         the passed parameters"""
-        gradient = dict([(p.name, np.zeros_like(x[0], dtype=np.float64)) for p in params.param_dict.values()])
+        gradient = dict([(p.name, 0) for p in params.param_dict.values()])
         g = self._gradient(x)
         for i, p in enumerate(self.params):
             if p in params.param_dict.values():
-                gradient[p.name] += np.take(g, i, axis=-1)
+                #gradient[p.name] += np.take(g, i, axis=-1)
+                gradient[p.name] += g[..., i]
         return gradient
 
     @abstractmethod
     def _gradient(self, x: np.ndarray):
+        """Provide the gradient with respect to all parameters of the covariance model for the passed lags.
+        The last dimension of the returned array should correspond to the parameters of the model."""
         pass
 
     def __setattr__(self, key: str, value: Union[float, Parameter]):
@@ -223,6 +240,25 @@ class CovarianceModel(ABC):
 
     def __repr__(self):
         return self.name + '(\n' + self.params.__repr__() + '\n)'
+
+    def __getstate__(self):
+        """
+        Necessary for pickling and unpiclking
+        Returns
+        -------
+        State as a dictionary
+        """
+        return self.__dict__
+
+    def __setstate__(self, state):
+        """
+        Necessary for pickling and unpickling.
+        Parameters
+        ----------
+        state
+            Dictionary with the new state
+        """
+        self.__dict__.update(state)
 
 
 class SeparableModelOld(CovarianceModel):
@@ -306,6 +342,17 @@ class ExponentialModel(CovarianceModel):
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
         d_nugget = 1. * (d == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transformed, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d = np.sqrt(sum((lag ** 2 for lag in lags)))
+        d_rho = (sigma**2 / rho) * d * np.exp(- d / rho)
+        d_sigma = 2 * sigma**2 * np.exp(- d / rho)
+        d_nugget = 1 * (d == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+
 
 
 class ExponentialModelUniDirectional(CovarianceModel):
@@ -331,10 +378,11 @@ class ExponentialModelUniDirectional(CovarianceModel):
 
 import scipy
 from scipy.special import kv
-from autograd.scipy.special import gamma, iv
-from autograd.extend import primitive, defvjp, defjvp
-# kv = primitive(scipy.special.kv)
-# defvjp(kv, None, lambda ans, n, x: lambda g: -g * (kv(n - 1, x) + kv(n + 1, x)) / 2.0)
+try:
+    from autograd.scipy.special import gamma, iv
+    from autograd.extend import primitive, defvjp, defjvp
+except ModuleNotFoundError:
+    from scipy.special import gamma
 
 def kv_(nu, z):
     if nu % 1 == 0:
@@ -405,8 +453,7 @@ class SquaredExponentialModel(CovarianceModel):
         self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
-        
-        d2 = sum((lag**2 for lag in lags))
+        d2 = np.sum(lags ** 2, axis=0)
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- 0.5 * d2 / self.rho.value ** 2) + nugget_effect
         return acf
@@ -424,7 +471,6 @@ class SquaredExponentialModel(CovarianceModel):
         f = self.sigma.value**2*self.rho.value**2*(2*np.pi)**(d/2)*np.exp(-.5*(self.rho.value**2*omega2))#/(2*np.pi)**2
         return (np.sum(f, axis=(1,2)).reshape(shape) + self.nugget.value)
 
-
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
         the model's parameters"""
@@ -432,6 +478,16 @@ class SquaredExponentialModel(CovarianceModel):
         d2 = sum((lag ** 2 for lag in lags))
         d_rho =  self.rho.value ** (-3) * d2 * self.sigma.value ** 2 * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
+        d_nugget = 1 * (d2 == 0)
+        return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
+    
+    def _gradient_reparamed(self, lags: np.ndarray):
+        '''Gradient when the parameters are log-transform, i.e. rho,sigma,nugget = exp(param_values)'''
+        rho, sigma, nugget = self.rho.value, self.sigma.value, self.nugget.value
+        
+        d2 = sum((lag ** 2 for lag in lags))
+        d_rho = (sigma / rho) ** 2 * d2 * np.exp( -0.5 * d2 / rho ** 2 )
+        d_sigma = 2 * sigma ** 2 * np.exp( -0.5 * d2 / rho ** 2 )
         d_nugget = 1 * (d2 == 0)
         return np.stack((d_rho, d_sigma, d_nugget), axis=-1)
 
@@ -487,30 +543,199 @@ class ChiSquaredModel(CovarianceModel):
         raise NotImplementedError()
 
 
+class BivariateUniformCorrelation(CovarianceModel):
+    """
+    This class defines the simple case of a bivariate covariance model where a given univariate covariance model is
+    used in parallel to a uniform correlation parameter.
+    """
+    def __init__(self, base_model: CovarianceModel):
+        self.base_model = base_model
+        r = Parameter('r', (-0.99, 0.99))
+        f = Parameter('f', (0.1, 10))
+        parameters = ParametersUnion([Parameters([r, f]), base_model.params])
+        super(BivariateUniformCorrelation, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        """
+        Evaluates the covariance model at the passed lags. Since the model is bivariate,
+        the returned array has two extra dimensions compared to the array lags, both of size
+        two.
+
+        Parameters
+        ----------
+        lags
+            lag array with shape (ndim, m1, m2, ..., mk)
+        Returns
+            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
+        -------
+
+        """
+        acv11 = self.base_model(lags)
+        # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
+        out = np.zeros(acv11.shape + (2, 2))
+        out = BackendManager.convert(out)
+        out[..., 0, 0] = acv11
+        out[..., 1, 1] = acv11 * self.f_0.value ** 2
+        out[..., 0, 1] = acv11 * self.r_0.value * self.f_0.value
+        out[..., 1, 0] = acv11 * self.r_0.value * self.f_0.value
+        return out
+
+    def _gradient(self, x: np.ndarray):
+        """
+
+        Parameters
+        ----------
+        x
+            shape (ndim, m1, ..., mk)
+        Returns
+        -------
+        gradient
+            shape (m1, ..., mk, 2, 2, p + 2)
+            where p is the number of parameters of the base model.
+        """
+        acv11 = self.base_model(x)
+        gradient_base_model = self.base_model._gradient(x)
+        # gradient 11
+        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
+        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
+        # gradient 12
+        temp = np.stack((acv11 * self.f_0.value, acv11 * self.r_0.value), axis=-1)
+        gradient_12 = np.concatenate((temp, gradient_base_model * self.r_0.value * self.f_0.value), axis=-1)
+        # gradient 21
+        gradient_21 = gradient_12
+        # gradient 22
+        temp = np.stack((np.zeros_like(acv11), 2 * self.f_0.value * acv11), axis=-1)
+        gradient_22 = np.concatenate((temp, gradient_base_model * self.f_0.value ** 2), axis=-1)
+        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
+        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
+        return np.stack((row1, row2), axis=x.ndim - 1)
+
+
+class TransformedModel(CovarianceModel):
+    """
+    This class defines a covariance model obtained from a covariance model for some input random fields,
+    to which a transform is applied in the spectral domain. For now this is specific to the biharmonic equation.
+    """
+    def __init__(self, input_model: CovarianceModel, transform_func):
+        self.input_model = input_model
+        self.transform_func = transform_func
+        transform_param = Parameter('logD', (1, 50))
+        eta_param = Parameter('eta', (-1, 1))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param]), input_model.params])
+        super(TransformedModel, self).__init__(parameters)
+
+    def transform_on_grid(self, ks):
+        return self.transform_func(self.logD_0.value, self.eta_0.value, ks)
+
+    def __call__(self):
+        raise NotImplementedError()
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+class NewTransformedModel(CovarianceModel):
+    """
+    Similar to the above class, but uses circulant embedding to alleviate some of the approximations.
+    """
+    def __init__(self, input_model: CovarianceModel, transform):
+        self.input_model = input_model
+        self.transform = transform
+        transform_param = Parameter('logD', (1, 50))
+        eta_param = Parameter('eta', (-1, 1))
+        nu_param = Parameter('nu', (-np.pi / 2, np.pi / 2))
+        z2_param = Parameter('logz2', (3, 5))
+        parameters = ParametersUnion([Parameters([transform_param, eta_param, nu_param, z2_param]), input_model.params])
+        super(NewTransformedModel, self).__init__(parameters)
+
+    def transform_on_grid(self, ks):
+        return self.transform(self.logD_0.value, self.eta_0.value, self.nu_0.value, self.logz2_0.value, ks)
+
+    def call_on_rectangular_grid(self, grid):
+        # periodic covariance of the input model
+        acv = grid.autocov(self.input_model)
+        # to spectral domain
+        f = fftn(acv, axes=(0, 1))
+        # apply the frequency-domain mapping
+        transform = self.transform_on_grid(grid.fourier_frequencies2)
+        if BackendManager.backend_name == 'numpy':
+            transform_transpose = np.transpose(transform, (0, 1, -1, -2))
+        elif BackendManager.backend_name == 'torch':
+            transform_transpose = np.transpose(transform, -1, -2).to(dtype=torch.complex128)
+            transform = transform.to(dtype=torch.complex128)
+        term1 = np.matmul(f, transform_transpose)
+        return ifftn(np.matmul(transform, term1), axes=(0, 1))
+
+    def __call__(self, lags: np.ndarray):
+        raise NotImplementedError('The autocovariance of this model can only be evaluated in specific cases')
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
+
+class NewTransformedModel2(CovarianceModel):
+    """
+    Similar to the above class, but uses circulant embedding to alleviate some of the approximations.
+    """
+    def __init__(self, input_model: CovarianceModel, transform_function, transform_params):
+        self.input_model = input_model
+        self.transform = transform_function
+        super(NewTransformedModel, self).__init__(transform_params)
+
+    def transform_on_grid(self, ks):
+        return self.transform(*self.params.values, ks)
+
+    def call_on_rectangular_grid(self, grid):
+        from numpy.fft import fftn, ifftn
+        # periodic covariance of the input model
+        acv = grid.autocov(self.input_model)
+        # to spectral domain
+        f = fftn(acv, axes=(0, 1))
+        # apply the frequency-domain mapping
+        transform = self.transform_on_grid(grid.fourier_frequencies2)
+        transform_transpose = np.transpose(transform, (0, 1, -1, -2))
+        term1 = np.matmul(f, transform_transpose)
+        return ifftn(np.matmul(transform, term1), axes=(0, 1))
+
+    def __call__(self, lags: np.ndarray):
+        raise NotImplementedError('The autocovariance of this model can only be evaluated in specific cases')
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
 class MaternCovarianceModel(CovarianceModel):
     def __init__(self):
-        sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
+        sigma = Parameter('sigma', (0.01, 1000))
         nu = Parameter('nu', (0.01, 100))
-        parameters = Parameters([sigma, nu, rho])
+        parameters = Parameters([rho, sigma, nu])
         super(MaternCovarianceModel, self).__init__(parameters)
 
     def __call__(self, lags: np.ndarray):
-        lags = np.stack(lags, axis=0)
         d = np.sqrt(np.sum(lags ** 2, axis=0))
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        if nu == 0.5:
+            return sigma ** 2 * np.exp(- d / rho)
         if nu==1.5:
-            K = np.sqrt(3) * d / rho
+            K = np.sqrt(np.array(3)) * d / rho
             return (1.0 + K) * np.exp(-K) * sigma**2
         term1 = 2 ** (1 - nu) / gamma(nu)
-        term2 = (np.sqrt(2 * nu) * d / rho) ** nu
+        term2 = (np.sqrt(np.array(2 * nu)) * d / rho) ** nu
         # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
-        term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
+
+        if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu() / rho)
+            term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d / rho)
         val = sigma ** 2 * term1 * term2 * term3
         val[d == 0] = sigma ** 2
         return val
 
     def f(self, freq_grid: Union[list, np.ndarray], infsum_grid: Union[list, np.ndarray], d: int = 2):
+        # TODO: include infinite sum grid
         freq_grid = np.stack(freq_grid, axis=0)
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         pi = np.pi
@@ -527,6 +752,40 @@ class MaternCovarianceModel(CovarianceModel):
         raise NotImplementedError()
 
 
+class MaternCovarianceModelAnisotropic(CovarianceModel):
+    def __init__(self):
+        sigma = Parameter('sigma', (0.01, 1000))
+        rho1 = Parameter('rho1', (0.01, 1000))
+        rho2 = Parameter('rho2', (0.01, 1000))
+        nu = Parameter('nu', (0.01, 100))
+        parameters = Parameters([sigma, nu, rho1, rho2])
+        super(MaternCovarianceModelAnisotropic, self).__init__(parameters)
+
+    def __call__(self, lags: np.ndarray):
+        sigma, rho1, rho2, nu = self.sigma.value, self.rho1.value, self.rho2.value, self.nu.value
+        lags[0, ...] /= rho1
+        lags[1, ...] /= rho2
+        d = np.sqrt(np.sum(lags ** 2, axis=0))
+        if nu==1.5:
+            K = np.sqrt(np.array(3)) * d
+            return (1.0 + K) * np.exp(-K) * sigma**2
+        term1 = 2 ** (1 - nu) / gamma(nu)
+        term2 = (np.sqrt(np.array(2 * nu)) * d) ** nu
+        # changed back to kv (faster) but I assume you changed it for a reason. Can discuss next time.
+
+        if BackendManager.backend_name == 'torch':
+            term3 = kv(nu, numpy.sqrt(2 * nu) * d.cpu())
+            term3 = term3.to(device=BackendManager.device)
+        else:
+            term3 = kv(nu, np.sqrt(2 * nu) * d)
+        val = sigma ** 2 * term1 * term2 * term3
+        val[d == 0] = sigma ** 2
+        return val
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError() 
+
+            
 class MaternCovarianceModelFrederik(CovarianceModel):
     def __init__(self):
         sigma = Parameter('sigma', (0.01, 1000))
@@ -552,7 +811,6 @@ class MaternCovarianceModelFrederik(CovarianceModel):
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()
-
 
 
 def test_gradient_cov():

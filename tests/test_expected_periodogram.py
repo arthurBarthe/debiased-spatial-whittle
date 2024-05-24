@@ -1,7 +1,9 @@
 import numpy as np
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
-from debiased_spatial_whittle.periodogram import autocov
+from debiased_spatial_whittle.cov_funcs import exp_cov
+from debiased_spatial_whittle.simulation import sim_circ_embedding
+from debiased_spatial_whittle.periodogram import autocov, compute_ep_old
+from debiased_spatial_whittle.likelihood import periodogram
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
@@ -203,6 +205,32 @@ def test_gradient_expected_periodogram():
     g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
+
+from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
+from debiased_spatial_whittle.models import BivariateUniformCorrelation
+def test_gradient_expected_periodogram_bivariate():
+    g = RectangularGrid((32, 32), nvars=2)
+    p = PeriodogramMulti()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = ExponentialModel()
+    model.rho = 3
+    model.sigma = 1
+    model.nugget = 0.1
+    bvm = BivariateUniformCorrelation(model)
+    bvm.r_0 = 0.1
+    bvm.f_0 = 1.2
+    ep_grad = ep_op.gradient(bvm, bvm.params)
+    ep = ep_op(bvm)
+    epsilon = 1e-6
+    for i, p in enumerate(bvm.params):
+        print(p)
+        p.value = p.value + epsilon
+        ep2 = ep_op(bvm)
+        grad_num = (ep2 - ep) / epsilon
+        assert_allclose(ep_grad[..., i], grad_num, rtol=0.001)
+        p.value = p.value - epsilon
+
+
 
 def test_gradient_expected_periodogram_sqExpCov():
     """

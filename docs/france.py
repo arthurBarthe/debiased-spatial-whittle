@@ -1,3 +1,6 @@
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('torch')
+
 import matplotlib.pyplot as plt
 
 import debiased_spatial_whittle.grids as grids
@@ -24,12 +27,13 @@ z = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-estimator = Estimator(debiased_whittle, use_gradients=False)
+estimator = Estimator(debiased_whittle, use_gradients=True, optim_options=dict(maxfun=100, maxiter=5, no_local_search=False), method='dual_annealing')
 
 model_est = MaternCovarianceModel()
 model_est.nu = 1.5
 #model_est.nugget = None
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kargs: print(args))
+
 print(estimate)
 
 plt.imshow(z, origin='lower', cmap='Spectral')

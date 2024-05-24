@@ -9,7 +9,7 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SamplerSeparable
 from debiased_spatial_whittle.utils import video_plot_3d
 
-n = (128, 128, 32)
+n = (64, 64, 512)
 
 grid = RectangularGrid(n)
 grid_space = RectangularGrid(n[:2])
@@ -17,13 +17,13 @@ grid_space = RectangularGrid(n[:2])
 model_space = SquaredExponentialModel()
 model_space.rho = 6
 model_time = SquaredExponentialModel()
-model_time.rho = 3
+model_time.rho = 16
 
 model_std = SquaredExponentialModel()
-model_std.rho = 4
+model_std.rho = 16
 model_std.sigma = 1
 sampler_std = SamplerOnRectangularGrid(model_std, grid_space)
-g = np.exp(sampler_std() - 2)
+g = np.exp(sampler_std() - 1)
 g = np.expand_dims(g, -1)
 
 plt.figure()
@@ -44,7 +44,7 @@ plt.figure()
 plt.imshow(y[..., 0])
 plt.show()
 
-anim = video_plot_3d(y)
+anim = video_plot_3d(y,get_title=lambda i:"", cmap='coolwarm', vmin=-2, vmax=2)
 plt.show()
 
 # estimation of g and z
@@ -52,7 +52,7 @@ g_hat = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
 z_hat = y / g_hat
 
 plt.figure()
-plt.imshow(g_hat / g)
+plt.imshow(g_hat)
 plt.title('g hat')
 plt.show()
 

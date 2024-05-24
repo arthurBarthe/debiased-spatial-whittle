@@ -1,4 +1,7 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('torch')
+np = BackendManager.get_backend()
+
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit, matern15_cov_func

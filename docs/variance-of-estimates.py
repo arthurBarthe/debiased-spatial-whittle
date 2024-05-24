@@ -38,9 +38,9 @@ hmat = db.fisher(model, params)
 print(hmat)
 
 # variance matrix of the score
-#jmat_mcmc = db.jmatrix(model, model.params, mcmc_mode=True)
+jmat_mcmc = db.jmatrix(model, params, mcmc_mode=True)
 jmat = db.jmatrix_sample(model, params, n_sims=1000)
-#print(jmat_mcmc)
+print(jmat_mcmc)
 print(jmat)
 
 # variance of estimates

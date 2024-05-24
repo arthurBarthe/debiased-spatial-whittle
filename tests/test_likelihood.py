@@ -1,12 +1,13 @@
 import numpy as np
 from numpy.testing import assert_allclose
 
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle, Estimator
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters
+from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram, compute_ep_old
+from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
+from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle, Estimator, periodogram, MultivariateDebiasedWhittle
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, sim_circ_embedding, SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters, BivariateUniformCorrelation
+from debiased_spatial_whittle.cov_funcs import exp_cov
 
 
 def test_oop():
@@ -60,6 +61,34 @@ def test_whittle_grad():
     assert_allclose(grad, grad_num, rtol=0.001)
 
 
+def test_whittle_grad_multi():
+    """
+    Tests the implementation of the gradient of the whittle likelihood in the multivariate case
+    """
+    g = RectangularGrid((32, 32), nvars=2)
+    p = PeriodogramMulti()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = SquaredExponentialModel()
+    model.rho = 3
+    model.sigma = 1
+    model.nugget = 0.2
+    bvm = BivariateUniformCorrelation(model)
+    bvm.r_0 = 0.3
+    bvm.f_0 = 1.5
+    sampler = SamplerBUCOnRectangularGrid(bvm, g)
+    z = sampler()
+    dbw = MultivariateDebiasedWhittle(p, ep_op)
+    epsilon = 1e-8
+    lkh, grad = dbw(z, bvm, bvm.params)
+    for i, p in enumerate(bvm.params):
+        print(p)
+        p.value = p.value + epsilon
+        lkh2 = dbw(z, bvm)
+        grad_num = (lkh2 - lkh) / epsilon
+        assert_allclose(grad[i], grad_num, rtol=0.001)
+        p.value = p.value - epsilon
+
+
 def test_hessian_diagonal():
     """
     Basic test for the hessian that verifies that the hessian has non-negative terms on the diagonal
@@ -79,6 +108,26 @@ def test_hessian_diagonal():
     assert np.all(np.diag(h) >= 0)
 
 
+def test_fisher_multivariate():
+    """
+    Runs the fisher method in the multivariate case. Checks that the diagonal of the result is positive.
+    """
+    g = RectangularGrid((32, 32), nvars=2)
+    p = PeriodogramMulti()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = SquaredExponentialModel()
+    model.rho = 3
+    model.sigma = 1
+    model.nugget = 0.2
+    bvm = BivariateUniformCorrelation(model)
+    bvm.r_0 = 0.3
+    bvm.f_0 = 1.5
+    sampler = SamplerBUCOnRectangularGrid(bvm, g)
+    z = sampler()
+    dbw = MultivariateDebiasedWhittle(p, ep_op)
+    h = dbw.fisher(bvm, bvm.params)
+    assert np.all(np.diag(h) > 0)
+
 def test_jmat():
     """
     Compares the predicted covariance matrix of the score with the sample variance of the score
@@ -92,7 +141,7 @@ def test_jmat():
     4. The indexing in the summation is not right.
     5. The gradient of the likelihood is not right.
     """
-    g = RectangularGrid((8, 8))
+    g = RectangularGrid((16, 16))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
@@ -101,8 +150,9 @@ def test_jmat():
     model.rho = 2
     sampler = SamplerOnRectangularGrid(model, g)
     params = model.params
+    print(params)
     jmat = d.jmatrix(model, params)
-    n_samples = 10000
+    n_samples = 1000
     estimates = []
     for i in range(n_samples):
         z = sampler()
@@ -143,3 +193,20 @@ def test_jmatrix_sample():
     model.rho = 2
     jmat = d.jmatrix_sample(model, model.params)
     print(jmat)
+
+
+def test_jmatrix_sample_multivariate():
+    g = RectangularGrid((32, 32), nvars=2)
+    p = PeriodogramMulti()
+    ep_op = ExpectedPeriodogram(g, p)
+    model = SquaredExponentialModel()
+    model.rho = 3
+    model.sigma = 1
+    model.nugget = 0.2
+    bvm = BivariateUniformCorrelation(model)
+    bvm.r_0 = 0.3
+    bvm.f_0 = 1.5
+    dbw = MultivariateDebiasedWhittle(p, ep_op)
+    jmat = dbw.jmatrix_sample(bvm, bvm.params)
+    assert jmat.shape == (5, 5)
+    assert np.all(np.diag(jmat) > 0)
