@@ -203,6 +203,17 @@ class CovarianceModel(ABC):
 
     @abstractmethod
     def __call__(self, x: np.ndarray):
+        """
+        Parameters
+        ----------
+        x: ndarray
+            Array of spatial lags. The first dimension is used for 
+
+        Returns
+        -------
+        cov: ndarray
+            Covariance model evaluated at the passed lags
+        """
         pass
 
     def gradient(self, x: np.ndarray, params: Parameters):
@@ -318,6 +329,26 @@ class SeparableModel(CovarianceModel):
 
 
 class ExponentialModel(CovarianceModel):
+    """
+    Generic class for the definition of an exponential covariance model, in any number of dimensions.
+
+    Attributes
+    ----------
+    rho: Parameter
+        Lengthscale parameter
+
+    sigma: Parameter
+        Amplitude parameter
+
+    nugget: Parameter
+        Nugget parameter
+
+    Examples
+    --------
+    >model = ExponentialModel()
+    >model.rho = 12.
+    >model.sigma = 1.
+    """
     def __init__(self):
         sigma = Parameter('sigma', (1e-30, 1000))
         rho = Parameter('rho', (1e-30, 1000))
@@ -442,6 +473,26 @@ class MaternModel(CovarianceModel):
 
 
 class SquaredExponentialModel(CovarianceModel):
+    """
+    Generic class for the definition of a Squared Exponential Covariance model, in any number of dimensions.
+
+    Attributes
+    ----------
+    rho: Parameter
+        Lengthscale parameter
+
+    sigma: Parameter
+        Amplitude parameter
+
+    nugget: Parameter
+        Nugget parameter
+
+    Examples
+    --------
+    >model = SquaredExponentialModel()
+    >model.rho = 12.
+    >model.sigma = 1.
+    """
     def __init__(self):
         rho = Parameter('rho', (0.01, 1000))
         sigma = Parameter('sigma', (0.01, 1000))
@@ -547,6 +598,17 @@ class BivariateUniformCorrelation(CovarianceModel):
     """
     This class defines the simple case of a bivariate covariance model where a given univariate covariance model is
     used in parallel to a uniform correlation parameter.
+
+    Attributes
+    ----------
+    base_model: CovarianceModel
+        Base univariate covariance model
+
+    r: Parameter
+        Correlation parameter, float between -1 and 1
+
+    f: Parameter
+        Amplitude ratio, float, positive
     """
     def __init__(self, base_model: CovarianceModel):
         self.base_model = base_model
@@ -563,11 +625,12 @@ class BivariateUniformCorrelation(CovarianceModel):
 
         Parameters
         ----------
-        lags
+        lags: ndarray
             lag array with shape (ndim, m1, m2, ..., mk)
+
         Returns
-            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
         -------
+            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
 
         """
         acv11 = self.base_model(lags)
@@ -706,6 +769,28 @@ class NewTransformedModel2(CovarianceModel):
 
 
 class MaternCovarianceModel(CovarianceModel):
+    """
+    Generic class for the definition of a Matern Covariance Model, in any number of dimensions.
+
+    Attributes
+    ----------
+    rho: Parameter
+        Lengthscale parameter
+
+    sigma: Parameter
+        Amplitude parameter
+
+    nu: Parameter
+        Slope parameter. Faster for values 0.5 and 1.5.
+
+    Examples
+    --------
+    > model = MaternCovarianceModel()
+    > model.rho = 12.
+    > model.sigma = 1.
+    > model.nu = 1.5
+    """
+
     def __init__(self):
         rho = Parameter('rho', (0.01, 1000))
         sigma = Parameter('sigma', (0.01, 1000))

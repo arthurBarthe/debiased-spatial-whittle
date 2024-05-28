@@ -55,6 +55,18 @@ class SamplerOnRectangularGrid:
     Class that allows to define samplers for Rectangular grids, for which
     fast exact sampling can be achieved via circulant embeddings and the use of the
     Fast Fourier Transform.
+
+    Attributes
+    ----------
+    model: CovarianceModel
+        Covariance model used for sampling.
+
+    grid: RectangularGrid
+        Grid on which we wish to sample
+
+    nsims: int
+        Simulations can be carried out in 'blocks'. This parameters allows to choose how many
+        i.i.d. samples are generated in each block computation.
     """
 
     def __init__(self, model: CovarianceModel, grid: RectangularGrid):
@@ -75,6 +87,7 @@ class SamplerOnRectangularGrid:
 
     @property
     def n_sims(self):
+        """number of simulations in each block computation."""
         return self._n_sims
 
     @n_sims.setter
@@ -83,6 +96,7 @@ class SamplerOnRectangularGrid:
 
     @property
     def f(self):
+        """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
@@ -97,12 +111,14 @@ class SamplerOnRectangularGrid:
     # TODO make this work for 1-d and 3-d
     def __call__(self):
         """
+        @public
         Samples nsims independent realizations of a Gaussian Process specified by
         the provided covariance model, on the provided rectangular grid.
 
         Returns
         -------
-
+        sample: ndarray
+            Sample values corresponding to the grid and covariance model. Shape is equal to the n attribute of grid.
         """
         if self._i_sim % self.n_sims == 0:
             f = self.f

@@ -413,6 +413,26 @@ class DebiasedWhittle:
 
 
 class Estimator:
+    """
+    Class to define an estimator that uses a likelihood.
+
+    Attributes
+    ----------
+    likelihood: DebiasedWhittle
+        Debiased Whittle likelihood used for fitting.
+
+    use_gradients: bool
+        Whether to use gradients in the optimization procedure
+
+    max_iter: int
+        Maximum number of iterations of the optimization procedure
+
+    optim_options: dict
+        Additional options passed to the optimizer.
+
+    method: string
+        Optimization procedure
+    """
     def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=dict(),
                  method='L-BFGS-B'):
         self.likelihood = likelihood
@@ -423,13 +443,44 @@ class Estimator:
         self.f_opt = None
         self.f_info = None
 
-    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
+    def __call__(self, model: CovarianceModel, sample: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
+        """
+        Fits the passed covariance model to the passed data.
+
+        Parameters
+        ----------
+        model: CovarianceModel
+            Covariance model to be fitted to the data. Only free parameters are estimated, that is parameters
+            of the covariance model set to None.
+
+        sample: ndarray | SampleOnRectangularGrid
+            Sampled random field
+
+        opt_callback: function handle
+            Callback function called by the optimizer
+
+        x0: ndarray
+            Inital parameter guess
+
+        Returns
+        -------
+        model: CovarianceModel
+            The fitted covariance model
+
+        Notes
+        -----
+        This directly updates the parameters of the passed covariance model.
+
+        Examples
+        --------
+        To be added
+        """
         free_params = model.free_params
 
         # function to be optimized.
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
-        func = self._get_opt_func(model, free_params, z, self.use_gradients)
+        func = self._get_opt_func(model, free_params, sample, self.use_gradients)
         if self.use_gradients:
             opt_func = lambda x: func(x)[0]    # this is inefficient, can change jac= in scipy.optimize
             jac = lambda x: func(x)[1]
