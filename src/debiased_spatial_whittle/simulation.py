@@ -5,7 +5,7 @@ from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
 import warnings
-from .periodogram import autocov
+from debiased_spatial_whittle.periodogram import autocov
 from typing import List
 
 fftn, ifftn = BackendManager.get_fft_methods()
@@ -52,9 +52,7 @@ def prod_list(l: Tuple[int]):
 
 class SamplerOnRectangularGrid:
     """
-    Class that allows to define samplers for Rectangular grids, for which
-    fast exact sampling can be achieved via circulant embeddings and the use of the
-    Fast Fourier Transform.
+    Class that allows to define efficient samplers on rectangular grids for fixed models.
 
     Attributes
     ----------
@@ -64,9 +62,26 @@ class SamplerOnRectangularGrid:
     grid: RectangularGrid
         Grid on which we wish to sample
 
-    nsims: int
+    n_sims: int
         Simulations can be carried out in 'blocks'. This parameters allows to choose how many
         i.i.d. samples are generated in each block computation.
+
+    Notes
+    -----
+    This sampler accounts for the grid's mask.
+
+    Examples
+    --------
+    >>> from debiased_spatial_whittle.models import ExponentialModel
+    >>> from debiased_spatial_whittle.grids import RectangularGrid
+    >>> model = ExponentialModel()
+    >>> model.rho = 12.
+    >>> model.sigma = 1.
+    >>> grid = RectangularGrid((256, 128))
+    >>> sampler = SamplerOnRectangularGrid(model, grid)
+    >>> sample = sampler()
+    >>> sample.shape
+    (256, 128)
     """
 
     def __init__(self, model: CovarianceModel, grid: RectangularGrid):
@@ -79,10 +94,9 @@ class SamplerOnRectangularGrid:
         self._z = None
         try:
             self.f
-
         except:
             print('up-sampling')
-            n = tuple(2*n for n in self.grid.n)
+            n = tuple(2 * n for n in self.grid.n)
             self.sampling_grid = RectangularGrid(n)    # may cause bugs?
 
     @property
@@ -104,14 +118,12 @@ class SamplerOnRectangularGrid:
             min_ = np.min(f)
             if min_ <= -1e-5:
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
-                
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
     # TODO make this work for 1-d and 3-d
     def __call__(self):
         """
-        @public
         Samples nsims independent realizations of a Gaussian Process specified by
         the provided covariance model, on the provided rectangular grid.
 
@@ -119,6 +131,12 @@ class SamplerOnRectangularGrid:
         -------
         sample: ndarray
             Sample values corresponding to the grid and covariance model. Shape is equal to the n attribute of grid.
+
+        Raises
+        ------
+        ValueError
+            If a non-negative definite circulant embedding could not be achieved. In that case a solution
+            is to increase the grid size.
         """
         if self._i_sim % self.n_sims == 0:
             f = self.f

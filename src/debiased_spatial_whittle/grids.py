@@ -120,6 +120,7 @@ fftshift = np.fft.fftshift
 ifftshift = np.fft.ifftshift
 arange = BackendManager.get_arange()
 
+
 class RectangularGrid:
     """
     Generic class for hypercubic grids.
@@ -127,7 +128,7 @@ class RectangularGrid:
     Attributes
     ----------
     n: tuple[int]
-        spatial dimensions of the grid
+        spatial dimensions of the grid in number of points
 
     delta: tuple[float]
         step sizes of the grid along all dimensions
@@ -140,17 +141,29 @@ class RectangularGrid:
         observed at that location.
         When nvars is 1 (univariate random field), mask should be an array with len(n) dimensions.
         When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
-
-
-    Examples
-    --------
-    > grid_1d = RectangularGrid((64, ), (2., ))
-
-    > grid_2d = RectangularGrid((512, 128), (1.5, 2.8))
-
-    > grid = RectangularGrid((512, 512), nvars=2)
     """
-    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
+    def __init__(self, shape: tuple[int], delta: tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
+        """
+        Parameters
+        ----------
+        shape
+            shape of the grid
+
+        delta
+            grid spacing in all dimensions. If None, set to 1 spatial unit in all dimensions.
+
+        mask
+            mask of zero (missing) and ones (observed). If None, set to 1 everywhere.
+
+        nvars
+            number of variates of the random field sampled on this grid
+
+        Examples
+        --------
+        >>> grid_1d = RectangularGrid((64, ), (2., ))
+        >>> grid_2d = RectangularGrid((512, 128), (1.5, 2.8))
+        >>> grid = RectangularGrid((512, 512), nvars=2)
+        """
         self.n = shape
         self.delta = delta
         self.nvars = nvars

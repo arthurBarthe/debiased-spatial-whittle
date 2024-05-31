@@ -3,7 +3,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
 
@@ -161,26 +161,33 @@ class CovarianceModel(ABC):
         return self.params.bounds
 
     @property
-    def n_params(self):
+    def n_params(self) -> int:
         """Number of parameters of the model"""
         return len(self.params)
 
     @property
-    def param_names(self):
+    def param_names(self) -> list[str]:
         """Names of the parameters of the model"""
         return self.params.names
 
     @property
-    def param_values(self):
+    def param_values(self) -> list:
+        """Values of the model's parameters"""
         return self.params.values
 
     @property
-    def free_params(self):
+    def free_params(self) -> Parameters:
+        """Free parameters of the model"""
         return self.params.free_params()
 
     @property
     def free_param_bounds(self):
         return self.free_params.bounds
+
+    @property
+    def has_free_params(self) -> bool:
+        """Whether the model has any free parameter"""
+        return len(self.free_params) > 0
 
     def update_free_params(self, updates):
         self.params.update(updates)
@@ -207,12 +214,25 @@ class CovarianceModel(ABC):
         Parameters
         ----------
         x: ndarray
-            Array of spatial lags. The first dimension is used for 
+            Array of spatial lags. The first dimension is used to index the dimensions of the domain.
 
         Returns
         -------
         cov: ndarray
             Covariance model evaluated at the passed lags
+
+        Notes
+        -----
+        The first dimension of the passed array should correspond to the dimension of the space over which
+        the random field is defined. Other dimensions can have any size.
+
+        Examples
+        --------
+        >>> model = ExponentialModel()
+        >>> model.rho = 12
+        >>> model.sigma = 1
+        >>> model(np.array([[0., 0., 0.], [0., 1., 2.]]))
+        array([1.        , 0.92004441, 0.84648172])
         """
         pass
 
@@ -345,9 +365,9 @@ class ExponentialModel(CovarianceModel):
 
     Examples
     --------
-    >model = ExponentialModel()
-    >model.rho = 12.
-    >model.sigma = 1.
+    >>> model = ExponentialModel()
+    >>> model.rho = 12.
+    >>> model.sigma = 1.
     """
     def __init__(self):
         sigma = Parameter('sigma', (1e-30, 1000))
@@ -489,9 +509,9 @@ class SquaredExponentialModel(CovarianceModel):
 
     Examples
     --------
-    >model = SquaredExponentialModel()
-    >model.rho = 12.
-    >model.sigma = 1.
+    >>> model = SquaredExponentialModel()
+    >>> model.rho = 12.
+    >>> model.sigma = 1.
     """
     def __init__(self):
         rho = Parameter('rho', (0.01, 1000))
@@ -604,11 +624,20 @@ class BivariateUniformCorrelation(CovarianceModel):
     base_model: CovarianceModel
         Base univariate covariance model
 
-    r: Parameter
+    r_0: Parameter
         Correlation parameter, float between -1 and 1
 
-    f: Parameter
+    f_0: Parameter
         Amplitude ratio, float, positive
+
+    Examples
+    --------
+    >>> base_model = ExponentialModel()
+    >>> base_model.rho = 12.
+    >>> base_model.sigma = 1.
+    >>> bivariate_model = BivariateUniformCorrelation(base_model)
+    >>> bivariate_model.r_0 = 0.75
+    >>> bivariate_model.f_0 = 2.3
     """
     def __init__(self, base_model: CovarianceModel):
         self.base_model = base_model
@@ -785,12 +814,11 @@ class MaternCovarianceModel(CovarianceModel):
 
     Examples
     --------
-    > model = MaternCovarianceModel()
-    > model.rho = 12.
-    > model.sigma = 1.
-    > model.nu = 1.5
+    >>> model = MaternCovarianceModel()
+    >>> model.rho = 12.
+    >>> model.sigma = 1.
+    >>> model.nu = 1.5
     """
-
     def __init__(self):
         rho = Parameter('rho', (0.01, 1000))
         sigma = Parameter('sigma', (0.01, 1000))
