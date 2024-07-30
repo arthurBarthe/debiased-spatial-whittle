@@ -11,11 +11,11 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 shape = (620 * 1, 620 * 1)
 
 model = SquaredExponentialModel()
-model.rho = 8
+model.rho = 16
 model.sigma = 1
-model.nugget = 0.025
+model.nugget = 0.0
 
-p_obs = 0.05
+p_obs = 0.9
 mask_bernoulli = np.random.rand(*shape) <= p_obs
 
 mask_france = grids.ImgGrid(shape).get_new() * mask_bernoulli

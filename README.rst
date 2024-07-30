@@ -55,6 +55,15 @@ run
 
 in a terminal from where you cloned the repository.
 
+If you get an error message regarding the version of python, install
+a compatible version of python on your machine and point to it via
+
+.. code-block:: bash
+
+    poetry env use <path_to_python>
+
+before running the poetry install command.
+
 
 
 Documentation
