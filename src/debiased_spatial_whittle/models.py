@@ -203,7 +203,29 @@ class CovarianceModel(ABC):
 
     @abstractmethod
     def __call__(self, x: np.ndarray):
-        pass
+        raise NotImplementedError()
+
+    def cov_mat_x1_x2(self, x1: np.ndarray, x2: np.ndarray = None) -> np.ndarray:
+        """
+        Compute the covariance matrix between between points in x1 and points in x2.
+
+        Parameters
+        ----------
+        x1
+            shape (N1, d), first set of locations
+        x2
+            shape (N2, d), second set of locations
+
+        Returns
+        -------
+        covmat
+            shape (N1, N2), covariance matrix
+        """
+        x1 = np.expand_dims(x1, axis=1)
+        x2 = np.expand_dims(x2, axis=0)
+        lags = x1 - x2
+        lags = np.transpose(lags, (2, 0, 1))
+        return self(lags)
 
     def gradient(self, x: np.ndarray, params: Parameters):
         """Provides the gradient of the covariance functions at the passed lags with respect to
