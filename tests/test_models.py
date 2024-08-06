@@ -137,3 +137,12 @@ def test_cov_mat_x1_x2():
     mat = model.cov_mat_x1_x2(x1, x2)
     assert mat.ndim == 2
     assert mat.shape == (25, 10)
+
+def test_cov_mat_x1_x2_2():
+    model = SquaredExponentialModel()
+    model.rho = 10
+    model.sigma = 1
+    x1 = np.random.rand(25, 3) * 100
+    mat = model.cov_mat_x1_x2(x1)
+    assert mat.ndim == 2
+    assert mat.shape == (25, 25)

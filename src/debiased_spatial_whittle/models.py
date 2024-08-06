@@ -221,6 +221,8 @@ class CovarianceModel(ABC):
         covmat
             shape (N1, N2), covariance matrix
         """
+        if x2 is None:
+            x2 = x1
         x1 = np.expand_dims(x1, axis=1)
         x2 = np.expand_dims(x2, axis=0)
         lags = x1 - x2
