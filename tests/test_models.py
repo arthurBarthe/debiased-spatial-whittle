@@ -84,6 +84,7 @@ def test_gradient_bivariate():
         assert_allclose(gradient[p.name], gradient_num, rtol=0.01)
         p.value = p.value - epsilon
 
+
 """
 def test_gradient_cov_separable():
     This test verifies that the analytical gradient of the covariance is close to a
@@ -108,6 +109,7 @@ def test_gradient_cov_separable():
     assert_allclose(g, g2, rtol=1e-2)
 """
 
+
 def test_gradient_cov_merged_params():
     """
     This test verifies that the analytical gradient of the covariance is close to a
@@ -126,4 +128,21 @@ def test_gradient_cov_merged_params():
     assert_allclose(g, g2, rtol=1e-2)
 
 
+def test_cov_mat_x1_x2():
+    model = SquaredExponentialModel()
+    model.rho = 10
+    model.sigma = 1
+    x1 = np.random.rand(25, 3) * 100
+    x2 = np.random.rand(10, 3) * 100
+    mat = model.cov_mat_x1_x2(x1, x2)
+    assert mat.ndim == 2
+    assert mat.shape == (25, 10)
 
+def test_cov_mat_x1_x2_2():
+    model = SquaredExponentialModel()
+    model.rho = 10
+    model.sigma = 1
+    x1 = np.random.rand(25, 3) * 100
+    mat = model.cov_mat_x1_x2(x1)
+    assert mat.ndim == 2
+    assert mat.shape == (25, 25)
