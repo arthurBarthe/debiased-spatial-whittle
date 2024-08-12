@@ -644,8 +644,8 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         model1, model2 = model.models
         n1, n2 = self.grid.n
         tau1, tau2 = np.arange(n1), np.arange(n2)
-        cov_seq1 = model1(tau1) * (1 - tau1 / n1)
-        cov_seq2 = model2(tau2) * (1 - tau2 / n2)
+        cov_seq1 = model1([tau1, ]) * (1 - tau1 / n1)
+        cov_seq2 = model2([tau2, ]) * (1 - tau2 / n2)
         ep1 = 2 * np.real(fft(cov_seq1)).reshape((-1, 1)) - cov_seq1[0]
         ep2 = 2 * np.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]
         return ep1 * ep2
