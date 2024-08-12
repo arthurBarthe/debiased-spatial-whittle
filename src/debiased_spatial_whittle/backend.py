@@ -115,6 +115,8 @@ class BackendManager:
     def get_slogdet(cls):
         if cls.backend_name == 'numpy' or cls.backend_name == 'autograd':
             return numpy.linalg.slogdet
+        elif cls.backend_name == 'cupy':
+            return cupy.linalg.slogdet
         elif cls.backend_name == 'torch':
             return torch.linalg.slogdet
         else:
@@ -124,6 +126,8 @@ class BackendManager:
     def get_inv(cls):
         if cls.backend_name == 'numpy' or cls.backend_name == 'autograd':
             return numpy.linalg.inv
+        elif cls.backend_name == 'cupy':
+            return cupy.linalg.inv
         elif cls.backend_name == 'torch':
             return torch.linalg.inv
         else:
