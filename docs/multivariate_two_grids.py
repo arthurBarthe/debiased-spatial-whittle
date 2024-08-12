@@ -1,5 +1,7 @@
-# Here we demonstrate a simple case of two random fields uniformely correlated and estimation via
-# debiased whittle likelihood
+# In this example, the two random fields sampling locations do not overlap. Yet we are able to estimate
+# the correlation parameter. Note that we would not be able to do so if the lengthscale parameter were close to zero.
+
+# ##Imports
 
 import sys
 import numpy as np
@@ -15,7 +17,7 @@ from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Est
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
-corr = 0.5
+# ##Grid specification
 
 g = RectangularGrid((256, 256), nvars=2)
 g.mask = np.random.rand(*g.mask.shape) > 0.2
@@ -23,14 +25,18 @@ x, y = g.grid_points
 g.mask[..., 0] = np.mod(x, 40) <= 20
 g.mask[..., 1] = np.mod(x, 40) > 20
 
+# ##Model definition
+
 m = SquaredExponentialModel()
 m.rho = 12
 m.sigma = 1
 m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)
-bvm.r_0 = corr
+bvm.r_0 = 0.5
 bvm.f_0 = 1.9
 print(bvm)
+
+# ##Sample generation
 
 s = SamplerBUCOnRectangularGrid(bvm, g)
 
@@ -44,12 +50,13 @@ ax = fig.add_subplot(1, 2, 2)
 ax.imshow(data[..., 1], cmap='Spectral')
 plt.show()
 
+# ##Inference
+
 p = Periodogram()
 p.taper = lambda x: x
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
-
 db = MultivariateDebiasedWhittle(p, ep)
 
 rs = np.linspace(-0.95, 0.95, 100)
@@ -62,11 +69,6 @@ for i, r in enumerate(rs):
 plt.figure()
 plt.plot(rs, lkhs, '-')
 plt.show()
-
-print(np.cov(data[..., 0].flatten(), data[..., 1].flatten()))
-
-if input('Carry out optimization? (y/n) ... ') != 'y':
-    sys.exit()
 
 e = Estimator(db)
 bvm.r_0 = None

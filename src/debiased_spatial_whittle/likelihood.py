@@ -1,17 +1,17 @@
 import warnings
 
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 import numpy
 
-from .samples import SampleOnRectangularGrid
-from .simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.samples import SampleOnRectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
-from .periodogram import compute_ep_old
-from .confidence import CovarianceFFT, McmcDiags
+from debiased_spatial_whittle.periodogram import compute_ep_old
+from debiased_spatial_whittle.confidence import CovarianceFFT, McmcDiags
 
 
 fftn = np.fft.fftn
@@ -106,7 +106,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 #########NEW OOP version
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
-from .models import CovarianceModel, Parameters
+from debiased_spatial_whittle.models import CovarianceModel, Parameters
 from typing import Callable, Union, Optional
 
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
@@ -128,7 +128,15 @@ class MultivariateDebiasedWhittle:
     """
     Implements the Debiased Whittle Likelihood for multivariate data. This requires
     the use of a multivariate periodogram.
-    Only implemented for bi-variate right now. Gradient not used currently.
+    Currently, only implemented for bi-variate.
+
+    Attributes
+    ----------
+    periodogram: MultPeriodogram
+        Multivariate periodogram applied to the multivariate random field
+
+    expected_periodogram: ExpectedPeriodogram
+        Object used to compute the expectation of the periodogram
     """
     def __init__(self, periodogram: MultPeriodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
@@ -207,7 +215,6 @@ class MultivariateDebiasedWhittle:
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
-            print(i_sample)
             z = sampler()
             _, grad = self(z, model, params_for_gradient)
             gradients.append(grad)
@@ -217,6 +224,17 @@ class MultivariateDebiasedWhittle:
 
 
 class DebiasedWhittle:
+    """
+    Implements the Debiased Whittle likelihood for univariate data.
+
+    Attributes
+    ----------
+    periodogram: Periodogram
+        Multivariate periodogram applied to the multivariate random field
+
+    expected_periodogram: ExpectedPeriodogram
+        Object used to compute the expectation of the periodogram
+    """
     def __init__(self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
@@ -243,27 +261,56 @@ class DebiasedWhittle:
             assert value.shape == self.expected_periodogram.grid.n, "shape mismatch between mask and grid"
         self._frequency_mask = value
 
-    def whittle(self, p: np.ndarray, ep: np.ndarray):
+    def whittle(self, periodogram: np.ndarray, expected_periodogram: np.ndarray):
         """
-        Compute the Whittle distance between a periodogram p and a spectral density function ep
+        Compute the Whittle distance between periodogram values and expectation.
 
         Parameters
         ----------
-        p
-            periodogram of the data
-        ep
-            spectral density
+        periodogram
+            periodogram of the data on Fourier grid
+
+        expected_periodogram
+            expected periodogram or spectral density values on same Fourier grid
+
         Returns
         -------
+        whittle_value: float
+            whittle distance between periodogram and expected periodogram
 
+        Notes
+        -----
+        In standard use cases, this method should not be called directly. Instead, one should use the __call__
+        method.
         """
-        n_points = self.expected_periodogram.grid.n_points
-        return 1 / n_points * np.sum((np.log(ep) + p / ep) * self.frequency_mask)
+        return np.mean((np.log(expected_periodogram) + periodogram / expected_periodogram) * self.frequency_mask)
 
-    def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
-        # TODO add a class sample which contains the data and the grid?
-        """Computes the likelihood for this data"""
-        p = self.periodogram(z)
+
+    def __call__(self, sample: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
+        """
+        Computes the Debiased Whittle likelihood for these data
+
+        Parameters
+        ----------
+        sample: ndarray | SampleOnRectangularGrid
+            sample data
+
+        model: CovarianceModel
+            covariance model used to compute the likelihood of the data
+
+        params_for_gradient: Parameters, optional
+            parameters with respect to which we require the derivative of the likelihood. Default, None
+
+        Returns
+        -------
+        likelihood: float
+            likelihood value
+
+        gradient: ndarray
+            gradient with respect to the parameters provided in params_for_gradient. If the latter is None,
+            this second output is not returned.
+        """
+        p = self.periodogram(sample)
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
         if not params_for_gradient:
@@ -288,6 +335,7 @@ class DebiasedWhittle:
 
         Returns
         -------
+        expected: float
             Expectation of the Debiased Whittle likelihood under true_model, evaluated at
             eval_model
         """
@@ -296,7 +344,22 @@ class DebiasedWhittle:
         return np.sum(np.log(ep_eval) + ep_true / ep_eval)
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
-        """Provides the expectation of the hessian matrix"""
+        """
+        Provides the Fisher Information Matrix
+
+        Parameters
+        ----------
+        model: CovarianceModel
+            True covariance model
+
+        params_for_gradient
+            Parameters with respect to which the Fisher is obtained
+
+        Returns
+        -------
+        fisher: ndarray
+            Fisher covariance matrix
+        """
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         h = zeros((len(params_for_gradient), len(params_for_gradient)))
@@ -344,7 +407,7 @@ class DebiasedWhittle:
                     mcmc = McmcDiags(model, self.expected_periodogram, d_epi / ep, d_epj / ep)
                     mcmc.run(500)
                     s1 = mcmc.estimate()
-                #s2 = covariance_fft.exact_summation2(model, self.expected_periodogram, d_epi/ ep**2, d_epj / ep**2)
+                #s2 = covariance_fft.exact_summation2(model, self.expected_periodogram, d_epi/ expected_periodogram**2, d_epj / expected_periodogram**2)
                 s2 = s1
                 print(f'{s1=}, {s2=}')
                 jmat[i, j] = 1 / (n1 * n2) ** 2 * (s1 + s2)
@@ -354,7 +417,9 @@ class DebiasedWhittle:
                        block_size: int = 100) -> np.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
-        simulated realisations.
+        simulated realisations. Specifically, this simulates n_sims samples from model, computes
+        the gradient for each sample using the __call__ method, and computes the sample covariance of those
+        gradients.
 
         Parameters
         ----------
@@ -413,8 +478,47 @@ class DebiasedWhittle:
 
 
 class Estimator:
-    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter=100, optim_options=dict(),
-                 method='L-BFGS-B'):
+    """
+    Class to define an estimator that uses a likelihood.
+
+    Attributes
+    ----------
+    likelihood: DebiasedWhittle
+        Debiased Whittle likelihood used for fitting.
+
+    use_gradients: bool
+        Whether to use gradients in the optimization procedure
+
+    max_iter: int
+        Maximum number of iterations of the optimization procedure
+
+    optim_options: dict
+        Additional options passed to the optimizer.
+
+    method: string
+        Optimization procedure
+    """
+    def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter: int=100,
+                 optim_options=dict(), method: str='L-BFGS-B'):
+        """
+
+        Parameters
+        ----------
+        likelihood
+            Debiased Whittle likelihood used for fitting.
+
+        use_gradients
+            Whether to use gradients in the optimization procedure
+
+        max_iter
+            Maximum number of iterations of the optimization procedure
+
+        optim_options
+            Additional options passed to the optimizer.
+
+        method
+            Optimization procedure
+        """
         self.likelihood = likelihood
         self.max_iter = max_iter
         self.use_gradients = use_gradients
@@ -423,15 +527,43 @@ class Estimator:
         self.f_opt = None
         self.f_info = None
 
-    def __call__(self, model: CovarianceModel, z: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
+    def __call__(self, model: CovarianceModel, sample: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
+        """
+        Fits the passed covariance model to the passed data.
+
+        Parameters
+        ----------
+        model: CovarianceModel
+            Covariance model to be fitted to the data. Only free parameters are estimated, that is parameters
+            of the covariance model set to None.
+
+        sample: ndarray | SampleOnRectangularGrid
+            Sampled random field
+
+        opt_callback: function handle
+            Callback function called by the optimizer
+
+        x0: ndarray
+            Inital parameter guess
+
+        Returns
+        -------
+        model: CovarianceModel
+            The fitted covariance model
+
+        Notes
+        -----
+        This directly updates the parameters of the passed covariance model.
+        """
         free_params = model.free_params
 
         # function to be optimized.
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
-        func = self._get_opt_func(model, free_params, z, self.use_gradients)
+        func = self._get_opt_func(model, free_params, sample, self.use_gradients)
         if self.use_gradients:
-            opt_func = lambda x: func(x)[0]    # this is inefficient, can change jac= in scipy.optimize
+            # TODO: inefficient, we call func twice
+            opt_func = lambda x: func(x)[0]
             jac = lambda x: func(x)[1]
         else:
             opt_func = func
@@ -472,8 +604,22 @@ class Estimator:
         return func
 
     def covmat(self, model: CovarianceModel, params: Parameters = None):
-        """Computes an approximation to the covariance matrix of the estimated vector"""
+        """
+        Compute an approximate covariance matrix of the parameter estimates under the specified covariance model.
+
+        Parameters
+        ----------
+        model
+            True covariance model
+
+        params
+            estimated parameters
+
+        Returns
+        -------
+        covmat: ndarray
+            Covariance matrix.
+        """
         jmat = self.likelihood.jmatrix(model, params)
         hmat = self.likelihood.fisher(model, params)
-        print(f'{jmat=}, {hmat=}')
         return np.dot(inv(hmat), np.dot(jmat, inv(hmat)))
