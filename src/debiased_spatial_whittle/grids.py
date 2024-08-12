@@ -225,9 +225,9 @@ class RectangularGrid:
         self._mask = value
 
     @property
-    def n_points(self) -> int:
-        """total number of points of the grid, irrespective of the mask"""
-        return np.prod(self.n)
+    def n_points(self):
+        """int: Total number of points of the grid, irrespective of the mask"""
+        return np.prod(np.array(self.n))
 
     @property
     def extent(self) -> tuple[float]:
