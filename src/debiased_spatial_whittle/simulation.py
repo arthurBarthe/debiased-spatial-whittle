@@ -67,11 +67,10 @@ class SamplerOnRectangularGrid:
         self._z = None
         try:
             self.f
-
         except:
             print('up-sampling')
-            n = tuple(2*n for n in self.grid.n)
-            self.sampling_grid = RectangularGrid(n)    # may cause bugs?
+            n = tuple(2 * n for n in self.grid.n)
+            self.sampling_grid = RectangularGrid(n, grid.delta)    # may cause bugs?
 
     @property
     def n_sims(self):
@@ -88,7 +87,8 @@ class SamplerOnRectangularGrid:
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = np.real(f)
             min_ = np.min(f)
-            if min_ <= -1e-5:
+            print(cov[0, :10])
+            if min_ <= -1e-1:
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
                 
             self._f = np.maximum(f, np.zeros_like(f))

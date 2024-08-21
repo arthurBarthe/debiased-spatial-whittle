@@ -879,13 +879,19 @@ class SpectralModel(CovarianceModel, ABC):
 
     def call_on_rectangular_grid(self, grid):
         from numpy.fft import fftfreq
+        ndim = len(grid.n)
         n = grid.n
-        n2 = [2 * n_i - 1 for n_i in n]
         delta = grid.delta
-        mesh = np.meshgrid(*[fftfreq(4 * n_i - 1, d_i / 10) for n_i, d_i in zip(n, delta)])
-        freqs = np.stack(mesh, axis=0)
+        mesh = np.meshgrid(*[fftfreq(5 * n_i + 1, d_i / 4) for n_i, d_i in zip(n, delta)], indexing='ij')
+        freqs = np.stack(mesh, axis=0) #/ (2 * np.pi)
         sdf = self.spectral_density(freqs)
-        return np.real(fftn(sdf, s=n2)) / np.sqrt(np.prod(np.array(n))) / np.sqrt(4 ** len(grid.n))
+        out = np.real(fftn(sdf)) / np.prod([(5 * n_i + 1) / 4 for n_i in n])
+        for i_dim in range(ndim):
+            n_i = n[i_dim]
+            out = np.take(out, np.concatenate((np.arange(0, 4 * n_i, 4), np.arange(- 4 * (n_i - 1), 0, 4))), i_dim)
+        out = out * self.sigma.value ** 2 / out[tuple([0, ] * ndim)]
+        out[tuple([0, ] * ndim)] += self.nugget.value ** 2
+        return out
 
 
 class SpectralMatern(SpectralModel):
@@ -897,15 +903,16 @@ class SpectralMatern(SpectralModel):
         sigma = Parameter('sigma', (0.01, 1000))
         rho = Parameter('rho', (0.01, 1000))
         nu = Parameter('nu', (0.01, 100))
-        parameters = Parameters([sigma, nu, rho])
+        nugget = Parameter('nugget', (1e-10, 10))
+        parameters = Parameters([sigma, nu, rho, nugget])
         super(SpectralMatern, self).__init__(parameters)
 
     def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
         ndim = frequencies.shape[0]
-        f2 = np.sum(frequencies ** 2, 0) / (4 * np.pi ** 2)
+        f2 = np.sum(frequencies ** 2, 0)
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
         term1 = 2 ** ndim * np.pi ** (ndim / 2) * gamma(nu + ndim / 2) * (2 * nu) ** nu / (gamma(nu) * rho ** (2 * nu))
-        term2 = (2 * nu / rho ** 2 + 4 * np.pi ** 2 * f2) ** (-nu + ndim / 2)
+        term2 = (2 * nu / rho ** 2 + 4 * np.pi ** 2 * f2) ** (-nu - ndim / 2)
         return sigma ** 2 * term1 * term2
 
     def _gradient(self, x: np.ndarray):
