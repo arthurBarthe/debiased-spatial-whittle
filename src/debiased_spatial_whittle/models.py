@@ -832,3 +832,81 @@ def test_gradient_cov():
     g = model.gradient(g.lags_unique, Parameters([model.rho, ]))['rho']
     g2 = (acv2 - acv1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
+
+
+class SpectralModel(CovarianceModel, ABC):
+    @abstractmethod
+    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Abstract method that must provide the spectral density function evaluated at the passed frequencies
+
+        Parameters
+        ----------
+        frequencies
+            shape (d, n1, ..., nk)
+
+        Returns
+        -------
+        sdf
+            shape (n1, ..., nk). Values of the spectral density function
+        """
+        raise NotImplementedError()
+
+    def __call__(self, lags: np.ndarray):
+        """
+        Compute an approximation to the covariance function evaluated at the passed lags based on the spectral
+        density function.
+
+        Parameters
+        ----------
+        lags
+            shape (d, n1, n2, ..., nk)
+
+        Returns
+        -------
+        cov
+            shape (n1, ..., nk). Approximate values of the covariance function
+        """
+        from numpy.fft import fftfreq
+        ndim = lags.shape[0]
+        # evaluate the sdf
+        # TODO nfreq should be odd, step should depend on lags
+        freqs = np.stack(np.meshgrid(*[fftfreq(4 * int(np.max(lags[i_dim])) + 1, 0.5) for i_dim in range(ndim)],
+                                     indexing='ij'))
+        sdf = self.spectral_density(freqs)
+        # apply fft
+        return fftn(sdf)
+
+    def call_on_rectangular_grid(self, grid):
+        from numpy.fft import fftfreq
+        n = grid.n
+        n2 = [2 * n_i - 1 for n_i in n]
+        delta = grid.delta
+        mesh = np.meshgrid(*[fftfreq(4 * n_i - 1, d_i / 10) for n_i, d_i in zip(n, delta)])
+        freqs = np.stack(mesh, axis=0)
+        sdf = self.spectral_density(freqs)
+        return np.real(fftn(sdf, s=n2)) / np.sqrt(np.prod(np.array(n))) / np.sqrt(4 ** len(grid.n))
+
+
+class SpectralMatern(SpectralModel):
+    """
+    Implement a spectral domain version of the Matern, which is approximate but much more efficient than the
+    spatial domain version for non half integer values of the slope parameter.
+    """
+    def __init__(self):
+        sigma = Parameter('sigma', (0.01, 1000))
+        rho = Parameter('rho', (0.01, 1000))
+        nu = Parameter('nu', (0.01, 100))
+        parameters = Parameters([sigma, nu, rho])
+        super(SpectralMatern, self).__init__(parameters)
+
+    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+        ndim = frequencies.shape[0]
+        f2 = np.sum(frequencies ** 2, 0) / (4 * np.pi ** 2)
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        term1 = 2 ** ndim * np.pi ** (ndim / 2) * gamma(nu + ndim / 2) * (2 * nu) ** nu / (gamma(nu) * rho ** (2 * nu))
+        term2 = (2 * nu / rho ** 2 + 4 * np.pi ** 2 * f2) ** (-nu + ndim / 2)
+        return sigma ** 2 * term1 * term2
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
