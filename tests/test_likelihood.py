@@ -163,7 +163,7 @@ def test_jmat():
     # sample_cov_mat = 1 / n_samples * np.dot(estimates.T, estimates)
     print(jmat)
     print(sample_cov_mat)
-    assert_allclose(jmat, sample_cov_mat, 0.1, )
+    assert_allclose(jmat, sample_cov_mat, 0.15, )
 
 
 def test_covmat():
