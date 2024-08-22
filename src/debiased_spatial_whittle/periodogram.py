@@ -13,6 +13,7 @@ fftn = np.fft.fftn
 ifftshift = np.fft.ifftshift
 ndarray = np.ndarray
 
+
 def autocov(cov_func, shape):
     """Compute the covariance function on a grid of lags determined by the passed shape.
     In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
@@ -123,13 +124,26 @@ def compute_ep_old(cov_func, grid, fold=True):
 
 ####NEW OOP VERSION
 from typing import Union
-from .models import CovarianceModel, SeparableModel
-from .grids import RectangularGrid
+from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
+from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
 
 class Periodogram:
-    """Class that allows to define a periodogram"""
+    """
+    Provides the capability to compute the periodogram of the data.
+
+    Attributes
+    ----------
+    taper: function handle
+        tapering function
+
+    scaling: str
+        Choice of scaling, only 'ortho' is currently accepted
+
+    fold: boolean
+        Whether to fold the periodogram.
+    """
 
     def __init__(self, taper = None, scaling='ortho'):
         if taper is None:
@@ -141,18 +155,54 @@ class Periodogram:
 
     def __hash__(self):
         return id(self) + self._version
+    
+    @property
+    def fold(self):
+        """Whether to compute a folded version of the periodogram."""
+        return self._fold
 
-    def __call__(self, z: Union[np.ndarray, SampleOnRectangularGrid]):
-        if isinstance(z, SampleOnRectangularGrid):
-            if self in z.periodograms:
-                return z.periodograms[self]
+    @fold.setter
+    def fold(self, value: bool):
+        self._fold = value
+
+    @property
+    def scaling(self):
+        """Choice of scaling applied to the periodogram. Only 'ortho' is currently accepted."""
+        return self._scaling
+
+    @scaling.setter
+    def scaling(self, value: str):
+        self._scaling = value
+
+    def __call__(self, sample: Union[np.ndarray, SampleOnRectangularGrid]):
+        """
+        Computes the periodogram of the data.
+
+        Parameters
+        ----------
+        sample: ndarray | SampleOnRectangularGrid
+            Sampled data on the grid. Can either be an ndarray, or an instance of SampleOnRectangularGrid.
+            In the latter case, repeated calls to this method will access cached values of the periodogram
+            rather than carrying out the same computation again.
+
+        Returns
+        -------
+        periodogram: ndarray
+            Periodogram of the data
+            - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
+            - shape (n1, ..., nk) if the fold attribute is True
+        """
+        # TODO add tapering
+        if isinstance(sample, SampleOnRectangularGrid):
+            if self in sample.periodograms:
+                return sample.periodograms[self]
             else:
-                z_values = z.values * self.taper(z.grid.n)
+                z_values = sample.values * self.taper(sample.grid.n)
         else:
-            z_values = z * self.taper(z.shape)
+            z_values = sample * self.taper(sample.shape)
         f = 1 / prod_list(z_values.shape) * np.abs(fftn(z_values))**2
-        if isinstance(z, SampleOnRectangularGrid):
-            z.periodograms[self] = f
+        if isinstance(sample, SampleOnRectangularGrid):
+            sample.periodograms[self] = f
         return f
 
     def __setattr__(self, key, value):
@@ -183,15 +233,36 @@ class HashableArray:
         return self.values == other.values
 
 class ExpectedPeriodogram:
-    """Class to obtain the expected periodogram when no assumptions are made about the form of the covariance
-    model (e.g. separability)."""
+    """
+    Provides the capability to compute the expected periodogram on a fixed grid for
+    any covariance model.
+
+    Attributes
+    ----------
+    grid: RectangularGrid
+        sampling grid
+
+    periodogram: Periodogram
+        periodogram for which we require the expectation. This is necessary to account for tapering for instance.
+
+    """
 
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
         self.grid = grid
         self.periodogram = periodogram
 
     @property
+    def grid(self) -> RectangularGrid:
+        """Sampling grid"""
+        return self._grid
+
+    @grid.setter
+    def grid(self, value: RectangularGrid):
+        self._grid = value
+
+    @property
     def periodogram(self):
+        """periodogram for which we require the expectation."""
         return self._periodogram
 
     @periodogram.setter
@@ -205,6 +276,8 @@ class ExpectedPeriodogram:
 
     def __call__(self, model: CovarianceModel) -> np.ndarray:
         """
+        Compute the expected periodogram for this covariance model.
+
         Parameters
         ----------
         model
@@ -212,8 +285,11 @@ class ExpectedPeriodogram:
 
         Returns
         -------
-        ep
-            The expected periodogram on the grid of Fourier frequencies
+        ep: ndarray
+            Shape  (n1, n2, ..., nk).
+            The expected periodogram on the grid of Fourier frequencies.
+            If the fold attribute of the periodogram is False, the shape of the returned array is instead
+            (2 * n1 + 1, ..., 2 * nk + 1).
         """
         acv = self.grid.autocov(model)
         return self.compute_ep(acv, self.periodogram.fold)
@@ -227,8 +303,9 @@ class ExpectedPeriodogram:
 
         Parameters
         ----------
-        acv
-            Autocovariance evaluated on the grid
+        acv: ndarray (2 * n1 + 1, ..., 2 * nk + 1)
+            Autocovariance evaluated on the grid. Here (n1, ..., nk) is the shape of the grid. The standard way to
+            obtain acv is through the call of the autocov method of a rectangular grid.
         fold
             Whether to apply folding of the expected periodogram
         d
@@ -237,7 +314,14 @@ class ExpectedPeriodogram:
         Returns
         -------
         np.ndarray
-            Expectation of the periodogram
+            Expectation of the periodogram.
+            - shape (2 * n1 + 1, ..., 2 * nk + 1) is the fold attribute of self.periodogram is False
+            - shape (n1, ..., nk) if fold is True
+
+        Notes
+        -----
+        For standard use cases, this should not be called directly. Instead, one should directly call
+        the __call__ method.
         """
         grid = self.grid
         shape = grid.n
@@ -305,22 +389,28 @@ class ExpectedPeriodogram:
             out = np.reshape(out, grid.n)
         return out
 
-    def gradient(self, model: CovarianceModel, params: Parameters) -> np.ndarray:
-        """Provides the gradient of the expected periodogram with respect to the parameters of the model
+    def gradient(self, model: CovarianceModel, params: Parameters) -> ndarray:
+        """
+        Provides the gradient of the expected periodogram with respect to the parameters of the model
         at all frequencies of the Fourier grid. The last dimension of the returned array indexes the parameters.
 
         Parameters
         ----------
-        model
+        model: CovarianceModel
             Covariance model. It should implement the gradient method.
-        params
+
+        params: Parameters
             Parameters with which to take the gradient.
 
         Returns
         -------
-        gradient
+        gradient: ndarray
             Array providing the gradient of the expected periodogram at all Fourier frequencies with respect
             to the requested parameters. The last dimension of the returned array indexes the parameters.
+
+        Notes
+        -----
+        This requires that the model's _gradient method be implemented.
         """
         lags = self.grid.lags_unique
         d_acv = model.gradient(lags, params)
@@ -345,7 +435,12 @@ class ExpectedPeriodogram:
 
         Returns
         -------
-        The covariance of the DFT between Fourier frequencies separated by the offset.
+        cov_dft: ndarray
+            The covariance of the DFT between Fourier frequencies separated by the offset.
+
+        Notes
+        -----
+        When m is zero everywhere, this is just the expected periodogram.
         """
         # TODO only works for 2d
         m1, m2 = m
@@ -356,13 +451,18 @@ class ExpectedPeriodogram:
 
     def cov_dft_matrix(self, model: CovarianceModel):
         """
-        Provides the covariance matrixof the Discrete Fourier Transform. Computed using matrix products,
+        Provides the covariance matrix of the Discrete Fourier Transform. Computed using matrix products,
         hence not viable for large grid sizes.
 
         Parameters
         ----------
-        model
+        model: CovarianceModel
             Covariance model for which we request the covariance matrix of the Discrete Fourier Transform
+
+        Returns
+        -------
+        cov_dft: ndarray (n1, n2, ..., nk)
+            Covariance matrix of the Discrete Fourier Transform of the data.
         """
         n = self.grid.n
         def transpose(mat):
@@ -383,12 +483,17 @@ class ExpectedPeriodogram:
     def rel_dft_matrix(self, model: CovarianceModel):
         """
         Provides the relation matrix of the Discrete Fourier Transform. Requires storing the full covariance
-        matrix, hencenot viable for large grids. Useful however to check other methods.
+        matrix, hence not viable for large grids. Useful however to check other methods.
 
         Parameters
         ----------
-        model
+        model: CovarianceModel
             Covariance model for which we request the covariance matrix of the Discrete Fourier Transform
+
+        Returns
+        -------
+        rel_dft: ndarray (n1, n2, ..., nk)
+            Relation matrix of the Discrete Fourier Transform of the data
         """
         n = self.grid.n
 
@@ -405,19 +510,22 @@ class ExpectedPeriodogram:
         temp2 = transpose(temp2)
         return temp2 / n[0] / n[1]
 
-
     def cov_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """
-        Returns the covariance of the periodogram
+        Returns the covariance of the periodogram (valid only in 2d)
 
         Parameters
         ----------
-        model
-        m
+        model: CovarianceModel
+            True covariance model
+
+        m: tuple[int, int]
+            frequency offset
 
         Returns
         -------
-
+        cov: ndarray
+            Covariance of the periodogram between frequencies offset by m
         """
         return np.abs(self.cov_dft_diagonals(model, m)) ** 2
 
@@ -456,7 +564,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         model1, model2 = model.models
         n1, n2 = self.grid.n
         tau1, tau2 = np.arange(n1), np.arange(n2)
-        cov_seq1 = model1([tau1,]) * (1 - tau1 / n1)
+        cov_seq1 = model1([tau1, ]) * (1 - tau1 / n1)
         cov_seq2 = model2([tau2, ]) * (1 - tau2 / n2)
         ep1 = 2 * np.real(fft(cov_seq1)).reshape((-1, 1)) - cov_seq1[0]
         ep2 = 2 * np.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]

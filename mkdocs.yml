@@ -1,0 +1,42 @@
+site_name: Documentation Debiased Spatial Whittle
+
+theme:
+  name: "material"
+
+plugins:
+- mkdocs-jupyter:
+    include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
+    'venus data/venus.py', '3dexponential.py']
+    execute: true
+- mkdocstrings:
+    handlers:
+      python:
+        options:
+          docstring_style: numpy
+          merge_init_into_class: true
+          show_root_heading: true
+          show_root_full_path: false
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          members_order: source
+          separate_signature: true
+          show_source: false
+
+
+nav:
+  - Home: index.md
+  - 'Getting started':
+      - Installation: install.md
+  - 'Example notebooks':
+      - France: france.py
+      - Circle: circle.py
+      - Anisotropic: non-isotropic.py
+      - 3d exponential model: 3dexponential.py
+      - Multivariate:
+          - 'Same grid': multivariate_simple.py
+          - 'Non-overlapping grids': multivariate_two_grids.py
+      - 'Venus topography': 'venus data/venus.py'
+  - Reference:
+      - Grids: reference.md
+      - Models: models.md
+      - Periodogram: periodogram.md
