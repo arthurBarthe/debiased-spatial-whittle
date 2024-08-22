@@ -1,6 +1,5 @@
 import numpy as np
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle import exp_cov, sim_circ_embedding, compute_ep_old, periodogram
 from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
@@ -53,6 +52,31 @@ def test_compare_to_mean():
     model.sigma = 1
     n_samples = 10000
     periodogram = Periodogram()
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
+    for i in range(n_samples):
+        z = sampler()
+        per = periodogram(z)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
+
+
+def test_compare_to_mean_taper():
+    """
+    Same as above but with the use of a taper.
+    """
+    from numpy import hanning
+    shape = (32, 32)
+    grid = RectangularGrid(shape)
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(shape[1]).reshape(1, -1)
     expected_periodogram = ExpectedPeriodogram(grid, periodogram)
     mean_per = np.zeros(shape)
     for i in range(n_samples):
