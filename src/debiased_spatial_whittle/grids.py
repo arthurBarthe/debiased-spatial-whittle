@@ -262,7 +262,9 @@ class RectangularGrid:
         return np.array(lags)
 
     @lru_cache(maxsize=5)
-    def spatial_kernel(self, taper_values):
+    def spatial_kernel(self, taper_values: np.ndarray = None):
+        if taper_values is None:
+            return spatial_kernel(self.mask, n_spatial_dim=self.ndim)
         return spatial_kernel(self.mask * taper_values.values, n_spatial_dim=self.ndim)
 
     def covariance_matrix(self, model: CovarianceModel):
