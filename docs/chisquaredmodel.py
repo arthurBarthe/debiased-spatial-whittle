@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import ChiSquaredModel, MaternCovarianceModel
+from debiased_spatial_whittle.models import ChiSquaredModel, MaternCovarianceModel, SquaredExponentialModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import ChiSquaredSamplerOnRectangularGrid
 
@@ -8,17 +8,17 @@ from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogra
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 
 
-m, n = 128, 128
+m, n = 256, 256
 
 grid = RectangularGrid((m, n))
 
-latent_model = MaternCovarianceModel()
+latent_model = SquaredExponentialModel()
 latent_model.sigma = 1
-latent_model.rho = 7
-latent_model.nu = 0.8
+latent_model.rho = 16
+latent_model.nugget = 0.01
 
 model = ChiSquaredModel(latent_model)
-model.dof_1 = 5
+model.dof_1 = 3
 
 sampler = ChiSquaredSamplerOnRectangularGrid(model, grid)
 z = sampler()
@@ -45,7 +45,7 @@ print(np.mean(per / ep))
 
 
 # estimation
-latent_model = MaternCovarianceModel()
+latent_model = SquaredExponentialModel()
 model = ChiSquaredModel(latent_model)
 model.dof_1 = None
 

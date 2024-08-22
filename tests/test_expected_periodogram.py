@@ -66,6 +66,31 @@ def test_compare_to_mean():
     assert_allclose(mean_per, e_per, rtol=0.05)
 
 
+def test_compare_to_mean_taper():
+    """
+    Same as above but with the use of a taper.
+    """
+    from numpy import hanning
+    shape = (32, 32)
+    grid = RectangularGrid(shape)
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(shape[1]).reshape(1, -1)
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
+    for i in range(n_samples):
+        z = sampler()
+        per = periodogram(z)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
+
+
 def test_compare_to_mean2():
     m, n = 8, 8
     cov_func = lambda lags: exp_cov(lags, rho=2., sigma=2)

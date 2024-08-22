@@ -146,14 +146,16 @@ class Periodogram:
     """
 
     def __init__(self, taper = None, scaling='ortho'):
-        self.taper = taper
+        if taper is None:
+            self.taper = lambda shape: np.ones(shape)
         self.scaling = scaling
+        #TODO add scaling
         self.fold = True
         self._version = 0
 
     def __hash__(self):
         return id(self) + self._version
-
+    
     @property
     def fold(self):
         """Whether to compute a folded version of the periodogram."""
@@ -162,18 +164,6 @@ class Periodogram:
     @fold.setter
     def fold(self, value: bool):
         self._fold = value
-
-    @property
-    def taper(self):
-        """function handle used for tapering of the data prior to the computation of the periodogram"""
-        if self._taper is None:
-            self.taper = lambda x: np.ones_like(x)
-        else:
-            return self._taper
-
-    @taper.setter
-    def taper(self, value):
-        self._taper = value
 
     @property
     def scaling(self):
@@ -207,10 +197,9 @@ class Periodogram:
             if self in sample.periodograms:
                 return sample.periodograms[self]
             else:
-                z_values = sample.values
+                z_values = sample.values * self.taper(sample.grid.n)
         else:
-            z_values = sample
-        z_taper = sample
+            z_values = sample * self.taper(sample.shape)
         f = 1 / prod_list(z_values.shape) * np.abs(fftn(z_values))**2
         if isinstance(sample, SampleOnRectangularGrid):
             sample.periodograms[self] = f
@@ -232,6 +221,16 @@ class Periodogram:
             self.__dict__['_version'] += 1
         super(Periodogram, self).__setattr__(key, value)
 
+
+class HashableArray:
+    def __init__(self, values: np.array):
+        self.values = values
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self.values == other.values
 
 class ExpectedPeriodogram:
     """
@@ -269,7 +268,7 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        #self._taper = value.taper(self.grid)
+        self._taper = HashableArray(value.taper(self.grid.n))
 
     @property
     def taper(self):
@@ -330,7 +329,7 @@ class ExpectedPeriodogram:
         p = grid.nvars
         # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
-            cg = grid.spatial_kernel
+            cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering
@@ -549,86 +548,7 @@ class ExpectedPeriodogram:
         m
         """
         return np.abs(self.cov_dft_antidiagonals(model, m)) ** 2
-#
-# <<<<<<< HEAD
-#     def compute_ep(self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)):
-#         """
-#         Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
-#         Fourier Transform identitied by the two-dimensional offset d. The standard expected periodogram corresponds to
-#         the default d = (0, 0).
-#
-#         Parameters
-#         ----------
-#         acv
-#             Autocovariance evaluated on the grid. In the case where the model is multivariate, the first
-#             dimensions correspond to the lags (one dimension for each spatial dimension), and the last two dimensions
-#             are used for the covariance matrix.
-#         fold
-#             Whether to apply folding of the expected periodogram
-#         d
-#             Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
-#
-#         Returns
-#         -------
-#         np.ndarray
-#             Expectation of the periodogram
-#         """
-#         grid = self.grid
-#         shape = grid.n
-#         n_dim = grid.ndim
-#         # In the case of a complete grid, cg takes a closed form given by the triangle kernel
-#         if d == (0, 0):
-#             cg = grid.spatial_kernel
-#         else:
-#             cg = spatial_kernel(self.grid.mask, d)
-#         # TODO add tapering
-#         # we allow for multivariate, but currently mask same for both grids
-#         if cg.ndim < acv.ndim:
-#             cg = np.expand_dims(cg, (-2, -1))
-#         cbar = cg * acv
-#         # now we need to "fold"
-#         if fold:
-#             #TODO can we go back to complex64?
-#             # TODO change made specifically for bivariate case. Make general. Should we have just one function for the
-#             # general case?
-#             result = np.zeros(grid.n + (2, 2), dtype=np.complex128)
-#             if n_dim == 2:
-#                 # we could actually always use the general version below but we leave the 2d case as it is easier to
-#                 #read
-#                 for i in range(2):
-#                     for j in range(2):
-#                         result[i:, j:, ...] += cbar[i * shape[0]: (i + 1) * shape[0],
-#                                                j * shape[1]: (j + 1) * shape[1],
-#                                                ...]
-#             elif n_dim == 3:
-#                 # we could actually always use the general version below but we leave the 2d case as it is easier to
-#                 #read
-#                 for i in range(2):
-#                     for j in range(2):
-#                         for k in range(2):
-#                             result[i:, j:, k:] += cbar[i * shape[0]: (i + 1) * shape[0],
-#                                                   j * shape[1]: (j + 1) * shape[1],
-#                                                   k * shape[2]: (k + 1) * shape[2]]
-#             else:
-#                 indexes = product(*[(0, 1) for i_dim in range(n_dim)])
-#                 for ijk in indexes:
-#                     result[tuple([slice(i, None) for i in ijk])] += \
-#                         cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
-#         else:
-#             m, n = shape
-#             result = np.zeros((2 * m, 2 * n))
-#             result[:m, :n] = cbar[:m, :n]
-#             result[m + 1:, :n] = cbar[m:, :n]
-#             result[m + 1:, n + 1:] = cbar[m:, n:]
-#             result[:m, n + 1:] = cbar[:m, n:]
-#
-#         if d == (0, 0):
-#             # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-#             #TODO for multivariate we do not take the real part anymore
-#             return fftn(result, axes=list(range(n_dim)))
-#         return fftn(result)
-# =======
-# >>>>>>> pytorch
+
 
 
 class SeparableExpectedPeriodogram(ExpectedPeriodogram):
