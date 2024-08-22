@@ -3,10 +3,9 @@ __docformat__ = "numpydoc"
 from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
-from functools import cached_property
 from abc import ABC, abstractmethod
 from pathlib import Path
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
 
@@ -282,13 +281,11 @@ class RectangularGrid:
         lags = [g - g.T for g in grid_vec]
         return np.array(lags)
 
-    @property
-    def spatial_kernel(self) -> np.ndarray:
-        """spatial kernel corresponding to the grid. In the case where the mask is 1 everywhere, this would simply
-        be a triangle kernel. However, in general, this quantity depends on the mask."""
-        if not hasattr(self, '_spatial_kernel'):
-            self._spatial_kernel = spatial_kernel(self.mask, n_spatial_dim=self.ndim)
-        return self._spatial_kernel
+    @lru_cache(maxsize=5)
+    def spatial_kernel(self, taper_values: np.ndarray = None):
+        if taper_values is None:
+            return spatial_kernel(self.mask, n_spatial_dim=self.ndim)
+        return spatial_kernel(self.mask * taper_values.values, n_spatial_dim=self.ndim)
 
     def covariance_matrix(self, model: CovarianceModel):
         """

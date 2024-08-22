@@ -51,7 +51,7 @@ class DeWhittle(Likelihood):
     
     def expected_periodogram(self, params: ndarray, **cov_args) -> ndarray:
         acf = self.cov_func(params, lags = None, **cov_args)
-        return compute_ep(ifftshift(acf), self.grid.spatial_kernel, self.grid.mask)
+        return compute_ep(ifftshift(acf), self.grid.spatial_kernel(), self.grid.mask)
 
         
     def __call__(self, params: ndarray, z:Optional[ndarray]=None, **cov_args) -> float: 
@@ -91,7 +91,7 @@ class DeWhittle(Likelihood):
         d_ep = []
         for i in range(len(params)):
             aux = ifftshift(d_cov[i])
-            d_ep.append(compute_ep(aux, self.grid.spatial_kernel, self.grid.mask, fold=True))  # TODO: ask about spatial_kernel and grid.mask
+            d_ep.append(compute_ep(aux, self.grid.spatial_kernel(), self.grid.mask, fold=True))  # TODO: ask about spatial_kernel and grid.mask
         return np.stack(d_ep, axis=0)
     
     
