@@ -867,15 +867,12 @@ class SpectralModel(CovarianceModel, ABC):
         cov
             shape (n1, ..., nk). Approximate values of the covariance function
         """
-        from numpy.fft import fftfreq
-        ndim = lags.shape[0]
-        # evaluate the sdf
-        # TODO nfreq should be odd, step should depend on lags
-        freqs = np.stack(np.meshgrid(*[fftfreq(4 * int(np.max(lags[i_dim])) + 1, 0.5) for i_dim in range(ndim)],
-                                     indexing='ij'))
-        sdf = self.spectral_density(freqs)
-        # apply fft
-        return fftn(sdf)
+        # set a grid
+        lags_flat = np.flatten()
+        abs_lags = np.abs(lags)
+        axes = tuple(range(1, lags.ndim))
+        bound = np.max(abs_lags, axis=axes)
+        step = np.min(np.diff(abs_lags, axis=axes))
 
     def call_on_rectangular_grid(self, grid):
         from numpy.fft import fftfreq
@@ -908,6 +905,18 @@ class SpectralMatern(SpectralModel):
         super(SpectralMatern, self).__init__(parameters)
 
     def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Implements the spectral density of the Matern.
+
+        Parameters
+        ----------
+        frequencies
+            shape (d, n1, ..., nk).
+
+        Returns
+        -------
+
+        """
         ndim = frequencies.shape[0]
         f2 = np.sum(frequencies ** 2, 0)
         sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
