@@ -104,10 +104,14 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 
 
 #########NEW OOP version
-from .periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 from .models import CovarianceModel, Parameters
 from typing import Callable, Union, Optional
 
+from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
+slogdet = BackendManager.get_slogdet()
+inv = BackendManager.get_inv()
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
@@ -116,7 +120,100 @@ def whittle_prime(per, e_per, e_per_prime):
         for i in range(e_per_prime.shape[-1]):
             out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
         return np.stack(out, axis=-1)
+    e_per_prime = np.reshape(e_per_prime, per.shape)
     return 1 / n * np.sum((e_per - per) * e_per_prime / e_per ** 2)
+
+
+class MultivariateDebiasedWhittle:
+    """
+    Implements the Debiased Whittle Likelihood for multivariate data. This requires
+    the use of a multivariate periodogram.
+    Only implemented for bi-variate right now. Gradient not used currently.
+    """
+    def __init__(self, periodogram: MultPeriodogram, expected_periodogram: ExpectedPeriodogram):
+        self.periodogram = periodogram
+        self.expected_periodogram = expected_periodogram
+
+    def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
+        # TODO add a class sample which contains the data and the grid?
+        """Computes the likelihood for this data"""
+        p = self.periodogram([z[..., 0], z[..., 1]])
+        ep = self.expected_periodogram(model)
+        ep_inv = inv(ep)
+        term1 = slogdet(ep)[1]
+        ratio = np.matmul(ep_inv, p)
+        if BackendManager.backend_name == 'numpy':
+            term2 = np.trace(ratio, axis1=-2, axis2=-1)
+        elif BackendManager.backend_name == 'torch':
+            term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
+        whittle = np.mean(term1 + term2)
+        whittle = np.real(whittle)
+        if BackendManager.backend_name == 'torch':
+            whittle = whittle.item()
+        if not params_for_gradient:
+            return whittle
+        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
+        ep_inv = np.expand_dims(ep_inv, 2)
+        # the derivative of the log determinant
+        d_log_det = np.trace(np.matmul(ep_inv, d_ep), axis1=-2, axis2=-1)
+        # the derivative the second term
+        d_ep_inv = - np.matmul(ep_inv, np.matmul(d_ep, ep_inv))
+        p = np.expand_dims(p, axis=2)
+        d_quad_term = np.trace(np.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
+        # derivative
+        d_whittle = np.mean(d_log_det + d_quad_term, axis=(0, 1))
+        return whittle, d_whittle
+
+    def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
+        """Provides the expectation of the hessian matrix"""
+        ep = self.expected_periodogram(model)
+        ep_inv = inv(ep)
+        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        h = zeros((len(params_for_gradient), len(params_for_gradient)))
+        for i1, p1_name in enumerate(params_for_gradient.names):
+            for i2, p2_name in enumerate(params_for_gradient.names):
+                d_ep1 = d_ep[..., i1]
+                d_ep2 = d_ep[..., i2]
+                h[i1, i2] = np.mean(np.trace(np.matmul(ep_inv, np.matmul(d_ep1, np.matmul(ep_inv, d_ep2))),
+                                             axis1=-2, axis2=-1))
+        return h
+
+    def jmatrix_sample(self, model: CovarianceModel, params_for_gradient: Parameters, n_sims: int = 400,
+                       block_size: int = 100) -> np.ndarray:
+        """
+        Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
+        simulated realisations.
+
+        Parameters
+        ----------
+        model
+            Covariance model to sample from
+        params_for_gradient
+            Parameters with respect to which we take the gradient
+        n_sims
+            Number of samples used for the estimate covariance matrix
+        block_size
+            Number of samples per simulations. A higher number should improve
+            computational efficiency, but for large grids this may cause
+            Out Of Memory issues.
+
+        Returns
+        -------
+        np.ndarray
+            Sample covariance matrix of the gradient of the likelihood
+        """
+        sampler = SamplerBUCOnRectangularGrid(model, self.expected_periodogram.grid)
+        sampler.n_sims = block_size
+        gradients = []
+        for i_sample in range(n_sims):
+            print(i_sample)
+            z = sampler()
+            _, grad = self(z, model, params_for_gradient)
+            gradients.append(grad)
+        gradients = np.array(gradients)
+        # enforce real values
+        return np.real(np.cov(gradients.T))
 
 
 class DebiasedWhittle:
@@ -166,11 +263,9 @@ class DebiasedWhittle:
     def __call__(self, z: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
-        p = self.periodogram(z)                # you are recomputing I for each iteration i think
+        p = self.periodogram(z)
         ep = self.expected_periodogram(model)
         whittle = self.whittle(p, ep)
-        if BackendManager.backend_name == 'torch':
-            whittle = whittle.item()
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
@@ -279,7 +374,6 @@ class DebiasedWhittle:
         np.ndarray
             Sample covariance matrix of the gradient of the likelihood
         """
-        # TODO here we could simulate independent realizations "in block" as long as we have enough memory
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
         gradients = []
@@ -288,7 +382,8 @@ class DebiasedWhittle:
             _, grad = self(z, model, params_for_gradient)
             gradients.append(grad)
         gradients = np.array(gradients)
-        return np.cov(gradients.T)
+        # enforce real values
+        return np.real(np.cov(gradients.T))
 
 
     def variance_of_estimates(self, model: CovarianceModel, params: Parameters, jmat: np.ndarray = None):
@@ -367,12 +462,13 @@ class Estimator:
             def func(param_values):
                 updates = dict(zip(free_params.names, param_values))
                 free_params.update_values(updates)
-                return self.likelihood(z, model)
+                return self.likelihood(z, model).item()
         else:
             def func(param_values):
                 updates = dict(zip(free_params.names, param_values))
                 free_params.update_values(updates)
-                return self.likelihood(z, model, params_for_gradient=free_params)
+                lkh, grad = self.likelihood(z, model, params_for_gradient=free_params)
+                return lkh.item(), grad
         return func
 
     def covmat(self, model: CovarianceModel, params: Parameters = None):

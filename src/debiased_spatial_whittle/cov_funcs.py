@@ -1,4 +1,6 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from scipy.special import gamma, kv
 
 

@@ -1,4 +1,7 @@
-import autograd.numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('autograd')
+np = BackendManager.get_backend()
+
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, SquaredModel
@@ -86,7 +89,7 @@ def test_likelihood_cov_func():
     
     cov_true = model(grid.lags_unique)
     cov_test = dw.cov_func(params)
-    assert_allclose(np.fft.ifftshift(cov_true), cov_test)
+    assert_allclose(cov_true, cov_test)
     
     
 def test_likelihood_sim_z():

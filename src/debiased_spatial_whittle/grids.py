@@ -1,4 +1,6 @@
-from .backend import BackendManager
+__docformat__ = "numpydoc"
+
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
 from abc import ABC, abstractmethod
@@ -7,6 +9,8 @@ from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
 
+
+fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 
 PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / 'france.jpg')
@@ -116,52 +120,130 @@ ifftshift = np.fft.ifftshift
 arange = BackendManager.get_arange()
 
 class RectangularGrid:
-    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None):
+    """
+    Generic class for hypercubic grids.
+
+    Attributes
+    ----------
+    n: tuple[int]
+        spatial dimensions of the grid
+
+    delta: tuple[float]
+        step sizes of the grid along all dimensions
+
+    nvars: int
+        number of variates observed on the grid
+
+    mask: ndarray
+        array of 0's (missing) and 1's (observed) indicating for each point of the grid whether the random field is
+        observed at that location.
+    """
+    def __init__(self, shape: Tuple[int], delta: Tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
         self.n = shape
-        self._delta = delta
-        self._mask = mask
+        self.delta = delta
+        self.nvars = nvars
+        self.mask = mask
 
     @property
     def ndim(self):
+        """
+        int: number of spatial dimensions of the grid.
+        """
         return len(self.n)
 
     @property
     def delta(self):
-        if self._delta is None:
-            return [1, ] * len(self.n)
+        """
+        step sizes of the grid along all dimensions
+        """
         return self._delta
 
     @delta.setter
     def delta(self, value):
+        if value is None:
+            value = [1., ] * len(self.n)
         assert len(value) == len(self.n), "The length of delta should be equal to the number of dimensions"
+        value = tuple([float(v) for v in value])
         self._delta = value
 
     @property
+    def nvars(self):
+        """
+        int: number of variates
+        """
+        return self._nvars
+
+    @nvars.setter
+    def nvars(self, value: int):
+        assert isinstance(value, int), "The number of components must be integer-valued."
+        assert value > 0, "The number of components must be positive."
+        self._nvars = value
+
+    @property
     def mask(self):
-        if self._mask is None:
-            return np.ones(self.n)
-        else:
-            return self._mask
+        """ndarray: observation mask"""
+        return self._mask
 
     @mask.setter
     def mask(self, value: np.ndarray):
-        assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+        if value is None:
+            value = np.ones(self.n)
+            if self.nvars > 1:
+                value = np.ones(self.n + (self.nvars,))
+        if self.nvars == 1:
+            assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+        else:
+            assert value.shape == self.n + (self.nvars, ), "Invalid shape of grid mask."
         self._mask = value
 
     @property
     def n_points(self):
-        """Total number of points of the grid, irrespective of the mask"""
-        p = 1
-        for ni in self.n:
-            p *= ni
-        return p
+        """int: Total number of points of the grid, irrespective of the mask"""
+        return np.prod(self.n)
+
+    @property
+    def extent(self):
+        """tuple[float]: spatial extent of the grid in spatial units"""
+        return tuple([n_i * delta_i for n_i, delta_i in zip(self.n, self.delta)])
+
+    @property
+    def imshow_extent(self):
+        extent = self.extent
+        imshow_extent = []
+        for e in extent:
+            imshow_extent.extend((0, e))
+        return imshow_extent
+
+    @property
+    def fourier_frequencies(self):
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid."""
+        mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        return np.stack(mesh, axis=-1)
+
+    @property
+    def fourier_frequencies2(self):
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
+        mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        out = np.stack(mesh, axis=-1)
+        return BackendManager.convert(out)
 
     @cached_property
     def lags_unique(self) -> List[np.ndarray]:
+        """
+
+        Returns
+        -------
+        Unique lags corresponding to the grids
+            shape (2 * n1 + 1, 2 * n2 + 1, ..., 2 * nd + 1, d)
+        """
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(*(arange(-n + 1, n) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(*(arange(-n + 1, n, dtype=np.float64) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
         return np.stack(lags, axis=0)
+
+    @property
+    def grid_points(self):
+        return tuple([np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)])
 
     @cached_property
     def lag_matrix(self):
@@ -173,7 +255,7 @@ class RectangularGrid:
         lags
             shape (n_points, n_points, n_dimensions).
         """
-        xs = [np.arange(s, dtype=np.int64) for s in self.n]
+        xs = [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
         grid = np.meshgrid(*xs, indexing='ij')
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
@@ -181,7 +263,7 @@ class RectangularGrid:
 
     @lru_cache(maxsize=5)
     def spatial_kernel(self, taper_values):
-        return spatial_kernel(self.mask * taper_values.values)
+        return spatial_kernel(self.mask * taper_values.values, n_spatial_dim=self.ndim)
 
     def covariance_matrix(self, model: CovarianceModel):
         """
@@ -196,10 +278,12 @@ class RectangularGrid:
 
     def autocov(self, model: CovarianceModel):
         """Compute the covariance function on a grid of lags determined by the passed shape.
-        In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
+        In d=1 the lags would be -(n-1)...n-1, but then a ifftshit is applied so that the lags are
         0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
         when computing the expecting periodogram"""
-        return ifftshift(model(self.lags_unique))
+        if hasattr(model, 'call_on_rectangular_grid'):
+            return model.call_on_rectangular_grid(self)
+        return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
     def autocov_separable(self, model: SeparableModel):
         assert isinstance(model, SeparableModel), "You can only call autocov_separable on a separable model"

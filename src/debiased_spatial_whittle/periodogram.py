@@ -205,7 +205,6 @@ class ExpectedPeriodogram:
 
     def __call__(self, model: CovarianceModel) -> np.ndarray:
         """
-
         Parameters
         ----------
         model
@@ -243,20 +242,24 @@ class ExpectedPeriodogram:
         grid = self.grid
         shape = grid.n
         n_dim = grid.ndim
-        # TODO In the case of a complete grid, cg takes a closed form given by the triangle kernel
+        p = grid.nvars
+        # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
         # TODO add tapering
+        if grid.nvars == 1:
+            cg = np.expand_dims(cg, (-1, -2))
+            acv = np.expand_dims(acv, (-1, -2))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
             # TODO: check if working
             if BackendManager.backend_name == 'torch':
-                result = np.zeros(shape, dtype=np.complex128, device=BackendManager.device)
+                result = np.zeros(grid.n + (p, p), dtype=np.complex128, device=BackendManager.device)
             else:
-                result = np.zeros(shape, dtype=np.complex128)
+                result = np.zeros(grid.n + (p, p), dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i*shape[0]: (i+1)*shape[0]]
@@ -265,9 +268,9 @@ class ExpectedPeriodogram:
             elif n_dim == 2:
                 for i in range(2):
                     for j in range(2):
-                        res = cbar[i*shape[0]: (i+1)*shape[0], 
+                        res = cbar[i*shape[0]: (i+1)*shape[0],
                                    j*shape[1]: (j+1)*shape[1]]
-                        result += np.pad(res, ((i,0), (j,0)), mode='constant')   # autograd solution
+                        result += np.pad(res, ((i,0), (j,0), (0, 0), (0, 0)), mode='constant')   # autograd solution
                         
             elif n_dim == 3:
                 for i in range(2):
@@ -276,7 +279,7 @@ class ExpectedPeriodogram:
                             res = cbar[i*shape[0]: (i+1)*shape[0],
                                        j*shape[1]: (j+1)*shape[1],
                                        k*shape[2]: (k+1)*shape[2]]    
-                            result += np.pad(res, ((i,0), (j,0), (k,0)), mode='constant')
+                            result += np.pad(res, ((i,0), (j,0), (k,0), (0, 0), (0, 0)), mode='constant')
         
 
             # else:
@@ -293,9 +296,14 @@ class ExpectedPeriodogram:
             result[:m, n + 1:] = cbar[:m, n:]
 
         if d == (0, 0):
-            # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-            return np.real(fftn(result))
-        return fftn(result)
+            out = fftn(result, None, list(range(n_dim)))
+            if grid.nvars == 1:
+                out = np.real(np.reshape(out, grid.n))
+            return out
+        out = fftn(result)
+        if grid.nvars == 1:
+            out = np.reshape(out, grid.n)
+        return out
 
     def gradient(self, model: CovarianceModel, params: Parameters) -> np.ndarray:
         """Provides the gradient of the expected periodogram with respect to the parameters of the model
@@ -318,7 +326,7 @@ class ExpectedPeriodogram:
         d_acv = model.gradient(lags, params)
         d_ep = []
         for p_name in params.names:
-            aux = ifftshift(d_acv[p_name])
+            aux = ifftshift(d_acv[p_name], axes=list(range(lags.shape[0])))
             d_ep.append(self.compute_ep(aux, self.periodogram.fold))
         return np.stack(d_ep, axis=-1)
 

@@ -7,8 +7,8 @@ from debiased_spatial_whittle.simulation import sim_circ_embedding
 from debiased_spatial_whittle.likelihood import fit
 import matplotlib.pyplot as plt
 
-rho_1, rho_2, theta = 40, 10, 0.8
-init_guess = np.array([20., 20., 0.5])
+rho_1, rho_2, theta = 30, 5, 0.8
+init_guess = np.array([1., 1., 0.5])
 
 cov = exp_cov_anisotropic
 cov_func = lambda lags: cov(lags, rho_1, rho_2, theta)

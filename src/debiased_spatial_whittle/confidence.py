@@ -1,5 +1,8 @@
 from typing import Callable, Tuple
-import numpy as np
+
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from numpy.random import randint, rand
 from progressbar import progressbar
 import matplotlib.pyplot as plt

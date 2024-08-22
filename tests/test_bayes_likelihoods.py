@@ -1,4 +1,7 @@
-import autograd.numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('autograd')
+np = BackendManager.get_backend()
+
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel, MaternCovarianceModel, Parameters
@@ -125,7 +128,7 @@ def test_dewhittle_fisher():
     assert np.all(np.diag(H) >= 0)
     
     H2 = dw.fisher(params)
-    assert_allclose( H, H2 * (2/dw.n_points) )
+    assert_allclose( H, H2)
     
 
 if __name__ == '__main__':
