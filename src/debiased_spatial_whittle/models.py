@@ -315,6 +315,50 @@ class CovarianceModel(ABC):
         """
         self.__dict__.update(state)
 
+    def __add__(self, other):
+        """
+        Add two covariance models, resulting in a covariance model whose covariance function is the
+        sum of the two covariance functions.
+
+        Parameters
+        ----------
+        other
+            Another covariance model
+
+        Returns
+        -------
+        new_model
+            New covariance model
+        """
+        return SumCovarianceModel(self, other)
+
+
+class SumCovarianceModel(CovarianceModel):
+    """
+    Defines a covariance model as the sum of two covariance models.
+    """
+    def __init__(self, model1, model2):
+        """
+        Parameters
+        ----------
+        model1
+            First covariance model
+        model2
+            Second covariance modelp
+        """
+        self.model1 = model1
+        self.model2 = model2
+        params = ParametersUnion([model1.params, model2.params])
+        super(SumCovarianceModel, self).__init__(params)
+
+    def __call__(self, lags: np.ndarray):
+        return self.model1(lags) + self.model2(lags)
+
+    def _gradient(self, x: np.ndarray):
+        grad1 = self.model1._gradient(x)
+        grad2 = self.model2._gradient(x)
+        return np.stack((grad1, grad2))
+
 
 class SeparableModelOld(CovarianceModel):
     """Class for a separable covariance model based on a list of covariance models"""
