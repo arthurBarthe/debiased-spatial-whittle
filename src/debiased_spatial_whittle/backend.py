@@ -145,6 +145,17 @@ class BackendManager:
             return fftn, ifftn
 
     @classmethod
+    def get_fftfreq(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.fft.fftfreq
+        elif cls.backend_name == 'cupy':
+            return cupy.fft.fftfreq
+        elif cls.backend_name == 'torch':
+            def new_fftfreq(*args, **kargs):
+                return torch.fft.fftfreq(*args, **kargs).to(device=cls.device)
+            return new_fftfreq
+
+    @classmethod
     def get_fftshift_methods(cls):
         if cls.backend_name == 'numpy' or cls.backend_name == 'autograd':
             return numpy.fft.fftshift, numpy.fft.ifftshift

@@ -6,6 +6,7 @@ except ModuleNotFoundError:
 from .backend import BackendManager
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
+fftfreq = BackendManager.get_fftfreq()
 
 import numpy
 
@@ -921,7 +922,6 @@ class AliasedSpectralModel(CovarianceModel):
         raise NotImplementedError()
 
     def call_on_rectangular_grid(self, grid):
-        fftfreq = np.fft.fftfreq
         ndim = len(grid.n)
         n = grid.n
         delta = grid.delta
