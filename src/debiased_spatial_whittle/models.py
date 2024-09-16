@@ -7,6 +7,7 @@ from .backend import BackendManager
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
 fftfreq = BackendManager.get_fftfreq()
+arange = BackendManager.get_arange()
 
 import numpy
 
@@ -882,7 +883,7 @@ class SpectralModel(CovarianceModel, ABC):
         for i_dim in range(ndim):
             n_i = n[i_dim]
             #out = np.take(out, np.concatenate((np.arange(0, 4 * n_i, 4), np.arange(- 4 * (n_i - 1), 0, 4))), i_dim)
-            out = np.take(out, np.concatenate((np.arange(0, 4 * n_i, 4), np.arange(out.shape[i_dim] - 4 * (n_i - 1), out.shape[i_dim], 4))), i_dim)
+            out = np.take(out, np.concatenate((arange(0, 4 * n_i, 4), arange(out.shape[i_dim] - 4 * (n_i - 1), out.shape[i_dim], 4))), i_dim)
         return out
 
 
@@ -931,7 +932,7 @@ class AliasedSpectralModel(CovarianceModel):
         out = np.real(fftn(sdf)) / np.prod(np.array(sdf.shape)) * (2 * np.pi) ** ndim
         for i_dim in range(ndim):
              n_i = n[i_dim]
-             out = np.take(out, np.concatenate((np.arange(0, n_i), np.arange(out.shape[i_dim] - (n_i - 1), out.shape[i_dim], 1))), i_dim)
+             out = np.take(out, np.concatenate((arange(0, n_i), arange(out.shape[i_dim] - (n_i - 1), out.shape[i_dim], 1))), i_dim)
         return out
 
 
