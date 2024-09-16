@@ -87,7 +87,6 @@ class SamplerOnRectangularGrid:
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = np.real(f)
             min_ = np.min(f)
-            print(cov[0, :10])
             if min_ <= -1e-1:
                 raise ValueError(f'Embedding is not positive definite, min value {min_}.')
                 

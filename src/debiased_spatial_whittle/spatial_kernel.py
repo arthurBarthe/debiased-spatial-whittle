@@ -32,7 +32,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
     if n_spatial_dim is None:
         n_spatial_dim = g.ndim
     n = g.shape[:n_spatial_dim]
-    normalization_factor = np.prod(n)
+    normalization_factor = np.prod(np.array(n))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         if n_spatial_dim == g.ndim:
