@@ -19,7 +19,7 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 model = SquaredExponentialModel()
 model.rho = 35
 model.sigma = 2
-model.nugget = 0.025
+model.nugget = 0.0
 
 # ##Grid specification
 
@@ -33,7 +33,7 @@ sampler = SamplerOnRectangularGrid(model, grid_france)
 
 z = sampler()
 plt.figure()
-plt.imshow(z, origin='lower', cmap='Spectral')
+plt.imshow(z, origin='lower', cmap='RdBu')
 plt.show()
 
 # ##Inference
