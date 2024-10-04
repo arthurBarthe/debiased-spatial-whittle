@@ -107,6 +107,7 @@ def fit(y, grid, cov_func, init_guess, fold=True, cov_func_prime=None, taper=Fal
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 from debiased_spatial_whittle.models import CovarianceModel, Parameters
+from debiased_spatial_whittle.new_models import Model, ModelParameter
 from typing import Callable, Union, Optional
 
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram as MultPeriodogram
@@ -527,7 +528,8 @@ class Estimator:
         self.f_opt = None
         self.f_info = None
 
-    def __call__(self, model: CovarianceModel, sample: Union[np.ndarray, SampleOnRectangularGrid], opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
+    def __call__(self, model: Model, sample: Union[np.ndarray, SampleOnRectangularGrid],
+                 opt_callback: Callable = None, x0: Optional[np.ndarray] = None):
         """
         Fits the passed covariance model to the passed data.
 
@@ -555,12 +557,12 @@ class Estimator:
         -----
         This directly updates the parameters of the passed covariance model.
         """
-        free_params = model.free_params
+        free_params = model.free_parameters
 
         # function to be optimized.
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
-        func = self._get_opt_func(model, free_params, sample, self.use_gradients)
+        func = self._get_opt_func(model, sample, self.use_gradients)
         if self.use_gradients:
             # TODO: inefficient, we call func twice
             opt_func = lambda x: func(x)[0]
@@ -568,32 +570,28 @@ class Estimator:
         else:
             opt_func = func
 
-        bounds = model.free_param_bounds
-        if x0 is None:
-            init_guess = numpy.array(free_params.init_guesses)
-        else:
-            init_guess = x0.copy()
-            
+        bounds = model.free_parameter_bounds_to_list_deep()
+        x0 = model.free_parameter_values_to_array_deep()
+
         if self.method in ('shgo', 'direct', 'differential_evolution', 'dual_annealing'):
             import scipy
             opt_result = getattr(scipy.optimize, self.method)(opt_func, bounds=bounds, callback=opt_callback,
                                                               **self.optim_options)
         else:
             if self.use_gradients:
-                opt_result = minimize(opt_func, init_guess, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
+                opt_result = minimize(opt_func, x0, jac=jac, method=self.method, bounds=bounds, callback=opt_callback,
                                   options=self.optim_options)
             else:
-                opt_result = minimize(opt_func, init_guess, method=self.method, bounds=bounds, callback=opt_callback,
+                opt_result = minimize(opt_func, x0, method=self.method, bounds=bounds, callback=opt_callback,
                                   options=self.optim_options)
-        model.params.update_values(dict(zip([p.name for p in free_params], opt_result.x)))
+        model.update_free_parameters(opt_result.x)
         self.opt_result = opt_result
         return model
 
-    def _get_opt_func(self, model, free_params, z, use_gradients):
+    def _get_opt_func(self, model: Model, z, use_gradients):
         if not use_gradients:
             def func(param_values):
-                updates = dict(zip(free_params.names, param_values))
-                free_params.update_values(updates)
+                model.update_free_parameters(param_values)
                 return self.likelihood(z, model).item()
         else:
             def func(param_values):
