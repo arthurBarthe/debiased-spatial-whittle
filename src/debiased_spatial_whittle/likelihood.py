@@ -571,7 +571,8 @@ class Estimator:
             opt_func = func
 
         bounds = model.free_parameter_bounds_to_list_deep()
-        x0 = model.free_parameter_values_to_array_deep()
+        # np.to_cpu ensures conversion to numpy array, necessary for the optimizer
+        x0 = np.to_cpu(model.free_parameter_values_to_array_deep())
 
         if self.method in ('shgo', 'direct', 'differential_evolution', 'dual_annealing'):
             import scipy
