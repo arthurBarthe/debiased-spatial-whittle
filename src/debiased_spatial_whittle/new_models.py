@@ -280,6 +280,18 @@ class SquaredExponentialModel(Model):
 
 
 class NuggetModel(CompoundModel):
+    """
+    Class to define a covariance modle based on a latent covariance model, and amplitude parameter and a nugget
+    parameter.
+
+    Properties
+    ----------
+    sigma: ModelParameter
+        standard deviation
+
+    nugget: ModelParameter
+        Proportion of variance explained by the nugget
+    """
     sigma = ModelParameter(default=1., bounds=(0, None), doc='Amplitude')
     nugget = ModelParameter(default=0., bounds=(0, 1), doc='Nugget amplitude')
 
