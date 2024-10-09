@@ -17,6 +17,7 @@ on:
       - "poetry.lock"
       - "pyproject.toml"
       - "docs/**"
+  pull-request:
   workflow_dispatch:
   repository_dispatch:
 
