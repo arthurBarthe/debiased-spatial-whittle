@@ -6,6 +6,8 @@ Spatial Debiased Whittle Likelihood
     :width: 150
     :alt: Image
 
+[![Documentation Status](https://readthedocs.org/projects/debiased-spatial-whittle/badge/?version=latest)](https://debiased-spatial-whittle.readthedocs.io/en/latest/?badge=latest)
+
 
 Intro
 ====
