@@ -1,5 +1,7 @@
 site_name: Documentation Debiased Spatial Whittle
 
+use_directory_urls: false
+
 theme:
   name: "material"
 
