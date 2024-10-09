@@ -6,6 +6,9 @@ Spatial Debiased Whittle Likelihood
     :width: 150
     :alt: Image
 
+.. image:: https://readthedocs.org/projects/debiased-spatial-whittle/badge/?version=latest
+    :target: https://debiased-spatial-whittle.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 Introduction
 ============
@@ -67,17 +70,10 @@ before running the poetry install command.
 
 
 Documentation
-=============
-The documentation currently only relies on Doc strings, and some examples that show the
-breadth of real-World scenarios for which the method can be applied.
+The documentation_ is hosted on readthedocs. It contains an API reference as well as
+examples.
 
-1. A standard full rectangular grid
-2. A circular observation domain
-3. Bernoulli missing observations
-4. Data on a France-like shape
-5. A mix of the last two
-6. A non-isotropic exponential covariance model
-7. A full Matern covariance model
+.. _documentation: https://debiased-spatial-whittle.readthedocs.io/en/latest/
 
 
 Tips
@@ -87,12 +83,5 @@ Tapering
 While tapering is not necessary for consistency of the SDW, it can be
 usefull for finite sample size in order to reduce variance, when
 remaining boundary effects are still important. In particular this
-is true for spectral models with a strong spectral slope, such as
+is true for spectral models with a strong dynamic range, such as
 the squared exponential covariance model.
-
-
-Future versions
-===============
-For future versions we will implement:
-
-1. Interpolation using the estimated covariance model
