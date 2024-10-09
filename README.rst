@@ -30,16 +30,10 @@ missing observations, and complex shapes of data.
 
 Documentation
 ====
-The documentation currently only relies on Doc strings, and some examples that show the
-breadth of real-World scenarios for which the method can be applied.
+The documentation_ is hosted on readthedocs. It contains an API reference as well as
+examples.
 
-1. A standard full rectangular grid
-2. A circular observation domain
-3. Bernoulli missing observations
-4. Data on a France-like shape
-5. A mix of the last two
-6. A non-isotropic exponential covariance model
-7. A full Matern covariance model
+.. _documentation: https://debiased-spatial-whittle.readthedocs.io/en/latest/
 
 
 Tips
