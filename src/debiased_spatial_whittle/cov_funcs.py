@@ -1,5 +1,8 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from scipy.special import gamma, kv
+
 
 def exp_cov(lags, rho, sigma=1.):
      return sigma ** 2 * np.exp(-np.sqrt(sum((lag**2 for lag in lags))) / rho)

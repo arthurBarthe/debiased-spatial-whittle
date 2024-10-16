@@ -1,19 +1,62 @@
-import numpy as np
-from numpy.fft import fftn, ifftn
+from .backend import BackendManager
+np = BackendManager.get_backend()
 
+import numpy as np_
 
-def spatial_kernel(data):
-    """Compute the spatial kernel, cg in the paper, via FFT.
+from typing import Tuple
+# TODO: have to adjust imports from backend
 
-    :param data: np.ndarray, the data for which we want to compute the sample autocovariance
-    In the case of a full grid with g=1 everywhere on the grid this takes a simple analytical form."""
-    n = list(data.shape)
-    two_n = list(data.shape)
-    for i in range(len(two_n)):
-        two_n[i] = two_n[i] * 2 - 1
-    f = abs(fftn(data, two_n))**2
-    slices = tuple(slice(None, 2 * s - 1, None) for s in n)
-    cg = np.real(ifftn(f)[slices])
-    # Normalise as in the paper
-    cg /= cg.flatten()[0]
+fftn = np.fft.fftn
+ifftn = np.fft.ifftn
+# ifftshift = np.fft.ifftshift
+
+def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None) -> np.ndarray:
+    """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
+
+    Parameters
+    ----------
+    g
+        mask of observations, or more generally pointwise modulation e.g. a taper or the product of a taper with an
+        observation mask
+    n_spatial_dim
+        Number of dimensions that are spatial dimensions. In the multivariate case, the last dimension is used for the
+        different variates.
+    m
+        offset in frequency indices
+
+    Returns
+    -------
+    cg
+        Spatial kernel
+    """
+    if n_spatial_dim is None:
+        n_spatial_dim = g.ndim
+    n = g.shape[:n_spatial_dim]
+    normalization_factor = np.prod(np.array(n))
+    two_n = tuple([s * 2 - 1 for s in n])
+    if m == (0, 0):
+        if n_spatial_dim == g.ndim:
+            # univariate case
+            f = np.abs(fftn(g, two_n))**2
+            cg = ifftn(f)
+            cg /= normalization_factor
+            return np.real(cg)
+        else:
+            # multivariate case
+            g = np.expand_dims(g, -1)
+            f1 = fftn(g, two_n, axes=tuple(range(n_spatial_dim)))
+            f2 = np.transpose(f1, tuple(range(n_spatial_dim)) + (-1, -2))
+            cg = ifftn(np.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
+            cg /= normalization_factor
+            return np.real(cg)
+    # TODO only works in 2d right now
+    m1, m2 = m
+    n1, n2 = n
+    a = np.exp(2j * np.pi * m1 / n1 * np.arange(n1)).reshape((-1, 1))
+    a = a * np.exp(2j * np.pi * m2 / n2 * np.arange(n2)).reshape((1, -1))
+    g2 = g * a
+    f = fftn(g, two_n) * np.conj(fftn(g2, two_n))
+    cg = ifftn(f)
+    # TODO check normalization is consistent
+    cg /= np.sum(g**2)
     return cg
