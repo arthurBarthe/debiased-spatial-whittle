@@ -453,6 +453,24 @@ class DebiasedWhittle:
         -------
         np.ndarray
             Sample covariance matrix of the gradient of the likelihood
+
+        Examples
+        --------
+        >>> import numpy.random as nrrandom
+        >>> nrrandom.seed(1712)
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 12
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> dbw.jmatrix_sample(model, model.params, n_sims=20)
+        array([[ 1.79844275e-06, -3.36165062e-05, -1.46535796e-04],
+               [-3.36165062e-05,  8.20809861e-04,  2.89073624e-03],
+               [-1.46535796e-04,  2.89073624e-03,  1.53001387e-02]])
         """
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
@@ -485,6 +503,25 @@ class DebiasedWhittle:
         -------
         cov_mat
             Covariance matrix of the parameter estimates.
+        
+        Examples
+        --------
+        >>> import numpy.random as nrrandom
+        >>> nrrandom.seed(1712)
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 12
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> jmat = dbw.jmatrix_sample(model, model.params, n_sims=20)
+        >>> dbw.variance_of_estimates(model, model.params, jmat)
+        array([[9.09922893e+00, 4.94112586e-01, 4.83568479e-03],
+               [4.94112586e-01, 2.75659859e-02, 1.70142181e-04],
+               [4.83568479e-03, 1.70142181e-04, 1.67758253e-05]])
         """
         hmat = self.fisher(model, params)
         if jmat is None:
@@ -511,7 +548,7 @@ class Estimator:
         Additional options passed to the optimizer.
 
     method: string
-        Optimization procedure
+        Optimization procedure. Should be one of the methods available in scipy's local or global optimizers.
     """
     def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter: int=100,
                  optim_options=dict(), method: str='L-BFGS-B'):
