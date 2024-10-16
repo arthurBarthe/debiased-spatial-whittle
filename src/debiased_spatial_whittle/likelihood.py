@@ -230,7 +230,7 @@ class DebiasedWhittle:
     Attributes
     ----------
     periodogram: Periodogram
-        Multivariate periodogram applied to the multivariate random field
+        Periodogram applied to the data
 
     expected_periodogram: ExpectedPeriodogram
         Object used to compute the expectation of the periodogram
@@ -345,7 +345,7 @@ class DebiasedWhittle:
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
         """
-        Provides the Fisher Information Matrix
+        Provides the Fisher Information Matrix.
 
         Parameters
         ----------
@@ -359,6 +359,22 @@ class DebiasedWhittle:
         -------
         fisher: ndarray
             Fisher covariance matrix
+
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 30
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> dbw.fisher(model, model.params)
+        array([[ 1.03736229e-03, -4.49238561e-02, -6.01436043e-01],
+               [-4.49238561e-02,  2.01197123e+00,  2.58931333e+01],
+               [-6.01436043e-01,  2.58931333e+01,  4.49900628e+02]])
         """
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
@@ -368,7 +384,6 @@ class DebiasedWhittle:
                 d_ep1 = d_ep[..., i1]
                 d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
-        # TODO ugly
         return h / self.expected_periodogram.grid.n_points
 
     def jmatrix(self, model: CovarianceModel, params_for_gradient: Parameters, mcmc_mode: bool = False):
