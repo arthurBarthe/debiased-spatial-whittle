@@ -299,6 +299,7 @@ class CovarianceModel(ABC):
     def __getstate__(self):
         """
         Necessary for pickling and unpiclking
+
         Returns
         -------
         State as a dictionary
@@ -448,6 +449,25 @@ class ExponentialModel(CovarianceModel):
         self.nugget = 0.
 
     def __call__(self, lags: np.ndarray):
+        """
+
+        Parameters
+        ----------
+        lags
+            Array of lags
+
+        Returns
+        -------
+        Exponential covariance function evaluated at the passed lags.
+
+        Examples
+        --------
+        >>> model = ExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]))
+        array([1.9881    , 1.2058436 , 1.2058436 , 0.98026987])
+        """
         d = np.sqrt(sum((lag**2 for lag in lags)))
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value ** 2 * np.exp(- d / self.rho.value) + nugget_effect
@@ -455,7 +475,17 @@ class ExponentialModel(CovarianceModel):
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
-        the model's parameters"""
+        the model's parameters. The user should not call this method directly in general, instead they should
+        use the gradient method.
+
+        Examples
+        --------
+        >>> model = ExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.3014609 , 0.3014609 , 0.34657773]), 'nugget': array([1., 0., 0., 0.])}
+        """
         d = np.sqrt(sum((lag ** 2 for lag in lags)))
         d_rho = (self.sigma.value / self.rho.value) ** 2 * d * np.exp(- d / self.rho.value)
         d_sigma = 2 * self.sigma.value * np.exp(- d / self.rho.value)
