@@ -642,8 +642,14 @@ class SquaredExponentialModel(CovarianceModel):
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
-        the model's parameters"""
-        # TODO: include nugget
+        the model's parameters.
+
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.21931151, 0.21931151, 0.38708346]), 'nugget': array([1., 0., 0., 0.])}
+        """
         d2 = sum((lag ** 2 for lag in lags))
         d_rho =  self.rho.value ** (-3) * d2 * self.sigma.value ** 2 * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
         d_sigma = 2 * self.sigma.value * np.exp(- 1 / 2 * d2 / self.rho.value ** 2)
