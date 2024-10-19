@@ -328,8 +328,10 @@ class ExpectedPeriodogram:
         else:
             cg = spatial_kernel(self.grid.mask, d)
         if grid.nvars == 1:
-            cg = np.expand_dims(cg, (-1, -2))
-            acv = np.expand_dims(acv, (-1, -2))
+            cg = np.expand_dims(cg, -1)
+            cg = np.expand_dims(cg, -1)
+            acv = np.expand_dims(acv, -1)
+            acv = np.expand_dims(acv, -1)
         cbar = cg * acv
         # now we need to "fold"
         if fold:

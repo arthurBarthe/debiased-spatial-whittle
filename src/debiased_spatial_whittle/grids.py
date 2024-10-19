@@ -243,15 +243,15 @@ class RectangularGrid:
         return imshow_extent
 
     @property
-    def fourier_frequencies(self) -> np.ndarray:
-        """Grid of Fourier frequencies corresponding to the spatial grid."""
-        mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
+    def fourier_frequencies(self):
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid."""
+        mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)], indexing='ij')
         return np.stack(mesh, axis=-1)
 
     @property
-    def fourier_frequencies2(self) -> np.ndarray:
-        """Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
-        mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
+    def fourier_frequencies2(self):
+        """ndarray: Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
+        mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)], indexing='ij')
         out = np.stack(mesh, axis=-1)
         return BackendManager.convert(out)
 

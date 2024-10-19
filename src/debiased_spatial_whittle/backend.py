@@ -90,6 +90,15 @@ class BackendManager:
             return lambda *args, **kargs: torch.zeros(*args, **kargs, device=BackendManager.device)
 
     @classmethod
+    def get_ones(cls):
+        if cls.backend_name == 'numpy' or cls.backend_name == 'autograd':
+            return numpy.ones
+        if cls.backend_name == 'cupy':
+            return cupy.ones
+        elif cls.backend_name == 'torch':
+            return lambda *args, **kargs: torch.ones(*args, **kargs, device=BackendManager.device)
+
+    @classmethod
     def get_randn(cls):
         if cls.backend_name == 'numpy' or cls.backend_name == 'autograd':
             return numpy.random.randn
@@ -147,6 +156,17 @@ class BackendManager:
             fftn = cls._changes_keyword(torch.fft.fftn, 'axes', 'dim')
             ifftn = cls._changes_keyword(torch.fft.ifftn, 'axes', 'dim')
             return fftn, ifftn
+
+    @classmethod
+    def get_fftfreq(cls):
+        if cls.backend_name == 'numpy':
+            return numpy.fft.fftfreq
+        elif cls.backend_name == 'cupy':
+            return cupy.fft.fftfreq
+        elif cls.backend_name == 'torch':
+            def new_fftfreq(*args, **kargs):
+                return torch.fft.fftfreq(*args, **kargs).to(device=cls.device)
+            return new_fftfreq
 
     @classmethod
     def get_fftshift_methods(cls):
