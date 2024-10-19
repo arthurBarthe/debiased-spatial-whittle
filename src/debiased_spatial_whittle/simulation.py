@@ -40,6 +40,8 @@ def sim_circ_embedding(cov_func, shape):
 from typing import Tuple
 from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, ChiSquaredModel, BivariateUniformCorrelation
 from debiased_spatial_whittle.grids import RectangularGrid
+from scipy.stats import multivariate_normal
+
 
 
 def prod_list(l: Tuple[int]):
@@ -232,45 +234,6 @@ class SamplerSeparable:
             z_i = self._unit_sample()
             z = i / (i + 1) * z + 1 / (i + 1) * z_i
         return z * np.sqrt(self.n_sim)
-
-from scipy.stats import multivariate_normal
-
-class SamplerCorrelatedOnRectangularGrid:
-    """Class that allows to define samplers for Rectangular grids, for which
-    fast exact sampling can be achieved via circulant embeddings and the use of the
-    Fast Fourier Transform."""
-
-    def __init__(self, model: CovarianceModel, grid: RectangularGrid, correlation: float):
-        self.model = model
-        self.grid = grid
-        self.e_dist = multivariate_normal(np.zeros(2), [[1, correlation], [correlation, 1]])
-        self._f = None
-
-    @property
-    def f(self):
-        if self._f is None:
-            cov = self.grid.autocov(self.model)
-            f = prod_list(self.grid.n) * ifftn(cov)
-            min_ = np.min(f)
-            if min_ <= -1e-5:
-                sys.exit(0)
-                warnings.warn(f'Embedding is not positive definite, min value {min_}.')
-            self._f = np.maximum(f, 0)
-        return self._f
-
-    # TODO make this work for 1-d and 3-d
-    def __call__(self, periodic: bool = False):
-        f = np.expand_dims(self.f, -1)
-        e = self.e_dist.rvs(size=f.shape + (2, ))
-        e = e[..., 0, :] + 1j * e[..., 1, :]
-        z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(self.grid.n_points) * np.real(fftn(z, axes=list(range(z.ndim - 1))))
-        if periodic:
-            return z_inv
-        for i, n in enumerate(self.grid.n):
-            z_inv = np.take(z_inv, np.arange(n), i)
-        z_inv = np.reshape(z_inv, self.grid.n + (2, ))
-        return z_inv * np.expand_dims(self.grid.mask, -1)
 
 
 class SamplerBUCOnRectangularGrid:

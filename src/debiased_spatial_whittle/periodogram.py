@@ -1,12 +1,12 @@
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
 from itertools import product
 from typing import Tuple
 
-from .spatial_kernel import spatial_kernel
-from .models import Parameters
-from .utils import prod_list
+from debiased_spatial_whittle.spatial_kernel import spatial_kernel
+from debiased_spatial_whittle.models import Parameters
+from debiased_spatial_whittle.utils import prod_list
 
 fft = np.fft.fft
 fftn = np.fft.fftn
@@ -136,20 +136,23 @@ class Periodogram:
     Attributes
     ----------
     taper: function handle
-        tapering function
-
-    scaling: str
-        Choice of scaling, only 'ortho' is currently accepted
+        tapering function, takes a single argument, the shape of the grid.
 
     fold: boolean
         Whether to fold the periodogram.
+
+    Examples
+    --------
+    >>> from numpy import hanning
+    >>> def hanning_taper(shape):
+    ...     m, n = shape
+    ...     return hanning(m).reshape((-1, 1)) * hanning(n).reshape((1, -1))
+    >>> periodogram = Periodogram(hanning_taper)
     """
 
-    def __init__(self, taper = None, scaling='ortho'):
+    def __init__(self, taper = None):
         if taper is None:
             self.taper = lambda shape: np.ones(shape)
-        self.scaling = scaling
-        #TODO add scaling
         self.fold = True
         self._version = 0
 
@@ -165,15 +168,6 @@ class Periodogram:
     def fold(self, value: bool):
         self._fold = value
 
-    @property
-    def scaling(self):
-        """Choice of scaling applied to the periodogram. Only 'ortho' is currently accepted."""
-        return self._scaling
-
-    @scaling.setter
-    def scaling(self, value: str):
-        self._scaling = value
-
     def __call__(self, sample: Union[np.ndarray, SampleOnRectangularGrid]):
         """
         Computes the periodogram of the data.
@@ -181,7 +175,7 @@ class Periodogram:
         Parameters
         ----------
         sample: ndarray | SampleOnRectangularGrid
-            Sampled data on the grid. Can either be an ndarray, or an instance of SampleOnRectangularGrid.
+            Sampled data on the grid. Can either be a ndarray, or an instance of SampleOnRectangularGrid.
             In the latter case, repeated calls to this method will access cached values of the periodogram
             rather than carrying out the same computation again.
 
@@ -190,9 +184,8 @@ class Periodogram:
         periodogram: ndarray
             Periodogram of the data
             - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
-            - shape (n1, ..., nk) if the fold attribute is True
+            - shape (n1, ..., nk) if the fold attribute is True (default)
         """
-        # TODO add tapering
         if isinstance(sample, SampleOnRectangularGrid):
             if self in sample.periodograms:
                 return sample.periodograms[self]
@@ -232,6 +225,7 @@ class HashableArray:
     def __eq__(self, other):
         return self.values == other.values
 
+
 class ExpectedPeriodogram:
     """
     Provides the capability to compute the expected periodogram on a fixed grid for
@@ -244,7 +238,6 @@ class ExpectedPeriodogram:
 
     periodogram: Periodogram
         periodogram for which we require the expectation. This is necessary to account for tapering for instance.
-
     """
 
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
@@ -306,10 +299,12 @@ class ExpectedPeriodogram:
         acv: ndarray (2 * n1 + 1, ..., 2 * nk + 1)
             Autocovariance evaluated on the grid. Here (n1, ..., nk) is the shape of the grid. The standard way to
             obtain acv is through the call of the autocov method of a rectangular grid.
+            In the case of p-multivariate random fields, acv should have two extra dimensions at the end both of size p,
+            hence acv should have overall shape (2 * n1 + 1, ... 2 * nk + 1, p, p) in the p-multivariate case.
         fold
             Whether to apply folding of the expected periodogram
         d
-            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
+            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT in the 2d case.
 
         Returns
         -------
@@ -332,14 +327,12 @@ class ExpectedPeriodogram:
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
-        # TODO add tapering
         if grid.nvars == 1:
             cg = np.expand_dims(cg, (-1, -2))
             acv = np.expand_dims(acv, (-1, -2))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
-            # TODO: check if working
             if BackendManager.backend_name == 'torch':
                 result = np.zeros(grid.n + (p, p), dtype=np.complex128, device=BackendManager.device)
             else:
@@ -364,8 +357,6 @@ class ExpectedPeriodogram:
                                        j*shape[1]: (j+1)*shape[1],
                                        k*shape[2]: (k+1)*shape[2]]    
                             result += np.pad(res, ((i,0), (j,0), (k,0), (0, 0), (0, 0)), mode='constant')
-        
-
             # else:
             #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
             #     for ijk in indexes:
@@ -380,10 +371,12 @@ class ExpectedPeriodogram:
             result[:m, n + 1:] = cbar[:m, n:]
 
         if d == (0, 0):
+            # this is the standard case
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
                 out = np.real(np.reshape(out, grid.n))
             return out
+        
         out = fftn(result)
         if grid.nvars == 1:
             out = np.reshape(out, grid.n)
@@ -411,6 +404,18 @@ class ExpectedPeriodogram:
         Notes
         -----
         This requires that the model's _gradient method be implemented.
+
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.models import SquaredExponentialModel
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> grid = RectangularGrid((64, 128))
+        >>> ep = ExpectedPeriodogram(grid, Periodogram())
+        >>> model = SquaredExponentialModel()
+        >>> model.sigma = 1
+        >>> model.rho = 16
+        >>> ep.gradient(model, model.params).shape
+        (64, 128, 3)
         """
         lags = self.grid.lags_unique
         d_acv = model.gradient(lags, params)
@@ -549,6 +554,19 @@ class ExpectedPeriodogram:
         """
         return np.abs(self.cov_dft_antidiagonals(model, m)) ** 2
 
+
+class SmoothedExpectedPeriodogram:
+    def __init__(self, grid: RectangularGrid, periodogram):
+        self.grid = grid
+        self.periodogram = periodogram
+        self.subgrid = RectangularGrid(tuple([n_i // 4 for n_i in grid.n]), grid.delta)
+        self.subep = ExpectedPeriodogram(self.subgrid, periodogram)
+
+    def __call__(self, model: CovarianceModel):
+        ep = self.subep(model)
+        for i_dim in range(self.grid.ndim):
+            ep = np.repeat(ep, 4, i_dim)
+        return ep
 
 
 class SeparableExpectedPeriodogram(ExpectedPeriodogram):

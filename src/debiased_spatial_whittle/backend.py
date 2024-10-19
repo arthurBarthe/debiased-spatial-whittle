@@ -61,7 +61,7 @@ class BackendManager:
             return autograd.numpy
         elif cls.backend_name == 'torch':
             torch.to_cpu = lambda x: x.cpu()
-            torch.set_default_tensor_type(torch.DoubleTensor)
+            torch.set_default_dtype(torch.float64)
             torch.array = lambda x: torch.tensor(x, dtype=torch.float64, device=cls.device)
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
