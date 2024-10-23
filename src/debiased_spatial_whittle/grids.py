@@ -325,7 +325,8 @@ class RectangularGrid:
         """
         if hasattr(model, 'call_on_rectangular_grid'):
             return model.call_on_rectangular_grid(self)
-        return ifftshift(model(self.lags_unique), list(range(self.ndim)))
+        lags = np.expand_dims(self.lags_unique, -1)
+        return ifftshift(model(lags), list(range(self.ndim)))
 
     def autocov_separable(self, model: SeparableModel):
         """

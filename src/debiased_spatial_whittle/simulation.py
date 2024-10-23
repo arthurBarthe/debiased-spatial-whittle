@@ -114,7 +114,7 @@ class SamplerOnRectangularGrid:
     def f(self):
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
-            cov = self.sampling_grid.autocov(self.model)
+            cov = self.sampling_grid.autocov(self.model)[..., 0]
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = np.real(f)
             min_ = np.min(f)

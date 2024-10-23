@@ -198,10 +198,7 @@ class Model(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
-        lags = np.expand_dims(lags, -1)
         acv = self._compute(lags)
-        if acv.shape[-1] == 1:
-            return np.squeeze(acv, -1)
         return acv
 
 
@@ -247,6 +244,12 @@ class CompoundModel(ModelInterface):
                 '<div style="margin-left:15px;padding-left:75px; border-left:solid gray 5px">' +
                 ''.join([child._repr_html_() for child in self.children]) +
                 '</div>')
+    def _compute(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+    def __call__(self, lags: np.ndarray):
+        acv = self._compute(lags)
+        return acv
 
 
 class SumModel(CompoundModel):
@@ -256,7 +259,7 @@ class SumModel(CompoundModel):
     def __init__(self, children, *args, **kwargs):
         super().__init__(children, *args, **kwargs)
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         values = (child(lags) for child in self.children)
         out = sum(values)
         return out / self._norm_constant() * self.sigma ** 2
@@ -307,5 +310,5 @@ class NuggetModel(CompoundModel):
     def __init__(self, model, *args, **kwargs):
         super().__init__([model, ], *args, **kwargs)
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         return (np.all(lags == 0, 0) * self.nugget + (1 - self.nugget) * self.children[0](lags)) * self.sigma ** 2
