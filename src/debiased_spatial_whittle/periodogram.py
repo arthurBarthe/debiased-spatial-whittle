@@ -128,6 +128,8 @@ from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
+ones = BackendManager.get_ones()
+zeros = BackendManager.get_zeros()
 
 class Periodogram:
     """
@@ -152,7 +154,7 @@ class Periodogram:
 
     def __init__(self, taper = None):
         if taper is None:
-            self.taper = lambda shape: np.ones(shape)
+            self.taper = lambda shape: ones(shape)
         self.fold = True
         self._version = 0
 
@@ -332,33 +334,39 @@ class ExpectedPeriodogram:
             cg = np.expand_dims(cg, -1)
             acv = np.expand_dims(acv, -1)
             acv = np.expand_dims(acv, -1)
+        if acv.ndim == n_dim + 2:
+            single_acv = True
+            acv = np.expand_dims(acv, -3)
+            q = 1
+        else:
+            single_acv = False
+            q = acv.shape[-3]
+        cg = np.expand_dims(cg, -3)
         cbar = cg * acv
+        result_shape = grid.n + (q, p, p)
         # now we need to "fold"
         if fold:
-            if BackendManager.backend_name == 'torch':
-                result = np.zeros(grid.n + (p, p), dtype=np.complex128, device=BackendManager.device)
-            else:
-                result = np.zeros(grid.n + (p, p), dtype=np.complex128)
+            result = zeros(result_shape, dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
-                    res = cbar[i*shape[0]: (i+1)*shape[0]]
-                    result += np.pad(res, (i,0), mode='constant')
+                    res = cbar[i * shape[0]: (i + 1) * shape[0]]
+                    result += np.pad(res, ((i, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
                     
             elif n_dim == 2:
                 for i in range(2):
                     for j in range(2):
-                        res = cbar[i*shape[0]: (i+1)*shape[0],
-                                   j*shape[1]: (j+1)*shape[1]]
-                        result += np.pad(res, ((i,0), (j,0), (0, 0), (0, 0)), mode='constant')   # autograd solution
+                        res = cbar[i * shape[0]: (i + 1) * shape[0],
+                                   j * shape[1]: (j + 1) * shape[1]]
+                        result += np.pad(res, ((i, 0), (j, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
                         
             elif n_dim == 3:
                 for i in range(2):
                     for j in range(2):
                         for k in range(2):
-                            res = cbar[i*shape[0]: (i+1)*shape[0],
-                                       j*shape[1]: (j+1)*shape[1],
-                                       k*shape[2]: (k+1)*shape[2]]    
-                            result += np.pad(res, ((i,0), (j,0), (k,0), (0, 0), (0, 0)), mode='constant')
+                            res = cbar[i * shape[0]: (i + 1) * shape[0],
+                                       j * shape[1]: (j + 1) * shape[1],
+                                       k * shape[2]: (k + 1) * shape[2]]
+                            result += np.pad(res, ((i, 0), (j, 0), (k, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
             # else:
             #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
             #     for ijk in indexes:
@@ -376,8 +384,10 @@ class ExpectedPeriodogram:
             # this is the standard case
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
-                out = np.real(np.reshape(out, grid.n))
-            return out
+                out = np.squeeze(out, (-2, -1))
+            if single_acv:
+                out = np.squeeze(out, -1)
+            return np.real(out)
         
         out = fftn(result)
         if grid.nvars == 1:

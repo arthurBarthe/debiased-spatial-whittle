@@ -25,7 +25,7 @@ test = ["astroid (>=1,<2)", "astroid (>=2,<4)", "pytest"]
 name = "attrs"
 version = "24.2.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -337,6 +337,14 @@ test = ["aiohttp (!=4.0.0a0,!=4.0.0a1)", "numpy", "pytest", "pytest-asyncio (!=0
 test-downstream = ["aiobotocore (>=2.5.4,<3.0.0)", "dask-expr", "dask[dataframe,test]", "moto[server] (>4,<5)", "pytest-timeout", "xarray"]
 test-full = ["adlfs", "aiohttp (!=4.0.0a0,!=4.0.0a1)", "cloudpickle", "dask", "distributed", "dropbox", "dropboxdrivefs", "fastparquet", "fusepy", "gcsfs", "jinja2", "kerchunk", "libarchive-c", "lz4", "notebook", "numpy", "ocifs", "pandas", "panel", "paramiko", "pyarrow", "pyarrow (>=1)", "pyftpdlib", "pygit2", "pytest", "pytest-asyncio (!=0.22.0)", "pytest-benchmark", "pytest-cov", "pytest-mock", "pytest-recording", "pytest-rerunfailures", "python-snappy", "requests", "smbprotocol", "tqdm", "urllib3", "zarr", "zstandard"]
 tqdm = ["tqdm"]
+
+[[package]]
+name = "future"
+version = "1.0.0"
+description = "Clean single-source support for Python 3 and 2"
+category = "main"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "ghp-import"
@@ -1412,6 +1420,26 @@ python-versions = ">=3.6.8"
 diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
+name = "pyswarms"
+version = "1.3.0"
+description = "A Python-based Particle Swarm Optimization (PSO) library."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+attrs = "*"
+future = "*"
+matplotlib = ">=1.3.1"
+numpy = "*"
+pyyaml = "*"
+scipy = "*"
+tqdm = "*"
+
+[package.extras]
+test = ["alabaster (==0.7.12)", "attrs (==18.1.0)", "babel (==2.6.0)", "backcall (==0.1.0)", "bleach (==3.1.0)", "bumpversion (==0.5.3)", "certifi (==2018.11.29)", "chardet (==3.0.4)", "coverage (==4.5.1)", "cycler (==0.10.0)", "decorator (==4.4.0)", "defusedxml (==0.6.0)", "docutils (==0.14)", "entrypoints (==0.3)", "flake8 (==3.5.0)", "future (==0.16.0)", "idna (==2.8)", "imagesize (==1.1.0)", "iniconfig (==1.1.1)", "ipykernel (==5.1.1)", "ipython (==7.5.0)", "ipython-genutils (==0.2.0)", "jedi (==0.13.3)", "jinja2 (==2.10)", "joblib (==0.13.2)", "jsonschema (==3.0.1)", "jupyter-client (==5.2.4)", "jupyter-core (==4.4.0)", "kiwisolver (==1.0.1)", "markupsafe (==1.1.0)", "matplotlib (==3.0.2)", "mccabe (==0.6.1)", "mistune (==0.8.4)", "mock (==2.0.0)", "nbconvert (==5.5.0)", "nbformat (==4.4.0)", "nbsphinx (==0.4.2)", "nbstripout (==0.3.5)", "numpy (==1.16.1)", "packaging (==19.0)", "pandas (==0.24.2)", "pandocfilters (==1.4.2)", "parso (==0.4.0)", "pbr (==5.1.1)", "pexpect (==4.7.0)", "pickleshare (==0.7.5)", "pluggy (==0.13.1)", "pockets (==0.7.2)", "prompt-toolkit (==2.0.9)", "ptyprocess (==0.6.0)", "py (==1.9.0)", "pycodestyle (==2.3.1)", "pyflakes (==1.6.0)", "pygments (==2.3.1)", "pyparsing (==2.3.1)", "pyrsistent (==0.15.2)", "pytest (==6.1.2)", "pytest-cov (==2.10.1)", "python-dateutil (==2.7.5)", "pytz (==2018.9)", "pyyaml (==3.13)", "pyzmq (==18.0.1)", "requests (==2.21.0)", "scikit-learn (==0.21.1)", "scipy (==1.2.0)", "seaborn (==0.9.0)", "six (==1.12.0)", "snowballstemmer (==1.2.1)", "sphinx (==1.7.6)", "sphinx-rtd-theme (==0.4.3)", "sphinxcontrib-napoleon (==0.7)", "sphinxcontrib-websupport (==1.1.0)", "testpath (==0.4.2)", "toml (==0.10.2)", "tornado (==6.0.2)", "tox (==3.2.1)", "tqdm (==4.24.0)", "traitlets (==4.3.2)", "urllib3 (==1.24.1)", "virtualenv (==16.3.0)", "wcwidth (==0.1.7)", "webencodings (==0.5.1)", "wheel (==0.31.1)"]
+
+[[package]]
 name = "pytest"
 version = "7.4.4"
 description = "pytest: simple powerful testing with Python"
@@ -1477,7 +1505,7 @@ python-versions = "*"
 name = "pyyaml"
 version = "6.0.2"
 description = "YAML parser and emitter for Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -1711,6 +1739,23 @@ optional = false
 python-versions = ">=3.8"
 
 [[package]]
+name = "tqdm"
+version = "4.66.5"
+description = "Fast, Extensible Progress Meter"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
+[[package]]
 name = "traitlets"
 version = "5.14.3"
 description = "Traitlets Python configuration system"
@@ -1826,7 +1871,7 @@ others = ["autograd", "seaborn", "numdifftools"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9, <4.0"
-content-hash = "7ce10fd5392196529ddfca3a78140bb159e3c088e98095eff68008d25fae30e8"
+content-hash = "fe8d2a7f1425f4f8fa1dbc486167f2b1b22d301027188b3c1d319de241699813"
 
 [metadata.files]
 appnope = [
@@ -2297,6 +2342,10 @@ fonttools = [
 fsspec = [
     {file = "fsspec-2024.9.0-py3-none-any.whl", hash = "sha256:a0947d552d8a6efa72cc2c730b12c41d043509156966cca4fb157b0f2a0c574b"},
     {file = "fsspec-2024.9.0.tar.gz", hash = "sha256:4b0afb90c2f21832df142f292649035d80b421f60a9e1c027802e5a0da2b04e8"},
+]
+future = [
+    {file = "future-1.0.0-py3-none-any.whl", hash = "sha256:929292d34f5872e70396626ef385ec22355a1fae8ad29e1a734c3e43f9fbc216"},
+    {file = "future-1.0.0.tar.gz", hash = "sha256:bd2968309307861edae1458a4f8a4f3598c03be43b97521076aebf5d94c07b05"},
 ]
 ghp-import = [
     {file = "ghp-import-2.1.0.tar.gz", hash = "sha256:9c535c4c61193c2df8871222567d7fd7e5014d835f97dc7b7439069e2413d343"},
@@ -2979,6 +3028,10 @@ pyparsing = [
     {file = "pyparsing-3.1.4-py3-none-any.whl", hash = "sha256:a6a7ee4235a3f944aa1fa2249307708f893fe5717dc603503c6c7969c070fb7c"},
     {file = "pyparsing-3.1.4.tar.gz", hash = "sha256:f86ec8d1a83f11977c9a6ea7598e8c27fc5cddfa5b07ea2241edbbde1d7bc032"},
 ]
+pyswarms = [
+    {file = "pyswarms-1.3.0-py2.py3-none-any.whl", hash = "sha256:8a51e55fbc26b0a6538913a0f2439c481b3891787b7ea98cb2cc063f834dd154"},
+    {file = "pyswarms-1.3.0.tar.gz", hash = "sha256:1204aa9c332c662113e3c37d1b109906f4a0859b29ded80c1582dc66387ce34b"},
+]
 pytest = [
     {file = "pytest-7.4.4-py3-none-any.whl", hash = "sha256:b090cdf5ed60bf4c45261be03239c2c1c22df034fbffe691abe93cd80cea01d8"},
     {file = "pytest-7.4.4.tar.gz", hash = "sha256:2cf0005922c6ace4a3e2ec8b4080eb0d9753fdc93107415332f50ce9e7994280"},
@@ -3487,6 +3540,10 @@ tornado = [
     {file = "tornado-6.4.1-cp38-abi3-win32.whl", hash = "sha256:d9a566c40b89757c9aa8e6f032bcdb8ca8795d7c1a9762910c722b1635c9de4d"},
     {file = "tornado-6.4.1-cp38-abi3-win_amd64.whl", hash = "sha256:b24b8982ed444378d7f21d563f4180a2de31ced9d8d84443907a0a64da2072e7"},
     {file = "tornado-6.4.1.tar.gz", hash = "sha256:92d3ab53183d8c50f8204a51e6f91d18a15d5ef261e84d452800d4ff6fc504e9"},
+]
+tqdm = [
+    {file = "tqdm-4.66.5-py3-none-any.whl", hash = "sha256:90279a3770753eafc9194a0364852159802111925aa30eb3f9d85b0e805ac7cd"},
+    {file = "tqdm-4.66.5.tar.gz", hash = "sha256:e1020aef2e5096702d8a025ac7d16b1577279c9d63f8375b63083e9a5f0fcbad"},
 ]
 traitlets = [
     {file = "traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f"},

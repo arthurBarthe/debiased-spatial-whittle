@@ -9,6 +9,8 @@ import param
 from param import Parameterized
 from param.parameterized import _get_param_repr
 
+zeros = BackendManager.get_zeros()
+
 
 def _parameterized_repr_html(p, open):
     """HTML representation for a Parameterized object"""
@@ -76,8 +78,11 @@ def _parameterized_repr_html(p, open):
     )
 
 
-class ModelParameter(param.Number):
+class ModelParameter(param.Parameter):
+    __slots__ = ['bounds', ]
+
     def __init__(self, *args, **kwargs):
+        self.bounds = kwargs.pop('bounds')
         super().__init__(*args, allow_refs=True, per_instance=True, **kwargs)
 
 
@@ -189,6 +194,16 @@ class Model(ModelInterface):
     def _repr_html_(self):
         return _parameterized_repr_html(self, True)
 
+    def _compute(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+    def __call__(self, lags: np.ndarray):
+        lags = np.expand_dims(lags, -1)
+        acv = self._compute(lags)
+        if acv.shape[-1] == 1:
+            return np.squeeze(acv, -1)
+        return acv
+
 
 class CompoundModel(ModelInterface):
     def __init__(self, children, *args, **kwargs):
@@ -241,31 +256,25 @@ class SumModel(CompoundModel):
     def __init__(self, children, *args, **kwargs):
         super().__init__(children, *args, **kwargs)
 
-    def _update(self, event):
-        values = np.array([child.sigma for child in self.children])
-        values = values / np.sqrt(np.sum(values ** 2))
-        for child, value in zip(self.children, values):
-            child.sigma = value
-
     def __call__(self, lags: np.ndarray):
-        out = np.zeros(lags.shape[1:])
-        for child in self.children:
-            out += child(lags)
+        values = (child(lags) for child in self.children)
+        out = sum(values)
         return out / self._norm_constant() * self.sigma ** 2
 
     def _norm_constant(self):
-        list_sigmas = []
-        for child in self.children:
-            list_sigmas.append(child.sigma)
-        sigmas = np.array(list_sigmas)
-        return np.sum(sigmas ** 2)
+        try:
+            sigmas = np.stack([child.sigma for child in self.children])
+        except TypeError:
+            sigmas = np.array([child.sigma for child in self.children])
+        out = np.sum(sigmas ** 2, axis=0)
+        return out
 
 
 class ExponentialModel(Model):
     rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
     sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         d = np.sqrt(np.sum(lags ** 2, 0)) / self.rho
         return self.sigma ** 2 * np.exp(- d)
 
@@ -274,7 +283,7 @@ class SquaredExponentialModel(Model):
     rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
     sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         d = np.sum(lags ** 2, 0) / (2 * self.rho ** 2)
         return self.sigma ** 2 * np.exp(- d)
 
@@ -298,5 +307,5 @@ class NuggetModel(CompoundModel):
     def __init__(self, model, *args, **kwargs):
         super().__init__([model, ], *args, **kwargs)
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         return (np.all(lags == 0, 0) * self.nugget + (1 - self.nugget) * self.children[0](lags)) * self.sigma ** 2
