@@ -9,6 +9,7 @@ from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
 
+ones = BackendManager.get_ones()
 
 fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
@@ -214,9 +215,9 @@ class RectangularGrid:
     @mask.setter
     def mask(self, value: np.ndarray):
         if value is None:
-            value = np.ones(self.n)
+            value = ones(self.n)
             if self.nvars > 1:
-                value = np.ones(self.n + (self.nvars,))
+                value = ones(self.n + (self.nvars,))
         if self.nvars == 1:
             assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
         else:

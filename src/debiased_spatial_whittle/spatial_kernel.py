@@ -8,7 +8,6 @@ from typing import Tuple
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
-# ifftshift = np.fft.ifftshift
 
 def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None) -> np.ndarray:
     """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
@@ -49,7 +48,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
             cg = ifftn(np.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
             cg /= normalization_factor
             return np.real(cg)
-    # TODO only works in 2d right now
+    # TODO case m != 0 only works in 2d right now
     m1, m2 = m
     n1, n2 = n
     a = np.exp(2j * np.pi * m1 / n1 * np.arange(n1)).reshape((-1, 1))
@@ -57,6 +56,5 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
     g2 = g * a
     f = fftn(g, two_n) * np.conj(fftn(g2, two_n))
     cg = ifftn(f)
-    # TODO check normalization is consistent
     cg /= np.sum(g**2)
     return cg
