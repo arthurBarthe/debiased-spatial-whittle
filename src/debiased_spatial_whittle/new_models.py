@@ -307,5 +307,5 @@ class NuggetModel(CompoundModel):
     def __init__(self, model, *args, **kwargs):
         super().__init__([model, ], *args, **kwargs)
 
-    def _compute(self, lags: np.ndarray):
+    def __call__(self, lags: np.ndarray):
         return (np.all(lags == 0, 0) * self.nugget + (1 - self.nugget) * self.children[0](lags)) * self.sigma ** 2
