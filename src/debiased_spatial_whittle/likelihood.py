@@ -286,7 +286,7 @@ class DebiasedWhittle:
         """
         if periodogram.ndim < expected_periodogram.ndim:
             periodogram = np.expand_dims(periodogram, -1)
-            reduce_axis = list(range(periodogram.ndim - 1))
+            reduce_axis = tuple(range(periodogram.ndim - 1))
             return np.mean((np.log(expected_periodogram) + periodogram / expected_periodogram) * self.frequency_mask,
                            axis=reduce_axis)
         return np.mean((np.log(expected_periodogram) + periodogram / expected_periodogram) * self.frequency_mask)
