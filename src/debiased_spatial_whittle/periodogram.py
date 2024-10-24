@@ -334,15 +334,9 @@ class ExpectedPeriodogram:
             cg = np.expand_dims(cg, -1)
             acv = np.expand_dims(acv, -1)
             acv = np.expand_dims(acv, -1)
-        if acv.ndim == n_dim + 2:
-            single_acv = True
-            acv = np.expand_dims(acv, -3)
-            q = 1
-        else:
-            single_acv = False
-            q = acv.shape[-3]
         cg = np.expand_dims(cg, -3)
         cbar = cg * acv
+        q = acv.shape[-3]
         result_shape = grid.n + (q, p, p)
         # now we need to "fold"
         if fold:
@@ -384,8 +378,10 @@ class ExpectedPeriodogram:
             # this is the standard case
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
+                # if uni-variate we remove the extra dimensions
                 out = np.squeeze(out, (-2, -1))
-            if single_acv:
+            if q == 1:
+                # if single model remove extra dimension
                 out = np.squeeze(out, -1)
             return np.real(out)
         
