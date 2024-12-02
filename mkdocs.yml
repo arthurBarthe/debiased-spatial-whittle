@@ -29,6 +29,7 @@ nav:
   - Home: index.md
   - 'Getting started':
       - Installation: install.md
+      - Backend selection: backend.md
   - 'Example notebooks':
       - France: france.py
       - Circle: circle.py
