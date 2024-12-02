@@ -8,10 +8,10 @@ from typing import Tuple
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
-# ifftshift = np.fft.ifftshift
 
 def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None) -> np.ndarray:
-    """Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
+    """
+    Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
 
     Parameters
     ----------
