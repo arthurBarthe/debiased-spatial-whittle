@@ -243,7 +243,7 @@ class SamplerCorrelatedOnRectangularGrid:
     def __init__(self, model: CovarianceModel, grid: RectangularGrid, correlation: float):
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(np.zeros(2), [[1, correlation], [correlation, 1]])
+        self.e_dist = multivariate_normal(None, np.zeros(2), [[1, correlation], [correlation, 1]])
         self._f = None
 
     @property
@@ -281,7 +281,7 @@ class SamplerBUCOnRectangularGrid:
         assert isinstance(model, BivariateUniformCorrelation)
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal([[1, model.r_0.value], [model.r_0.value, 1]])
+        self.e_dist = multivariate_normal(None, [[1, model.r_0.value], [model.r_0.value, 1]])
         self._f = None
 
     @property
@@ -358,14 +358,14 @@ def test_upsampling():
     model.rho = 40
     model.sigma = 1
     model.nugget=0.1
-    grid = RectangularGrid((128,128))
+    grid = RectangularGrid((128, 128))
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
     plt.figure()
     plt.imshow(z, cmap='Spectral')
     plt.show()
     
-    params = np.log([40,1])
+    params = np.log([40, 1])
     
     dw = DeWhittle(z, grid, ExponentialModel(), nugget=0.1)
     dw.fit(None, prior=False)
