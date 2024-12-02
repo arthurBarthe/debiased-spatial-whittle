@@ -233,7 +233,6 @@ class SamplerSeparable:
             z = i / (i + 1) * z + 1 / (i + 1) * z_i
         return z * np.sqrt(self.n_sim)
 
-from scipy.stats import multivariate_normal
 
 class SamplerCorrelatedOnRectangularGrid:
     """Class that allows to define samplers for Rectangular grids, for which
@@ -243,7 +242,7 @@ class SamplerCorrelatedOnRectangularGrid:
     def __init__(self, model: CovarianceModel, grid: RectangularGrid, correlation: float):
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(np.zeros(2), [[1, correlation], [correlation, 1]])
+        self.e_dist = (np.zeros(2), [[1, model.r_0.value], [model.r_0.value, 1]])
         self._f = None
 
     @property
@@ -261,7 +260,7 @@ class SamplerCorrelatedOnRectangularGrid:
     # TODO make this work for 1-d and 3-d
     def __call__(self, periodic: bool = False):
         f = np.expand_dims(self.f, -1)
-        e = self.e_dist.rvs(size=f.shape + (2, ))
+        e = np.random.multivariate_normal(*self.e_dist, size=f.shape + (2, ))
         e = e[..., 0, :] + 1j * e[..., 1, :]
         z = np.sqrt(np.maximum(f, 0)) * e
         z_inv = 1 / np.sqrt(self.grid.n_points) * np.real(fftn(z, axes=list(range(z.ndim - 1))))
@@ -281,7 +280,9 @@ class SamplerBUCOnRectangularGrid:
         assert isinstance(model, BivariateUniformCorrelation)
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(np.zeros(2), [[1, model.r_0.value], [model.r_0.value, 1]])
+        self.e_dist = (np.zeros(2),
+                       [[1, model.r_0.value],
+                        [model.r_0.value, 1]])
         self._f = None
 
     @property
@@ -300,7 +301,7 @@ class SamplerBUCOnRectangularGrid:
     # TODO allow block simulations for increased computational efficiency
     def __call__(self, periodic: bool = False, return_spectral: bool = False):
         f = np.expand_dims(self.f, -1)
-        e = self.e_dist.rvs(size=f.shape + (2,))
+        e = np.random.multivariate_normal(*self.e_dist, size=f.shape + (2, ))
         e = BackendManager.convert(e)
         e[..., -1] *= self.model.f_0.value
         e = e[..., 0, :] + 1j * e[..., 1, :]
