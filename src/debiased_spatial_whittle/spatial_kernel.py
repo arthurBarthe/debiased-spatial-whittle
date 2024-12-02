@@ -17,17 +17,23 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
     ----------
     g
         mask of observations, or more generally pointwise modulation e.g. a taper or the product of a taper with an
-        observation mask
+        observation mask.
+        Shape (n1, ..., nd) for univariate data in d-dimensional space
+        Shape (n1, ..., nd) for p-variate data in d-dimensional space
+
     n_spatial_dim
         Number of dimensions that are spatial dimensions. In the multivariate case, the last dimension is used for the
         different variates.
+
     m
         offset in frequency indices
 
     Returns
     -------
     cg
-        Spatial kernel
+        Spatial kernel.
+        Shape (2 * n1 + 1, ..., 2 * nd + 1) for univariate data
+        Shape (2 * n1 + 1, ..., 2 * nd + 1, p, p) for p-variate data
     """
     if n_spatial_dim is None:
         n_spatial_dim = g.ndim
@@ -37,7 +43,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
     if m == (0, 0):
         if n_spatial_dim == g.ndim:
             # univariate case
-            f = np.abs(fftn(g, two_n))**2
+            f = np.abs(fftn(g, two_n)) ** 2
             cg = ifftn(f)
             cg /= normalization_factor
             return np.real(cg)
