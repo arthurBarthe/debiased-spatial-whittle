@@ -21,7 +21,7 @@ from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
 # Note that we use the argument nvars=2 to specify that we observe a bivariate random field
 
-g = RectangularGrid((64, 64), nvars=2)
+g = RectangularGrid((128, 128), nvars=2)
 
 
 # ##Model specification
@@ -52,7 +52,6 @@ plt.show()
 # ##Profile likelihood plot for the correlation parameter
 
 p = Periodogram()
-p.taper = lambda x: x
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
