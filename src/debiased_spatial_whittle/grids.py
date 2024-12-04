@@ -141,7 +141,7 @@ class RectangularGrid:
         When nvars is 1 (univariate random field), mask should be an array with len(n) dimensions.
         When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
     """
-    def __init__(self, shape: tuple[int], delta: tuple[float] = None, mask: np.ndarray = None, nvars: int = 1):
+    def __init__(self, shape: tuple[int, ...], delta: tuple[float, ...] = None, mask: np.ndarray = None, nvars: int = 1):
         """
         Parameters
         ----------

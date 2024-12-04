@@ -1,10 +1,6 @@
 from .backend import BackendManager
 np = BackendManager.get_backend()
-
-import numpy as np_
-
 from typing import Tuple
-# TODO: have to adjust imports from backend
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
@@ -19,7 +15,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
         mask of observations, or more generally pointwise modulation e.g. a taper or the product of a taper with an
         observation mask.
         Shape (n1, ..., nd) for univariate data in d-dimensional space
-        Shape (n1, ..., nd) for p-variate data in d-dimensional space
+        Shape (n1, ..., nd, p) for p-variate data in d-dimensional space
 
     n_spatial_dim
         Number of dimensions that are spatial dimensions. In the multivariate case, the last dimension is used for the
@@ -55,7 +51,7 @@ def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: in
             cg = ifftn(np.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
             cg /= normalization_factor
             return np.real(cg)
-    # TODO only works in 2d right now
+    # TODO this specific case only works in 2d right now
     m1, m2 = m
     n1, n2 = n
     a = np.exp(2j * np.pi * m1 / n1 * np.arange(n1)).reshape((-1, 1))
