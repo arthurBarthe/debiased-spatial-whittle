@@ -1,14 +1,18 @@
 import numpy
 import warnings
+
+TORCH_INSTALLED = True
+CUPY_INSTALLED = True
+
 try:
     import torch
 except ModuleNotFoundError:
-    warnings.warn('Module Pytorch not found, will not be available as backend.')
+    TORCH_INSTALLED = False
 
 try:
     import cupy
 except ModuleNotFoundError:
-    warnings.warn('Module cupy not found, will not be available as backend.')
+    CUPY_INSTALLED = False
 
 def func(x):
     n = len(x)
@@ -46,6 +50,10 @@ class BackendManager:
     
     @classmethod
     def set_backend(cls, name: str):
+        if name == 'cupy' and (not CUPY_INSTALLED):
+            warnings.warn('Module Cupy not found, will not be available as backend.')
+        elif name == 'torch' and (not TORCH_INSTALLED):
+            warnings.warn('Module Torch not found, will not be available as backend.')
         cls.backend_name = name
     
     @classmethod
