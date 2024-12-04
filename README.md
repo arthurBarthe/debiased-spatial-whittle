@@ -19,29 +19,45 @@ The SDW extends ideas from the Whittle likelihood and Debiased Whittle Likelihoo
 
 ## Installation instructions
 
-The package can be installed via one of the following methods. Note that in all cases, since the repository is currently private, git needs to be configured on your machine with an SSH key linking your machine to your GitHub account.
+The package can be installed via one of the following methods.
 
-1. Via the use of Poetry ([https://python-poetry.org/](https://python-poetry.org/)), by adding the following line to the dependencies listed in the `pyproject.toml` of your project:
+1. Via the use of Poetry ([https://python-poetry.org/](https://python-poetry.org/)), by running the following command:
 
-    ```toml
-    debiased-spatial-whittle = {git = "git@github.com:arthurBarthe/dbw_private.git", branch="master"}
-    ```
+   ```bash
+   poetry add debiased-spatial-whittle
+   ```
 
 2. Otherwise, you can directly install via pip:
 
     ```bash
-    pip install git+https://github.com/arthurBarthe/dbw_private.git
+    pip install debiased-spatial-whittle
     ```
 
-3. Install for development - in this case, you need to clone this repo and run
+## Development
 
-    ```bash
-    poetry install
-    ```
+Firstly, you need to install poetry. Then, git clone this repository, ad run the following command from
+the directory corresponding to the package.
 
-    in a terminal from where you cloned the repository.
+   ```bash
+   poetry install
+   ```
 
-If you get an error message regarding the version of Python, install a compatible version of Python on your machine and point to it via
+If you run into some issue regarding the Python version, you can run
+   ```bash
+   poetry env use <path_to_python>
+   ```
+where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
 
-```bash
-poetry env use <path_to_python>
+### Unit tests
+Unit tests are run with pytest. On Pull-requests, the unit tests will be 
+run.
+
+## Documentation
+The documentation is hosted on readthedocs. It is based on docstrings.
+Currently, it points to the joss_paper branch and is updated on any push to that branch.
+
+## PyPi
+The package is updated on PyPi automatically on creation of a new 
+release in Github. Note that currently the version in pyproject.toml
+needs to be manually updated. This should be fixed by adding
+a step in the workflow used for publication to Pypi.
