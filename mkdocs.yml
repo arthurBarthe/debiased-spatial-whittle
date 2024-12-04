@@ -42,4 +42,4 @@ nav:
   - Reference:
       - Grids: grids.md
       - Models: models.md
-      - Periodogram: periodogram.md
+      - Estimation: periodogram.md
