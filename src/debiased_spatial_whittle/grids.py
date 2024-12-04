@@ -126,10 +126,10 @@ class RectangularGrid:
 
     Attributes
     ----------
-    n: tuple[int]
+    n: tuple[int, ...]
         spatial dimensions of the grid in number of points
 
-    delta: tuple[float]
+    delta: tuple[float, ...]
         step sizes of the grid along all dimensions
 
     nvars: int, optional
@@ -141,7 +141,8 @@ class RectangularGrid:
         When nvars is 1 (univariate random field), mask should be an array with len(n) dimensions.
         When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
     """
-    def __init__(self, shape: tuple[int, ...], delta: tuple[float, ...] = None, mask: np.ndarray = None, nvars: int = 1):
+    def __init__(self, shape: tuple[int, ...], delta: tuple[float, ...] = None, mask: np.ndarray = None,
+                 nvars: int = 1):
         """
         Parameters
         ----------
@@ -169,12 +170,12 @@ class RectangularGrid:
         self.mask = mask
 
     @property
-    def n(self) -> tuple[int]:
+    def n(self) -> tuple[int, ...]:
         """size of the grid"""
         return self._n
 
     @n.setter
-    def n(self, value: tuple[int]):
+    def n(self, value: tuple[int, ...]):
         self._n = value
 
     @property
@@ -183,7 +184,7 @@ class RectangularGrid:
         return len(self.n)
 
     @property
-    def delta(self) -> tuple[float]:
+    def delta(self) -> tuple[float, ...]:
         """step sizes of the grid along all dimensions, in spatial units."""
         return self._delta
 
@@ -229,17 +230,17 @@ class RectangularGrid:
         return np.prod(np.array(self.n))
 
     @property
-    def extent(self) -> tuple[float]:
+    def extent(self) -> tuple[float, ...]:
         """spatial extent of the grid in spatial units"""
         return tuple([n_i * delta_i for n_i, delta_i in zip(self.n, self.delta)])
 
     @property
-    def imshow_extent(self) -> list[tuple[float]]:
+    def imshow_extent(self) -> list[float]:
         """extent parameter to pass to matplotlib.pyplot.imshow."""
         extent = self.extent
         imshow_extent = []
         for e in extent:
-            imshow_extent.extend((0, e))
+            imshow_extent.extend((0., e))
         return imshow_extent
 
     @property

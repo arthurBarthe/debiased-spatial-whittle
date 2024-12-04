@@ -40,6 +40,6 @@ nav:
           - 'Non-overlapping grids': multivariate_two_grids.py
       - 'Venus topography': 'venus data/venus.py'
   - Reference:
-      - Grids: reference.md
+      - Grids: grids.md
       - Models: models.md
       - Periodogram: periodogram.md

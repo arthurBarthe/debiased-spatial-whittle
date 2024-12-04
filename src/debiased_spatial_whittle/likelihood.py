@@ -156,10 +156,8 @@ class MultivariateDebiasedWhittle:
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
         whittle = np.mean(term1 + term2)
         whittle = np.real(whittle)
-        if BackendManager.backend_name == 'torch':
-            whittle = whittle.item()
         if not params_for_gradient:
-            return whittle
+            return np.item(whittle)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
         ep_inv = np.expand_dims(ep_inv, 2)
