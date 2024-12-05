@@ -56,6 +56,21 @@ run.
 The documentation is hosted on readthedocs. It is based on docstrings.
 Currently, it points to the joss_paper branch and is updated on any push to that branch.
 
+## Versioning
+Currently, versioning is handled manuallyusing poetry, e.g.
+
+   ```bash
+   poetry version patch
+   ```
+or
+   ```bash
+   poetry version minor
+   ```
+
+When creating a release in Github, the version tag should be set to match
+the version in th pyproject.toml. Creating a release in Github will trigger
+a Github workflow that will publish to Pypi (see Pypi section).
+
 ## PyPi
 The package is updated on PyPi automatically on creation of a new 
 release in Github. Note that currently the version in pyproject.toml
