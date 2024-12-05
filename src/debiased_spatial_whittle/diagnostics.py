@@ -10,7 +10,9 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 
 
 class GoodnessOfFit:
-    def __init__(self, model: CovarianceModel, grid: RectangularGrid, sample, n_bins: int = 10):
+    def __init__(
+        self, model: CovarianceModel, grid: RectangularGrid, sample, n_bins: int = 10
+    ):
         self.model = model
         self.grid = grid
         self.sample = sample
@@ -25,7 +27,7 @@ class GoodnessOfFit:
     def compute_residuals(self, sample, model):
         periodogram = self.periodogram_computer(sample)
         ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
-        residuals = 1 - np.exp(- periodogram / ep)
+        residuals = 1 - np.exp(-periodogram / ep)
         return residuals
 
     def compute_diagnostic_statistic(self, sample=None, model=None):
@@ -37,18 +39,25 @@ class GoodnessOfFit:
         statistic, pvalue = chisquare(bin_counts)
         return statistic, pvalue
 
-    def p_value(self, statistic: float, n_sim: int=20):
+    def p_value(self, statistic: float, n_sim: int = 20):
         statistic_values = []
-        dbw = DebiasedWhittle(self.periodogram_computer, ExpectedPeriodogram(self.grid, self.periodogram_computer))
+        dbw = DebiasedWhittle(
+            self.periodogram_computer,
+            ExpectedPeriodogram(self.grid, self.periodogram_computer),
+        )
         estimator = Estimator(dbw)
         for i in range(n_sim):
             sample = self.sampler()
             if self.bootstrap:
                 model_est = self.get_model_est()
                 estimator(model_est, sample)
-                statistic_value, _ = self.compute_diagnostic_statistic(sample, model_est)
+                statistic_value, _ = self.compute_diagnostic_statistic(
+                    sample, model_est
+                )
             else:
-                statistic_value, _ = self.compute_diagnostic_statistic(sample, self.model)
+                statistic_value, _ = self.compute_diagnostic_statistic(
+                    sample, self.model
+                )
             statistic_values.append(statistic_value)
         return np.mean(statistic <= statistic_values)
 
@@ -59,6 +68,7 @@ class ModelDiagnostic:
     1. that the expected periodogram matches a sample average of periodograms
     2. the distribution of estimates
     """
+
     # the values below are used as default
     _run_estimation = True
     _n_samples = 100
@@ -100,11 +110,11 @@ class ModelDiagnostic:
 
     @property
     def sample_periodograms(self):
-        return np.stack([sample['periodogram'] for sample in self._samples])
+        return np.stack([sample["periodogram"] for sample in self._samples])
 
     @property
     def sample_data(self):
-        return np.stack([sample['data'] for sample in self._samples])
+        return np.stack([sample["data"] for sample in self._samples])
 
     def _run_sample(self):
         z = self.sampler()
@@ -131,59 +141,60 @@ class ModelDiagnostic:
         ax = fig.add_subplot()
 
 
-
 from numpy import ndarray
 from scipy import stats
 
 
 class DiagnosticTest:
-        
-    def __init__(self, I: ndarray, f: ndarray, alpha:float=0.05):
+    def __init__(self, I: ndarray, f: ndarray, alpha: float = 0.05):
         self._I = I
         self._f = f
-        self._n = np.prod(I.shape)   # TODO: missing observations 
+        self._n = np.prod(I.shape)  # TODO: missing observations
         self._alpha = alpha
-        
+
     @property
     def I(self):
         return self._I
-    
+
     @property
     def n(self):
         return self._n
-    
+
     @property
     def test_statistic(self):
-        return np.mean(self.I/self.f)
-    
+        return np.mean(self.I / self.f)
+
     @property
     def residuals(self):
-        return self.I/self.f
-    
+        return self.I / self.f
+
     @property
     def f(self):
         return self._f
-    
+
     @f.setter
     def f(self, arr):
         self._f = arr
         self()
-    
+
     def __repr__(self):
-        return 'Goodness-of-fit spectrum test'
-    
+        return "Goodness-of-fit spectrum test"
+
     @staticmethod
-    def construct_res(pass_test:bool, test_statistic:float, confidence_interval:list):
+    def construct_res(
+        pass_test: bool, test_statistic: float, confidence_interval: list
+    ):
         return locals()
 
-    def __call__(self, alpha:float=0.05):
-        
-        lp,up = alpha/2, 1-alpha/2
-        lb, ub = stats.norm.ppf([lp,up], loc=1., scale=np.sqrt(1/self.n))  # normal approx
-        success = lb<self.test_statistic<ub
-        CI = [round(lb,3), round(ub,3)]
+    def __call__(self, alpha: float = 0.05):
+        lp, up = alpha / 2, 1 - alpha / 2
+        lb, ub = stats.norm.ppf(
+            [lp, up], loc=1.0, scale=np.sqrt(1 / self.n)
+        )  # normal approx
+        success = lb < self.test_statistic < ub
+        CI = [round(lb, 3), round(ub, 3)]
 
-        self.res = self.construct_res(success, round(self.test_statistic,3), CI)       
+        self.res = self.construct_res(success, round(self.test_statistic, 3), CI)
         for k, v in self.res.items():
-            print (f'{f"{k}":>20}:', v)
+            print(f'{f"{k}":>20}:', v)
         return self.res

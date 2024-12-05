@@ -1,6 +1,7 @@
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.models import ExponentialModel
 
+
 def test_covariance_matrix():
     grid = RectangularGrid((8, 8))
     model = ExponentialModel()

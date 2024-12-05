@@ -4,7 +4,8 @@
 # ##Imports
 
 from debiased_spatial_whittle.backend import BackendManager
-BackendManager.set_backend('numpy')
+
+BackendManager.set_backend("numpy")
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
 from debiased_spatial_whittle.models import SquaredExponentialModel
@@ -33,7 +34,7 @@ sampler = SamplerOnRectangularGrid(model, grid_france)
 
 z = sampler()
 plt.figure()
-plt.imshow(z, origin='lower', cmap='RdBu')
+plt.imshow(z, origin="lower", cmap="RdBu")
 plt.show()
 
 # ##Inference
@@ -47,4 +48,3 @@ model_est = SquaredExponentialModel()
 model_est.nugget = None
 estimate = estimator(model_est, z)
 print(estimate)
-

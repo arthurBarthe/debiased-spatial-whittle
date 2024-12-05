@@ -5,20 +5,31 @@ from debiased_spatial_whittle.simulation import sim_circ_embedding
 from debiased_spatial_whittle.periodogram import autocov, compute_ep_old
 from debiased_spatial_whittle.likelihood import periodogram
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.periodogram import (
+    Periodogram,
+    SeparableExpectedPeriodogram,
+    ExpectedPeriodogram,
+)
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel, Parameters
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    SeparableModel,
+    Parameters,
+)
 from debiased_spatial_whittle.confidence import CovarianceFFT
+
 
 def test_non_negative():
     """
     This test verifies that the expected periodogram is non-negative.
     """
     m, n = 128, 64
-    cov_func = lambda lags: exp_cov(lags, rho=10.)
+    cov_func = lambda lags: exp_cov(lags, rho=10.0)
     z = sim_circ_embedding(cov_func, (m, n))[0]
     e_per = compute_ep_old(cov_func, np.ones_like(z))
     assert np.all(e_per >= 0)
+
 
 def test_autocov_1():
     """
@@ -26,9 +37,9 @@ def test_autocov_1():
     :return:
     """
     cov_func = lambda x: x
-    shape = (3, )
+    shape = (3,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0., 1., 2., -2., -1.])
+    assert np.all(acv == [0.0, 1.0, 2.0, -2.0, -1.0])
 
 
 def test_autocov_2():
@@ -37,9 +48,9 @@ def test_autocov_2():
     :return:
     """
     cov_func = lambda x: x
-    shape = (4, )
+    shape = (4,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0., 1., 2., 3., -3., -2., -1.])
+    assert np.all(acv == [0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0])
 
 
 def test_compare_to_mean():
@@ -71,6 +82,7 @@ def test_compare_to_mean_taper():
     Same as above but with the use of a taper.
     """
     from numpy import hanning
+
     shape = (32, 32)
     grid = RectangularGrid(shape)
     model = ExponentialModel()
@@ -79,7 +91,9 @@ def test_compare_to_mean_taper():
     model.sigma = 1
     n_samples = 10000
     periodogram = Periodogram()
-    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(shape[1]).reshape(1, -1)
+    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(
+        shape[1]
+    ).reshape(1, -1)
     expected_periodogram = ExpectedPeriodogram(grid, periodogram)
     mean_per = np.zeros(shape)
     for i in range(n_samples):
@@ -93,7 +107,7 @@ def test_compare_to_mean_taper():
 
 def test_compare_to_mean2():
     m, n = 8, 8
-    cov_func = lambda lags: exp_cov(lags, rho=2., sigma=2)
+    cov_func = lambda lags: exp_cov(lags, rho=2.0, sigma=2)
     mean_per = np.zeros((m, n))
     grid = np.ones((m, n))
     n_samples = 10000
@@ -124,7 +138,6 @@ def test_compare_to_mean_3d():
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
     assert_allclose(mean_per, e_per, rtol=0.05)
-
 
 
 def test_compare_to_average_masked_grid():
@@ -167,7 +180,7 @@ def test_separable_expected_periodogram():
     m2 = ExponentialModel()
     m2.rho = 32
     m2.sigma = 2
-    model = SeparableModel((m1, m2), dims=[(0, ), (1, )])
+    model = SeparableModel((m1, m2), dims=[(0,), (1,)])
     g = RectangularGrid((64, 64))
     p = Periodogram()
     ep1 = ExpectedPeriodogram(g, p)
@@ -227,12 +240,24 @@ def test_gradient_expected_periodogram():
     ep1 = ep_op(model)
     model.rho = model.rho.value + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
+    g = ep_op.gradient(
+        model,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
 
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
+
+from debiased_spatial_whittle.multivariate_periodogram import (
+    Periodogram as PeriodogramMulti,
+)
 from debiased_spatial_whittle.models import BivariateUniformCorrelation
+
+
 def test_gradient_expected_periodogram_bivariate():
     g = RectangularGrid((32, 32), nvars=2)
     p = PeriodogramMulti()
@@ -256,7 +281,6 @@ def test_gradient_expected_periodogram_bivariate():
         p.value = p.value - epsilon
 
 
-
 def test_gradient_expected_periodogram_sqExpCov():
     """
     This test verifies that the analytical gradient of the expected periodogram is close to a
@@ -273,7 +297,14 @@ def test_gradient_expected_periodogram_sqExpCov():
     ep1 = ep_op(model)
     model.rho = model.rho.value + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(model, Parameters([model.rho, ]))[:, :, 0]
+    g = ep_op.gradient(
+        model,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-2)
 
@@ -321,7 +352,7 @@ def test_cov_dft_quad():
     f = np.random.randn(*n)
     f2 = np.random.randn(*n)
     cov_mat = ep.cov_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
-    cov_mat = np.abs(cov_mat)**2
+    cov_mat = np.abs(cov_mat) ** 2
     s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
     cov_fft = CovarianceFFT(g)
     s2 = cov_fft.exact_summation1(model, ep, f=f, f2=f2, normalize=False)
@@ -352,6 +383,7 @@ def test_rel_dft():
     print(s1, s2)
     assert_allclose(s1, s2)
 
+
 def test_rel_dft_quad():
     """
     In this test we check that we get the same result by:
@@ -371,7 +403,7 @@ def test_rel_dft_quad():
     f = np.random.randn(*n)
     f2 = np.random.randn(*n)
     cov_mat = ep.rel_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
-    cov_mat = np.abs(cov_mat)**2
+    cov_mat = np.abs(cov_mat) ** 2
     s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
     cov_fft = CovarianceFFT(g)
     s2 = cov_fft.exact_summation2(model, ep, f=f, f2=f2, normalize=False)

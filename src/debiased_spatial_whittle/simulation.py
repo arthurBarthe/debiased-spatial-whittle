@@ -1,7 +1,7 @@
 import sys
-from typing import Union
 
 from debiased_spatial_whittle.backend import BackendManager
+
 np = BackendManager.get_backend()
 
 import warnings
@@ -12,6 +12,7 @@ fftn, ifftn = BackendManager.get_fft_methods()
 randn = BackendManager.get_randn()
 arange = BackendManager.get_arange()
 
+
 def prod_list(l: List[int]):
     l = list(l)
     if l == []:
@@ -19,14 +20,15 @@ def prod_list(l: List[int]):
     else:
         return l[0] * prod_list(l[1:])
 
-#TODO make this work for 1-d and 3-d
+
+# TODO make this work for 1-d and 3-d
 def sim_circ_embedding(cov_func, shape):
     cov = autocov(cov_func, shape)
     f = prod_list(shape) * ifftn(cov)
     min_ = np.min(f)
     if min_ < 0:
         sys.exit(0)
-        warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+        warnings.warn(f"Embedding is not positive definite, min value {min_}.")
     e = np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape)
     z = np.sqrt(np.maximum(f, 0)) * e
     z_inv = 1 / np.sqrt(prod_list(shape)) * np.real(fftn(z))
@@ -35,10 +37,16 @@ def sim_circ_embedding(cov_func, shape):
     return z_inv, min_
 
 
-
 ####NEW OOP VERSION
 from typing import Tuple
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel, TMultivariateModel, SquaredModel, ChiSquaredModel, BivariateUniformCorrelation
+from debiased_spatial_whittle.models import (
+    CovarianceModel,
+    SeparableModel,
+    TMultivariateModel,
+    SquaredModel,
+    ChiSquaredModel,
+    BivariateUniformCorrelation,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 
 
@@ -95,9 +103,9 @@ class SamplerOnRectangularGrid:
         try:
             self.f
         except:
-            print('up-sampling')
+            print("up-sampling")
             n = tuple(2 * n for n in self.grid.n)
-            self.sampling_grid = RectangularGrid(n)    # may cause bugs?
+            self.sampling_grid = RectangularGrid(n)  # may cause bugs?
 
     @property
     def n_sims(self):
@@ -117,7 +125,9 @@ class SamplerOnRectangularGrid:
             f = np.real(f)
             min_ = np.min(f)
             if min_ <= -1e-5:
-                raise ValueError(f'Embedding is not positive definite, min value {min_}.')
+                raise ValueError(
+                    f"Embedding is not positive definite, min value {min_}."
+                )
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
@@ -140,15 +150,19 @@ class SamplerOnRectangularGrid:
         """
         if self._i_sim % self.n_sims == 0:
             f = self.f
-            shape = f.shape + (self.n_sims, )
-            e = (randn(*shape) + 1j * randn(*shape))
+            shape = f.shape + (self.n_sims,)
+            e = randn(*shape) + 1j * randn(*shape)
             f = np.expand_dims(f, -1)
             z = np.sqrt(np.maximum(f, np.zeros_like(f))) * e
-            z_inv = 1 / np.sqrt(np.array(prod_list(self.sampling_grid.n))) * np.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
+            z_inv = (
+                1
+                / np.sqrt(np.array(prod_list(self.sampling_grid.n)))
+                * np.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
+            )
             for i, n in enumerate(self.grid.n):
                 z_inv = np.take(z_inv, arange(n), i)
             self._z = z_inv * np.expand_dims(self.grid.mask, -1)
-        result =  self._z[..., self._i_sim % self._n_sims]
+        result = self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
         return result
 
@@ -157,6 +171,7 @@ class TSamplerOnRectangularGrid:
     """
     Class for the sampling of a t-multivariate random field
     """
+
     def __init__(self, model: TMultivariateModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
@@ -174,6 +189,7 @@ class SquaredSamplerOnRectangularGrid:
     """
     Class for the sampling of a SquaredModel
     """
+
     def __init__(self, model: SquaredModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
@@ -181,13 +197,14 @@ class SquaredSamplerOnRectangularGrid:
 
     def __call__(self):
         z = self.latent_sampler()
-        return z ** 2
+        return z**2
 
 
 class ChiSquaredSamplerOnRectangularGrid:
     """
     Class for the sampling of a Chi Squared model on a rectangular grid
     """
+
     def __init__(self, model: ChiSquaredModel, grid: RectangularGrid):
         self.model = model
         self.grid = grid
@@ -233,17 +250,23 @@ class SamplerSeparable:
             z = i / (i + 1) * z + 1 / (i + 1) * z_i
         return z * np.sqrt(self.n_sim)
 
+
 from scipy.stats import multivariate_normal
+
 
 class SamplerCorrelatedOnRectangularGrid:
     """Class that allows to define samplers for Rectangular grids, for which
     fast exact sampling can be achieved via circulant embeddings and the use of the
     Fast Fourier Transform."""
 
-    def __init__(self, model: CovarianceModel, grid: RectangularGrid, correlation: float):
+    def __init__(
+        self, model: CovarianceModel, grid: RectangularGrid, correlation: float
+    ):
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(None, np.zeros(2), [[1, correlation], [correlation, 1]])
+        self.e_dist = multivariate_normal(
+            None, np.zeros(2), [[1, correlation], [correlation, 1]]
+        )
         self._f = None
 
     @property
@@ -254,22 +277,26 @@ class SamplerCorrelatedOnRectangularGrid:
             min_ = np.min(f)
             if min_ <= -1e-5:
                 sys.exit(0)
-                warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                warnings.warn(f"Embedding is not positive definite, min value {min_}.")
             self._f = np.maximum(f, 0)
         return self._f
 
     # TODO make this work for 1-d and 3-d
     def __call__(self, periodic: bool = False):
         f = np.expand_dims(self.f, -1)
-        e = self.e_dist.rvs(size=f.shape + (2, ))
+        e = self.e_dist.rvs(size=f.shape + (2,))
         e = e[..., 0, :] + 1j * e[..., 1, :]
         z = np.sqrt(np.maximum(f, 0)) * e
-        z_inv = 1 / np.sqrt(self.grid.n_points) * np.real(fftn(z, axes=list(range(z.ndim - 1))))
+        z_inv = (
+            1
+            / np.sqrt(self.grid.n_points)
+            * np.real(fftn(z, axes=list(range(z.ndim - 1))))
+        )
         if periodic:
             return z_inv
         for i, n in enumerate(self.grid.n):
             z_inv = np.take(z_inv, np.arange(n), i)
-        z_inv = np.reshape(z_inv, self.grid.n + (2, ))
+        z_inv = np.reshape(z_inv, self.grid.n + (2,))
         return z_inv * np.expand_dims(self.grid.mask, -1)
 
 
@@ -277,11 +304,14 @@ class SamplerBUCOnRectangularGrid:
     """
     Class to sample from the BivariateUniformCorrelation model on a rectangular grid.
     """
+
     def __init__(self, model: BivariateUniformCorrelation, grid: RectangularGrid):
         assert isinstance(model, BivariateUniformCorrelation)
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal([0, 0], [[1, model.r_0.value], [model.r_0.value, 1]])
+        self.e_dist = multivariate_normal(
+            [0, 0], [[1, model.r_0.value], [model.r_0.value, 1]]
+        )
         self._f = None
 
     @property
@@ -293,7 +323,7 @@ class SamplerBUCOnRectangularGrid:
             min_ = np.min(f)
             if min_ <= -1e-5:
                 sys.exit(0)
-                warnings.warn(f'Embedding is not positive definite, min value {min_}.')
+                warnings.warn(f"Embedding is not positive definite, min value {min_}.")
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
@@ -308,7 +338,17 @@ class SamplerBUCOnRectangularGrid:
         z = np.sqrt(f) * e
         if return_spectral:
             return z
-        z_inv = 1 / np.sqrt(np.array([self.grid.n_points, ])) * np.real(fftn(z, None, list(range(z.ndim - 1))))
+        z_inv = (
+            1
+            / np.sqrt(
+                np.array(
+                    [
+                        self.grid.n_points,
+                    ]
+                )
+            )
+            * np.real(fftn(z, None, list(range(z.ndim - 1))))
+        )
         if periodic:
             return z_inv
         for i, n in enumerate(self.grid.n):
@@ -317,24 +357,18 @@ class SamplerBUCOnRectangularGrid:
         return z_inv * self.grid.mask
 
 
-
-
-
-
-
-
-
 def test_simulation_1d():
     from numpy.random import seed
     from .grids import RectangularGrid
     from .models import ExponentialModel
     import matplotlib.pyplot as plt
+
     seed(1712)
     model = ExponentialModel()
     model.rho = 2
     model.sigma = 1
     grid1 = RectangularGrid((16, 1))
-    grid2 = RectangularGrid((16, ))
+    grid2 = RectangularGrid((16,))
     sampler1 = SamplerOnRectangularGrid(model, grid1)
     sampler2 = SamplerOnRectangularGrid(model, grid2)
     z1 = sampler1()
@@ -342,56 +376,55 @@ def test_simulation_1d():
     z2 = sampler2()
     plt.figure()
     plt.plot(z1)
-    plt.plot(z2, '*')
+    plt.plot(z2, "*")
     plt.show()
     assert True
 
 
 def test_upsampling():
-    from numpy.random import seed
     import matplotlib.pyplot as plt
     from debiased_spatial_whittle.grids import RectangularGrid
     from debiased_spatial_whittle.models import ExponentialModel
     from debiased_spatial_whittle.plotting_funcs import plot_marginals
-    from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
+    from debiased_spatial_whittle.bayes import DeWhittle
 
     model = ExponentialModel()
     model.rho = 40
     model.sigma = 1
-    model.nugget=0.1
+    model.nugget = 0.1
     grid = RectangularGrid((128, 128))
     sampler = SamplerOnRectangularGrid(model, grid)
     z = sampler()
     plt.figure()
-    plt.imshow(z, cmap='Spectral')
+    plt.imshow(z, cmap="Spectral")
     plt.show()
-    
+
     params = np.log([40, 1])
-    
+
     dw = DeWhittle(z, grid, ExponentialModel(), nugget=0.1)
     dw.fit(None, prior=False)
     # stop
     MLEs = dw.sim_MLEs(params, niter=500)
     plot_marginals([MLEs], params)
-    
+
+
 def t_rf_test():
     from debiased_spatial_whittle.models import ExponentialModel
     from debiased_spatial_whittle.bayes import DeWhittle
     from debiased_spatial_whittle.plotting_funcs import plot_marginals
+
     np.random.seed(18979125)
-    n=(64,64)
+    n = (64, 64)
     grid = RectangularGrid(n)
     t_model = TMultivariateModel(ExponentialModel())
-    t_model.nu_1 = 5.
+    t_model.nu_1 = 5.0
     print(t_model)
-    params = np.log([10.,1.])
+    params = np.log([10.0, 1.0])
     dw = DeWhittle(np.ones(n), grid, t_model, nugget=0.1)
     MLEs_t = dw.sim_MLEs(np.exp(params), niter=1000)
 
     model = ExponentialModel()
     dw_gauss = DeWhittle(np.ones(n), grid, model, nugget=0.1)
     MLEs_g = dw_gauss.sim_MLEs(np.exp(params), niter=1000)
-    
-    plot_marginals([MLEs_t, MLEs_g], params, density_labels=['t', 'gauss'])
-   
-        
+
+    plot_marginals([MLEs_t, MLEs_g], params, density_labels=["t", "gauss"])

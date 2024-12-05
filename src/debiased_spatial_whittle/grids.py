@@ -1,6 +1,7 @@
 __docformat__ = "numpydoc"
 
 from debiased_spatial_whittle.backend import BackendManager
+
 np = BackendManager.get_backend()
 
 from abc import ABC, abstractmethod
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 
-PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / 'france.jpg')
+PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / "france.jpg")
 
 
 class Grid(ABC):
@@ -54,9 +55,9 @@ class CircleGrid(Grid):
     def get_new(self):
         (x_0, y_0), diameter = self.center, self.diameter
         shape = self.shape
-        x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing='ij')
-        circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter ** 2
-        circle = circle * 1.
+        x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
+        circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
+        circle = circle * 1.0
         return circle
 
 
@@ -71,12 +72,12 @@ class BernoulliGrid(Grid):
 
     @p.setter
     def p(self, value: float):
-        assert 0 <= value <= 1, 'p should be a probability'
+        assert 0 <= value <= 1, "p should be a probability"
         self._p = value
 
     def get_new(self):
         epsilon = np.random.rand(*self.shape)
-        return (epsilon >= self.p) * 1.
+        return (epsilon >= self.p) * 1.0
 
 
 class ImgGrid(Grid):
@@ -85,7 +86,7 @@ class ImgGrid(Grid):
         self.img_path = img_path
         img = plt.imread(self.img_path)
         img = np.array(img)
-        img = (img[110:-110, 110:-110, 0] == 0) * 1.
+        img = (img[110:-110, 110:-110, 0] == 0) * 1.0
         self.img = np.flipud(img)
 
     @property
@@ -101,17 +102,16 @@ class ImgGrid(Grid):
         m, n = self.shape
         x = np.asarray(np.arange(n) / n * n_0, dtype=np.int64)
         y = np.asarray(np.arange(m) / m * m_0, dtype=np.int64)
-        xx, yy = np.meshgrid(x, y, indexing='xy')
+        xx, yy = np.meshgrid(x, y, indexing="xy")
         return self.img[yy, xx]
 
     def get_new(self):
         return self.interpolate()
 
 
-
 ###NEW OOP VERSION
 from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
-from typing import List, Tuple
+from typing import Tuple
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
@@ -141,8 +141,14 @@ class RectangularGrid:
         When nvars is 1 (univariate random field), mask should be an array with len(n) dimensions.
         When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
     """
-    def __init__(self, shape: tuple[int, ...], delta: tuple[float, ...] = None, mask: np.ndarray = None,
-                 nvars: int = 1):
+
+    def __init__(
+        self,
+        shape: tuple[int, ...],
+        delta: tuple[float, ...] = None,
+        mask: np.ndarray = None,
+        nvars: int = 1,
+    ):
         """
         Parameters
         ----------
@@ -191,8 +197,12 @@ class RectangularGrid:
     @delta.setter
     def delta(self, value):
         if value is None:
-            value = [1., ] * len(self.n)
-        assert len(value) == len(self.n), "The length of delta should be equal to the number of dimensions"
+            value = [
+                1.0,
+            ] * len(self.n)
+        assert len(value) == len(
+            self.n
+        ), "The length of delta should be equal to the number of dimensions"
         value = tuple([float(v) for v in value])
         self._delta = value
 
@@ -203,7 +213,9 @@ class RectangularGrid:
 
     @nvars.setter
     def nvars(self, value: int):
-        assert isinstance(value, int), "The number of components must be integer-valued."
+        assert isinstance(
+            value, int
+        ), "The number of components must be integer-valued."
         assert value > 0, "The number of components must be positive."
         self._nvars = value
 
@@ -219,9 +231,11 @@ class RectangularGrid:
             if self.nvars > 1:
                 value = np.ones(self.n + (self.nvars,))
         if self.nvars == 1:
-            assert value.shape == self.n, "The shape of the mask should be the same as the shape of the grid"
+            assert (
+                value.shape == self.n
+            ), "The shape of the mask should be the same as the shape of the grid"
         else:
-            assert value.shape == self.n + (self.nvars, ), "Invalid shape of grid mask."
+            assert value.shape == self.n + (self.nvars,), "Invalid shape of grid mask."
         self._mask = value
 
     @property
@@ -240,7 +254,7 @@ class RectangularGrid:
         extent = self.extent
         imshow_extent = []
         for e in extent:
-            imshow_extent.extend((0., e))
+            imshow_extent.extend((0.0, e))
         return imshow_extent
 
     @property
@@ -252,7 +266,9 @@ class RectangularGrid:
     @property
     def fourier_frequencies2(self) -> np.ndarray:
         """Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
-        mesh = np.meshgrid(*[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        mesh = np.meshgrid(
+            *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)]
+        )
         out = np.stack(mesh, axis=-1)
         return BackendManager.convert(out)
 
@@ -261,13 +277,21 @@ class RectangularGrid:
         """ndarray: dtype float64, shape (2 * n1 + 1, ..., 2 * nk + 1), with k is the number of dimensions of the grid."""
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(*(arange(-n + 1, n, dtype=np.float64) * delta_i for n, delta_i in zip(shape, delta)), indexing='ij')
+        lags = np.meshgrid(
+            *(
+                arange(-n + 1, n, dtype=np.float64) * delta_i
+                for n, delta_i in zip(shape, delta)
+            ),
+            indexing="ij",
+        )
         return np.stack(lags, axis=0)
 
     @property
     def grid_points(self) -> np.ndarray:
         """dtype float, list of grid ticks."""
-        return tuple([np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)])
+        return tuple(
+            [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
+        )
 
     @cached_property
     def lag_matrix(self) -> np.ndarray:
@@ -277,7 +301,7 @@ class RectangularGrid:
         to their coordinates. The matrix may be very large for large grid sizes.
         """
         xs = [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
-        grid = np.meshgrid(*xs, indexing='ij')
+        grid = np.meshgrid(*xs, indexing="ij")
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
         return np.array(lags)
@@ -302,7 +326,9 @@ class RectangularGrid:
         covmat: ndarray
             shape (n_points, n_points), covariance matrix
         """
-        return model(self.lag_matrix) * np.dot(self.mask.reshape((-1, 1)), self.mask.reshape((1, -1)))
+        return model(self.lag_matrix) * np.dot(
+            self.mask.reshape((-1, 1)), self.mask.reshape((1, -1))
+        )
 
     def autocov(self, model: CovarianceModel):
         """
@@ -323,7 +349,7 @@ class RectangularGrid:
         For instance, in dimension 1, the covariance model is evaluated at lags
             0, 1, ..., n - 1, - n + 1, ..., -1.
         """
-        if hasattr(model, 'call_on_rectangular_grid'):
+        if hasattr(model, "call_on_rectangular_grid"):
             return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
@@ -341,13 +367,23 @@ class RectangularGrid:
         cov: ndarray
             Autocovariance for the grid's lags.
         """
-        assert isinstance(model, SeparableModel), "You can only call autocov_separable on a separable model"
+        assert isinstance(
+            model, SeparableModel
+        ), "You can only call autocov_separable on a separable model"
         n1, n2 = self.n
         lag1, lag2 = np.arange(-n1 + 1, n1), np.arange(-n2 + 1, n2)
         lag1, lag2 = ifftshift(lag1), ifftshift(lag2)
         model1, model2 = model.models
-        cov1 = model1([lag1, ]).reshape((-1, 1))
-        cov2 = model2([lag2, ]).reshape((1, -1))
+        cov1 = model1(
+            [
+                lag1,
+            ]
+        ).reshape((-1, 1))
+        cov2 = model2(
+            [
+                lag2,
+            ]
+        ).reshape((1, -1))
         return cov1 * cov2
 
     def separate(self, dims):

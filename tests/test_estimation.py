@@ -1,12 +1,11 @@
 import numpy as np
 from numpy.testing import assert_almost_equal
 from debiased_spatial_whittle.cov_funcs import exp_cov
-from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram, compute_ep_old
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit, whittle, periodogram
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, sim_circ_embedding
-from debiased_spatial_whittle.models import ExponentialModel, ExponentialModelUniDirectional, SeparableModel
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.models import ExponentialModel, SeparableModel
 
 
 def test_expcov():
@@ -32,7 +31,7 @@ def test_expcov():
         e(model_est, z)
         est_rho = model_est.rho
         print(est_rho.value)
-        assert(abs(est_rho.value - rho) / rho < 0.05)
+        assert abs(est_rho.value - rho) / rho < 0.05
 
 
 def test_separable_expcov():
@@ -47,7 +46,7 @@ def test_separable_expcov():
     m2 = ExponentialModel()
     m2.rho = 32
     m2.sigma = 2
-    model = SeparableModel((m1, m2), dims=[(0, ), (1, )])
+    model = SeparableModel((m1, m2), dims=[(0,), (1,)])
     # simulation
     g = RectangularGrid((128, 128))
     sampler = SamplerOnRectangularGrid(model, g)
@@ -58,7 +57,7 @@ def test_separable_expcov():
     m2.rho = None
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
-    #ep = SeparableExpectedPeriodogram(g, p)
+    # ep = SeparableExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
     e = Estimator(d)
     e(model_est, z)
@@ -85,12 +84,18 @@ def test_oop_vs_old():
     model_est = ExponentialModel()
     model_est.sigma = 1
     z = sampler()
-    e(model_est, z, opt_callback=lambda x: print('current oop: ', x))
+    e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
     est_rho = model_est.rho.value
     # old version
     g = np.ones((128, 128))
     cov_func = exp_cov
-    est_rho2 = fit(z, g, cov_func, [model_est.rho.init_guess], opt_callback=lambda x: print('current old: ', x))
+    est_rho2 = fit(
+        z,
+        g,
+        cov_func,
+        [model_est.rho.init_guess],
+        opt_callback=lambda x: print("current old: ", x),
+    )
     assert_almost_equal(est_rho, est_rho2[0])
 
 
@@ -112,9 +117,10 @@ def test_optim_with_gradient():
     model_est = ExponentialModel()
     model_est.sigma = 1
     z = sampler()
-    e(model_est, z, opt_callback=lambda x: print('current oop: ', x))
+    e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
     est_rho = model_est.rho.value
-    assert (abs(est_rho - 10) < 2)
+    assert abs(est_rho - 10) < 2
+
 
 """
 def test_optim_with_gradient_shared_param():

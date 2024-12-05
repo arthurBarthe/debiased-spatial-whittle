@@ -9,8 +9,16 @@ def prod_list(l):
     else:
         return l[0] * prod_list(l[1:])
 
-def video_plot_3d(y: np.ndarray, interval=100, repeat_delay=1000,
-                  get_title=None, xlabel='', ylabel='', **imshow_kwargs):
+
+def video_plot_3d(
+    y: np.ndarray,
+    interval=100,
+    repeat_delay=1000,
+    get_title=None,
+    xlabel="",
+    ylabel="",
+    **imshow_kwargs,
+):
     """
     Produces an animated plot to show the 3 dimensional array
     Parameters
@@ -29,15 +37,20 @@ def video_plot_3d(y: np.ndarray, interval=100, repeat_delay=1000,
     for i in range(y.shape[-1]):
         im = ax.imshow(y[..., i], animated=True, **imshow_kwargs)
         if get_title is not None:
-            ttl = plt.text(0., 1.01, get_title(i),
-                           horizontalalignment='left',
-                           verticalalignment='bottom',
-                           transform=ax.transAxes)
+            ttl = plt.text(
+                0.0,
+                1.01,
+                get_title(i),
+                horizontalalignment="left",
+                verticalalignment="bottom",
+                transform=ax.transAxes,
+            )
         if i == 0:
-            ax.imshow(y[..., 0], **imshow_kwargs) # show an initial one first
+            ax.imshow(y[..., 0], **imshow_kwargs)  # show an initial one first
         ims.append([im, ttl])
-    ani = animation.ArtistAnimation(fig, ims, interval=interval, blit=True,
-                                    repeat_delay=repeat_delay)
+    ani = animation.ArtistAnimation(
+        fig, ims, interval=interval, blit=True, repeat_delay=repeat_delay
+    )
 
     # To save the animation, use e.g.
     #
@@ -48,5 +61,5 @@ def video_plot_3d(y: np.ndarray, interval=100, repeat_delay=1000,
     # writer = animation.FFMpegWriter(
     #     fps=15, metadata=dict(artist='Me'), bitrate=1800)
     # ani.save("movie.mp4", writer=writer)
-    #plt.show()
+    # plt.show()
     return ani

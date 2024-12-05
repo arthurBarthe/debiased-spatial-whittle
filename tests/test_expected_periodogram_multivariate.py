@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SamplerBUCOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
+from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.models import SquaredExponentialModel
 from debiased_spatial_whittle.models import BivariateUniformCorrelation
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram

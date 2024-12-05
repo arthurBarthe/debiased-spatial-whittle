@@ -1,7 +1,7 @@
 import numpy as np
 
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, Parameters
+from debiased_spatial_whittle.models import ExponentialModel
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import DebiasedWhittle
 from debiased_spatial_whittle.confidence import McmcDiags, CovarianceFFT
@@ -35,5 +35,6 @@ def test_mcmc_jmat():
     print(mcmc.partition_function(), mcmc.estimate())
     print(s1)
     import matplotlib.pyplot as plt
+
     plt.plot(mcmc.partition_function_trace())
     plt.show()

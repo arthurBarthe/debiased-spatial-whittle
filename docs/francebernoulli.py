@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import SquaredExponentialModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -19,7 +19,7 @@ p_obs = 0.9
 mask_bernoulli = np.random.rand(*shape) <= p_obs
 
 mask_france = grids.ImgGrid(shape).get_new() * mask_bernoulli
-print(f'Number of observations: {np.sum(mask_france)}')
+print(f"Number of observations: {np.sum(mask_france)}")
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france
 sampler = SamplerOnRectangularGrid(model, grid_france)
@@ -37,5 +37,5 @@ estimate = estimator(model_est, z)
 print(estimate)
 
 z[mask_france == 0] = np.nan
-plt.imshow(z, origin='lower', cmap='Spectral')
+plt.imshow(z, origin="lower", cmap="Spectral")
 plt.show()

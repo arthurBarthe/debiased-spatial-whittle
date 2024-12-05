@@ -1,10 +1,16 @@
-from debiased_spatial_whittle.models import BivariateUniformCorrelation, ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import (
+    BivariateUniformCorrelation,
+    ExponentialModel,
+)
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle
 from debiased_spatial_whittle.hypothesis_tests import FixedParametersHT
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
+from debiased_spatial_whittle.multivariate_periodogram import (
+    Periodogram as PeriodogramMulti,
+)
+
 
 def test_fixed_parameters_ht():
     grid = RectangularGrid((64, 64), nvars=2)
@@ -13,8 +19,8 @@ def test_fixed_parameters_ht():
     model.sigma = 1
     model.nugget = 0.01
     bvm = BivariateUniformCorrelation(model)
-    bvm.r_0 = 0.
-    bvm.f_0 = 1.
+    bvm.r_0 = 0.0
+    bvm.f_0 = 1.0
     sampler = SamplerBUCOnRectangularGrid(bvm, grid)
     z = sampler()
 
@@ -26,6 +32,5 @@ def test_fixed_parameters_ht():
     periodogram = PeriodogramMulti()
     expected_periodogram = ExpectedPeriodogram(grid, periodogram)
     dbw = MultivariateDebiasedWhittle(periodogram, expected_periodogram)
-    hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.), dbw)
+    hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.0), dbw)
     hypothesis_test(z)
-

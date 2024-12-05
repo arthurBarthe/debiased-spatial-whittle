@@ -1,15 +1,14 @@
 from debiased_spatial_whittle.backend import BackendManager
 
-BackendManager.set_backend('numpy')
+BackendManager.set_backend("numpy")
 np = BackendManager.get_backend()
-
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    Parameters,
+)
 from debiased_spatial_whittle.models import BivariateUniformCorrelation
 
 
@@ -26,7 +25,14 @@ def test_gradient_cov():
     acv1 = model(g.lags_unique)
     model.rho = model.rho.value + epsilon
     acv2 = model(g.lags_unique)
-    g = model.gradient(g.lags_unique, Parameters([model.rho, ]))['rho']
+    g = model.gradient(
+        g.lags_unique,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )["rho"]
     g2 = (acv2 - acv1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
 
@@ -50,7 +56,7 @@ def test_gradient_sqExpCov():
     model.sigma = model.sigma.value + epsilon
     acv3 = model(g.lags_unique)
     gradient = model.gradient(g.lags_unique, Parameters([model.rho, model.sigma]))
-    g_rho, g_sigma = gradient['rho'], gradient['sigma']
+    g_rho, g_sigma = gradient["rho"], gradient["sigma"]
     g2 = (acv2 - acv1) / epsilon
     g3 = (acv3 - acv1) / epsilon
     assert_allclose(g_rho, g2, rtol=1e-5)
@@ -117,9 +123,16 @@ def test_gradient_cov_merged_params():
     """
     grid = RectangularGrid((64, 64))
     model = ExponentialModel()
-    model.merge_parameters(('rho', 'sigma'))
+    model.merge_parameters(("rho", "sigma"))
     model.sigma = 5
-    g = model.gradient(grid.lags_unique, Parameters([model.rho, ]))['rho and sigma']
+    g = model.gradient(
+        grid.lags_unique,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )["rho and sigma"]
     epsilon = 1e-3
     acv1 = model(grid.lags_unique)
     model.sigma = 5 + epsilon
@@ -137,6 +150,7 @@ def test_cov_mat_x1_x2():
     mat = model.cov_mat_x1_x2(x1, x2)
     assert mat.ndim == 2
     assert mat.shape == (25, 10)
+
 
 def test_cov_mat_x1_x2_2():
     model = SquaredExponentialModel()

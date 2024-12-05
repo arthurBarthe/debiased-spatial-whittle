@@ -1,11 +1,15 @@
 from .backend import BackendManager
+
 np = BackendManager.get_backend()
 from typing import Tuple
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
 
-def spatial_kernel(g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None) -> np.ndarray:
+
+def spatial_kernel(
+    g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None
+) -> np.ndarray:
     """
     Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
 
