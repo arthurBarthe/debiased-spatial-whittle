@@ -140,6 +140,26 @@ def test_compare_to_mean_3d():
     assert_allclose(mean_per, e_per, rtol=0.05)
 
 
+def test_compare_to_mean_1d():
+    shape = (256,)
+    grid = RectangularGrid(shape)
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
+    for i in range(n_samples):
+        z = sampler()
+        per = periodogram(z)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
+
+
 def test_compare_to_average_masked_grid():
     """
     Compare the sample average of periodograms over independent realizations

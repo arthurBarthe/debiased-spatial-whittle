@@ -122,6 +122,32 @@ def test_optim_with_gradient():
     assert abs(est_rho - 10) < 2
 
 
+def test_estimation_1d():
+    """
+    Tests estimation in the case of 1-dimensional data
+    """
+    # oop version
+    g = RectangularGrid((128,))
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    d = DebiasedWhittle(p, ep)
+    e = Estimator(d)
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = 10
+    sampler = SamplerOnRectangularGrid(model, g)
+    model_est = ExponentialModel()
+    model_est.sigma = 1
+    estimates = []
+    for i in range(100):
+        model_est.rho = None
+        model_est.rho.init_guess = 0.1
+        z = sampler()
+        e(model_est, z)
+        estimates.append(model_est.rho.value)
+    assert np.abs(np.mean(estimates) - model.rho.value) <= 2
+
+
 """
 def test_optim_with_gradient_shared_param():
     This test checks that the estimation procedures works correctly when using the gradient of the likelihood

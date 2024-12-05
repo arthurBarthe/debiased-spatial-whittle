@@ -347,7 +347,7 @@ class ExpectedPeriodogram:
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                    result += np.pad(res, (i, 0), mode="constant")
+                    result += np.pad(res, ((i, 0), (0, 0), (0, 0)), mode="constant")
 
             elif n_dim == 2:
                 for i in range(2):

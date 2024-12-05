@@ -21,7 +21,7 @@ class TestEpFullGrid:
         sampler = SamplerBUCOnRectangularGrid(self.bvm, self.grid)
         p_computer = Periodogram()
         periodograms = []
-        for i in range(1000):
+        for i in range(10000):
             sample_i = sampler()
             p_value = p_computer([sample_i[..., 0], sample_i[..., 1]])
             periodograms.append(p_value)
@@ -29,4 +29,4 @@ class TestEpFullGrid:
         ep_computer = ExpectedPeriodogram(self.grid, p_computer)
         ep = ep_computer(self.bvm)
         # for this model and grid (full grid), the expected periodogram is real-valued
-        assert_allclose(np.real(avg_per), np.real(ep), rtol=0.25)
+        assert_allclose(np.real(avg_per), np.real(ep), rtol=0.2)
