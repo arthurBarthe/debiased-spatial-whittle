@@ -49,7 +49,7 @@ If you run into some issue regarding the Python version, you can run
 where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
 
 ### Unit tests
-Unit tests are run with pytest. On Pull-requests, the unit tests will be 
+Unit tests are run with pytest. On Pull-requests, the unit tests will be
 run.
 
 ## Documentation
@@ -72,7 +72,7 @@ the version in th pyproject.toml. Creating a release in Github will trigger
 a Github workflow that will publish to Pypi (see Pypi section).
 
 ## PyPi
-The package is updated on PyPi automatically on creation of a new 
+The package is updated on PyPi automatically on creation of a new
 release in Github. Note that currently the version in pyproject.toml
 needs to be manually updated. This should be fixed by adding
 a step in the workflow used for publication to Pypi.

@@ -1,7 +1,7 @@
 We provide a BackendManager class which allows switching between
 Numpy, Cupy and PyTorch for array computations.
 In particular, this means that all the FFTs carried out by the package
-may benefit from GPU implementations provided by Cupy and Pytorch, 
+may benefit from GPU implementations provided by Cupy and Pytorch,
 leading to large performance gains.
 
 Setting the backend must be carried out
