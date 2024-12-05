@@ -284,7 +284,8 @@ class DebiasedWhittle:
         return np.mean((np.log(expected_periodogram) + periodogram / expected_periodogram) * self.frequency_mask)
 
 
-    def __call__(self, sample: np.ndarray, model: CovarianceModel, params_for_gradient: Parameters = None):
+    def __call__(self, sample: np.ndarray, model: CovarianceModel,
+                 params_for_gradient: Parameters = None) -> np.float64:
         """
         Computes the Debiased Whittle likelihood for these data
 
@@ -549,7 +550,7 @@ class Estimator:
         Optimization procedure. Should be one of the methods available in scipy's local or global optimizers.
     """
     def __init__(self, likelihood: DebiasedWhittle, use_gradients: bool = False, max_iter: int=100,
-                 optim_options=dict(), method: str='L-BFGS-B'):
+                 optim_options: dict = dict(), method: str='L-BFGS-B'):
         """
 
         Parameters

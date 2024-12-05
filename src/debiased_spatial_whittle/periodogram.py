@@ -138,18 +138,13 @@ class Periodogram:
     taper: function handle
         tapering function
 
-    scaling: str
-        Choice of scaling, only 'ortho' is currently accepted
-
     fold: boolean
         Whether to fold the periodogram.
     """
 
-    def __init__(self, taper = None, scaling='ortho'):
+    def __init__(self, taper = None):
         if taper is None:
             self.taper = lambda shape: np.ones(shape)
-        self.scaling = scaling
-        #TODO add scaling
         self.fold = True
         self._version = 0
 
@@ -164,15 +159,6 @@ class Periodogram:
     @fold.setter
     def fold(self, value: bool):
         self._fold = value
-
-    @property
-    def scaling(self):
-        """Choice of scaling applied to the periodogram. Only 'ortho' is currently accepted."""
-        return self._scaling
-
-    @scaling.setter
-    def scaling(self, value: str):
-        self._scaling = value
 
     def __call__(self, sample: Union[np.ndarray, SampleOnRectangularGrid]):
         """
@@ -192,7 +178,6 @@ class Periodogram:
             - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
             - shape (n1, ..., nk) if the fold attribute is True
         """
-        # TODO add tapering
         if isinstance(sample, SampleOnRectangularGrid):
             if self in sample.periodograms:
                 return sample.periodograms[self]
@@ -332,14 +317,12 @@ class ExpectedPeriodogram:
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
-        # TODO add tapering
         if grid.nvars == 1:
             cg = np.expand_dims(cg, (-1, -2))
             acv = np.expand_dims(acv, (-1, -2))
         cbar = cg * acv
         # now we need to "fold"
         if fold:
-            # TODO: check if working
             if BackendManager.backend_name == 'torch':
                 result = np.zeros(grid.n + (p, p), dtype=np.complex128, device=BackendManager.device)
             else:
@@ -597,3 +580,4 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         -------
 
         """
+        raise NotImplementedError('This has not been implemented yet.')

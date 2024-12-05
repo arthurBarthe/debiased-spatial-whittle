@@ -257,7 +257,7 @@ class RectangularGrid:
         return BackendManager.convert(out)
 
     @cached_property
-    def lags_unique(self) -> List[np.ndarray]:
+    def lags_unique(self) -> np.ndarray:
         """ndarray: dtype float64, shape (2 * n1 + 1, ..., 2 * nk + 1), with k is the number of dimensions of the grid."""
         shape = self.n
         delta = self.delta
