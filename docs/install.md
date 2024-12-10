@@ -4,6 +4,11 @@ The package can be installed via one of the following methods.
 
     pip install debiased-spatial-whittle
 
+If you want to install the optional Cupy and Pytorch dependencies for GPU computations,
+you need to add the optional gpu dependency:
+
+    pip install debiased-spatial-whittle[gpu]
+
 Otherwise, you should be able to directly install this repository:
 
     pip install git@github.com:arthurBarthe/debiased-spatial-whittle
@@ -12,6 +17,10 @@ Otherwise, you should be able to directly install this repository:
 Via the use of Poetry (https://python-poetry.org/) by running
 
     poetry add debiased-spatial-whittle
+
+Or, to add optional gpu dependencies,
+
+    poetry add debiased-spatial-whittle -E gpu
 
 You can also use the latest github version by adding the following dependency in your pyproject.toml:
 
@@ -25,3 +34,7 @@ poetry install
 ```
 which will install an environment based on the dependencies listed in the lock
 file.
+
+To install with gpu dependencies,
+
+    poetry install -E gpu

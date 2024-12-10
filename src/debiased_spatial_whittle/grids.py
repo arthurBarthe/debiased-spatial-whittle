@@ -342,6 +342,8 @@ class RectangularGrid:
         Returns
         -------
         cov: ndarray
+            Shape (2 * n1 - 1, 2 * n2 - 1, ..., 2 * nd - 1) if the grid has shape (n1, ..., nd), see
+            notes below.
             Covariance model evaluated on a grid of lags determined by the spatial rectangular grid.
 
         Notes

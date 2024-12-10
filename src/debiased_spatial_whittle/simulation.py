@@ -71,12 +71,12 @@ class SamplerOnRectangularGrid:
         Grid on which we wish to sample
 
     n_sims: int
-        Simulations can be carried out in 'blocks'. This parameters allows to choose how many
+        Simulations can be carried out in 'blocks'. This parameter allows to choose how many
         i.i.d. samples are generated in each block computation.
 
     Notes
     -----
-    This sampler accounts for the grid's mask.
+    This sampler accounts for the grid's mask by setting missing values to zero.
 
     Examples
     --------

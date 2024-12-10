@@ -8,7 +8,7 @@ theme:
 plugins:
 - mkdocs-jupyter:
     include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'venus data/venus.py', '3dexponential.py']
+    '3dexponential.py']
     execute: true
 - mkdocstrings:
     handlers:
@@ -24,6 +24,17 @@ plugins:
           separate_signature: true
           show_source: false
 
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css
 
 nav:
   - Home: index.md
@@ -38,7 +49,6 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
-      - 'Venus topography': 'venus data/venus.py'
   - Reference:
       - Grids: grids.md
       - Models: models.md

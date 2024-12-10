@@ -177,7 +177,7 @@ class SimpleKriging:
         return xs_approx_pred_draws
 
 
-def interpolation_test():
+def test_interpolation():
     np.random.seed(1252149)
     n = (64, 64)
     mask = np.ones(n)
