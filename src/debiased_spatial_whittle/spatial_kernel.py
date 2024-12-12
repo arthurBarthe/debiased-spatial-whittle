@@ -1,4 +1,4 @@
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 from typing import Tuple
@@ -10,7 +10,7 @@ ifftn = np.fft.ifftn
 def spatial_kernel(
     g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None
 ) -> np.ndarray:
-    """
+    r"""
     Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
 
     Parameters
@@ -32,8 +32,28 @@ def spatial_kernel(
     -------
     cg
         Spatial kernel.
+
         Shape (2 * n1 + 1, ..., 2 * nd + 1) for univariate data
+
         Shape (2 * n1 + 1, ..., 2 * nd + 1, p, p) for p-variate data
+
+    Examples
+    --------
+    >>> g = np.arange(10)
+    >>> spatial_kernel(g)
+    array([2.85000000e+01, 2.40000000e+01, 1.96000000e+01, 1.54000000e+01,
+           1.15000000e+01, 8.00000000e+00, 5.00000000e+00, 2.60000000e+00,
+           9.00000000e-01, 2.09423122e-15, 2.09423122e-15, 9.00000000e-01,
+           2.60000000e+00, 5.00000000e+00, 8.00000000e+00, 1.15000000e+01,
+           1.54000000e+01, 1.96000000e+01, 2.40000000e+01])
+
+    Notes
+    -----
+    The formula for the spatial kernel in dimension 1 is,
+
+    $$
+        c_g(\tau) = \sum_{s}{g_s g_{s + \tau}}, \quad \tau=0, \ldots, n - 1, - (n - 1), \ldots, -1.
+    $$
     """
     if n_spatial_dim is None:
         n_spatial_dim = g.ndim

@@ -1,7 +1,8 @@
 # Welcome to the documentation of Debiased Spatial Whittle!
 
 This documentation includes an API reference as well as some example
-notebooks.
+notebooks. The article where the Debiased Spatial Whittle was proposed
+is available [here](https://doi.org/10.1111/rssb.12539).
 
 ## Package description
 This package implements a Fourier-based approximate likelihood method

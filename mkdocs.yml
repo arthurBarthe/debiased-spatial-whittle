@@ -4,6 +4,8 @@ use_directory_urls: false
 
 theme:
   name: "material"
+  features:
+    - content.code.copy
 
 plugins:
 - mkdocs-jupyter:
@@ -14,6 +16,8 @@ plugins:
     handlers:
       python:
         options:
+          show_properties: true
+          show_signature_annotations: false
           docstring_style: numpy
           merge_init_into_class: true
           show_root_heading: true
@@ -27,6 +31,13 @@ plugins:
 markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
 
 extra_javascript:
   - javascripts/katex.js

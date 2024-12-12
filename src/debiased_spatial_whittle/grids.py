@@ -138,8 +138,33 @@ class RectangularGrid:
     mask: ndarray
         array of 0's (missing) and 1's (observed) indicating for each point of the grid whether the random field is
         observed at that location.
-        When nvars is 1 (univariate random field), mask should be an array with len(n) dimensions.
-        When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
+
+    n_points: int
+        total number of points of the grid
+
+    ndim: int
+        number of spatial (or spatio-temporal) dimensions
+
+    extent: tuple[float, ...]
+        spatial extent of the grid, determined by the shape and the step sizes
+
+    imshow_extent: tuple[float, ...]
+        spatial extent for use as extent parameter of pyplot.imshow
+
+    lags_unique: ndarray
+        unique lags of the grid
+
+    grid_points: ndarray
+        array with the coordinates of the points of the grid
+
+    lag_matrix: ndarray
+        lags between points of the grid
+
+    fourier_frequencies: ndarray
+        array of the fourier frequencies of the grid
+
+    fourier_frequencies: ndarray
+        array of the fourier frequencies of the grid lags
     """
 
     def __init__(
@@ -221,7 +246,12 @@ class RectangularGrid:
 
     @property
     def mask(self) -> np.ndarray:
-        """observation mask. By default, 1 everywhere."""
+        """
+        array of 0's (missing) and 1's (observed) indicating for each point of the grid whether the random field is
+        observed at that location.
+        When nvars is 1 (univariate random field), mask should be an array with ndim dimensions.
+        When nvars is greater than one, mask should have an extra dimension, the last one, with size nvars.
+        """
         return self._mask
 
     @mask.setter
@@ -239,8 +269,8 @@ class RectangularGrid:
         self._mask = value
 
     @property
-    def n_points(self):
-        """int: Total number of points of the grid, irrespective of the mask"""
+    def n_points(self) -> int:
+        """total number of points of the grid, irrespective of the mask"""
         return np.prod(np.array(self.n))
 
     @property
@@ -259,13 +289,31 @@ class RectangularGrid:
 
     @property
     def fourier_frequencies(self) -> np.ndarray:
-        """Grid of Fourier frequencies corresponding to the spatial grid."""
+        r"""
+        Grid of Fourier frequencies corresponding to the spatial grid. For instance, in dimension 1, for
+        a grid with $n$ points and a step size $\delta$,
+        $
+            \left(
+                \frac{2k\pi}{\delta n}
+            \right)_{k=0, \ldots, n - 1}
+            .
+        $
+        """
         mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
         return np.stack(mesh, axis=-1)
 
     @property
     def fourier_frequencies2(self) -> np.ndarray:
-        """Grid of Fourier frequencies corresponding to the spatial grid, without folding."""
+        r"""
+        Grid of Fourier frequencies corresponding to the grid of lags. For instance, in dimension 1, for
+        a grid with $n$ points and a step size $\delta$,
+        $
+            \left(
+                \frac{2k\pi}{\delta (2n - 1)}
+            \right)_{k=0, \ldots, 2n - 2}
+            .
+        $
+        """
         mesh = np.meshgrid(
             *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)]
         )
@@ -274,7 +322,7 @@ class RectangularGrid:
 
     @cached_property
     def lags_unique(self) -> np.ndarray:
-        """ndarray: dtype float64, shape (2 * n1 + 1, ..., 2 * nk + 1), with k is the number of dimensions of the grid."""
+        """shape (2 * n1 + 1, ..., 2 * nd + 1), with d the number of dimensions of the grid."""
         shape = self.n
         delta = self.delta
         lags = np.meshgrid(
@@ -288,7 +336,7 @@ class RectangularGrid:
 
     @property
     def grid_points(self) -> np.ndarray:
-        """dtype float, list of grid ticks."""
+        """list of grid ticks."""
         return tuple(
             [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
         )
@@ -308,6 +356,19 @@ class RectangularGrid:
 
     @lru_cache(maxsize=5)
     def spatial_kernel(self, taper_values: np.ndarray = None):
+        """
+        Compute the spatial kernel from the grid's mask and the taper values.
+
+        Parameters
+        ----------
+        taper_values
+            Taper values applied to data on the grid
+
+        Returns
+        -------
+        spatial_kernel
+            Shape (2 * n1 - 1, ..., 2 * nd - 1)
+        """
         if taper_values is None:
             return spatial_kernel(self.mask, n_spatial_dim=self.ndim)
         return spatial_kernel(self.mask * taper_values.values, n_spatial_dim=self.ndim)

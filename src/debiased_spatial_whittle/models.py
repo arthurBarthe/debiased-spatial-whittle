@@ -157,13 +157,39 @@ class ParametersUnion(Parameters):
 
 
 class CovarianceModel(ABC):
-    """Abstract class for the definition of a covariance model."""
+    """
+    Abstract class for the definition of a covariance model.
+
+    Attributes
+    ----------
+    n_params
+        number of parameters of the model
+
+    param_names
+        names of the model's parameters
+
+    param_bounds
+        bounds of the model's parameters
+
+    param_values
+        values of the model's parameters
+
+    free_params
+        parameters whose value is not fixed
+
+    has_free_params
+        true if the model has any free parameter
+
+    free_param_bounds
+        bounds of the free parameters
+    """
 
     def __init__(self, parameters: Parameters):
         self.params = parameters
 
     @property
     def param_bounds(self):
+        """parameter bounds"""
         return self.params.bounds
 
     @property
@@ -187,7 +213,8 @@ class CovarianceModel(ABC):
         return self.params.free_params()
 
     @property
-    def free_param_bounds(self):
+    def free_param_bounds(self) -> list:
+        """free parameters's bounds"""
         return self.free_params.bounds
 
     @property
@@ -249,14 +276,14 @@ class CovarianceModel(ABC):
         Parameters
         ----------
         x1
-            shape (N1, d), first set of locations
+            shape (n1, d), first set of locations
         x2
-            shape (N2, d), second set of locations
+            shape (n2, d), second set of locations
 
         Returns
         -------
         covmat
-            shape (N1, N2), covariance matrix
+            shape (n1, n2), covariance matrix
         """
         if x2 is None:
             x2 = x1
@@ -266,9 +293,32 @@ class CovarianceModel(ABC):
         lags = np.transpose(lags, (2, 0, 1))
         return self(lags)
 
-    def gradient(self, x: np.ndarray, params: Parameters):
-        """Provides the gradient of the covariance functions at the passed lags with respect to
-        the passed parameters"""
+    def gradient(self, x: np.ndarray, params: Parameters) -> dict[str, np.ndarray]:
+        """
+        Provides the gradient of the covariance functions at the passed lags with respect to
+        the passed parameters
+
+        Parameters
+        ----------
+        x
+            array of lags
+
+        params
+            parameters with respect to which we request the gradient
+
+        Returns
+        -------
+        gradient
+            dictionary whose keys are the parameter names, and values are the derivatives
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.21931151, 0.21931151, 0.38708346]), 'nugget': array([1., 0., 0., 0.])}
+        """
         gradient = dict([(p.name, 0) for p in params.param_dict.values()])
         g = self._gradient(x)
         for i, p in enumerate(self.params):
@@ -705,9 +755,12 @@ class SquaredExponentialModel(CovarianceModel):
         return np.sum(f, axis=(1, 2)).reshape(shape) + self.nugget.value
 
     def _gradient(self, lags: np.ndarray):
-        """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
+        """
+        Provides the derivatives of the covariance model evaluated at the passed lags with respect to
         the model's parameters.
 
+        Examples
+        --------
         >>> model = SquaredExponentialModel()
         >>> model.rho = 2
         >>> model.sigma = 1.41
@@ -1036,7 +1089,7 @@ class MaternCovarianceModel(CovarianceModel):
         Amplitude parameter
 
     nu: Parameter
-        Slope parameter. Faster for values 0.5 and 1.5.
+        Slope parameter. Faster for values 0.5, 1.5 and 2.5.
 
     Examples
     --------

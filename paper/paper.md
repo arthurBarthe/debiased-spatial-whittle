@@ -61,6 +61,22 @@ gains via GPU implementations of the FFT.
 
 # Software description
 
+The software is organized around several modules that can be grouped into the following
+categories:
+
+- grids:
+  - grids.py: allows to define the hypercubic grids where the data sit.
+  - simulation.py: allows to sample a realization from a model on a grid
+- models:
+  - models.py: allows to define a covariance model.
+    Standard covariance models are pre-defined.
+- estimation:
+  - periodogram.py: allows to compute the periodogram of the data, and to obtain
+    the expected periodogram for a given model, grid, and periodogram combination.
+  - likelihood.py: allows to define the Debiased Whittle Likelihood and the corresponding
+    estimator.
+
+
 
 # Citations
 

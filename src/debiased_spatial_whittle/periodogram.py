@@ -429,39 +429,11 @@ class ExpectedPeriodogram:
             d_ep.append(self.compute_ep(aux, self.periodogram.fold))
         return np.stack(d_ep, axis=-1)
 
-    def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
-        """Returns the covariance of the DFT over a given diagonal.
-
-        Parameters
-        ----------
-        model
-            Covariance model. The covariance matrix of the DFT will depend on both the model and the sampling.
-
-        m
-            Offset in Fourier frequency indices. More precisely, m = (m1, m2) is the offset
-            between two frequencies. In dimension 1 this would correspond to i2 - i1 = m1 in terms of
-            the indices of Fourier frequencies.
-
-        Returns
-        -------
-        cov_dft: ndarray
-            The covariance of the DFT between Fourier frequencies separated by the offset.
-
-        Notes
-        -----
-        When m is zero everywhere, this is just the expected periodogram.
-        """
-        # TODO only works for 2d
-        m1, m2 = m
-        n1, n2 = self.grid.n
-        acv = self.grid.autocov(model)
-        ep = self.compute_ep(acv, d=m)
-        return ep[max(0, m1) : n1 + m1, max(0, m2) : m2 + n2]
-
     def cov_dft_matrix(self, model: CovarianceModel):
-        """
-        Provides the covariance matrix of the Discrete Fourier Transform. Computed using matrix products,
-        hence not viable for large grid sizes.
+        r"""
+        Provides the complex-valued covariance matrix of the Discrete Fourier Transform.
+        Implemented via FFT, but still requires the full covariance matrix of the data,
+        hence this is not viable for large grids.
 
         Parameters
         ----------
@@ -470,8 +442,19 @@ class ExpectedPeriodogram:
 
         Returns
         -------
-        cov_dft: ndarray (n1, n2, ..., nk)
+        cov_dft: ndarray (n1, n2, ..., nd)
             Covariance matrix of the Discrete Fourier Transform of the data.
+
+        Notes
+        -----
+        The result of this method corresponds to,
+
+        $$
+            E[\mathbf{J} \mathbf{J}^*] = E[U^* \mathbf{X} \mathbf{X}^* U]=U^* E[\mathbf{X} \mathbf{X}^T] U= U^* C_X U
+        $$
+
+        where $\mathbf{J}$ is the Discrete Fourier Transform (DFT) of the data $\mathbf{X}$,
+        whose covariance matrix is denoted by $C_X$, and $U$ is the DFT matrix.
         """
         n = self.grid.n
 
@@ -519,6 +502,35 @@ class ExpectedPeriodogram:
         temp2 = fftn(temp_T, axes=(1, 2))
         temp2 = transpose(temp2)
         return temp2 / n[0] / n[1]
+
+    def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
+        """Returns the covariance of the DFT over a given diagonal.
+
+        Parameters
+        ----------
+        model
+            Covariance model. The covariance matrix of the DFT will depend on both the model and the sampling.
+
+        m
+            Offset in Fourier frequency indices. More precisely, m = (m1, m2) is the offset
+            between two frequencies. In dimension 1 this would correspond to i2 - i1 = m1 in terms of
+            the indices of Fourier frequencies.
+
+        Returns
+        -------
+        cov_dft: ndarray
+            The covariance of the DFT between Fourier frequencies separated by the offset.
+
+        Notes
+        -----
+        When m is zero everywhere, this is just the expected periodogram.
+        """
+        # TODO only works for 2d
+        m1, m2 = m
+        n1, n2 = self.grid.n
+        acv = self.grid.autocov(model)
+        ep = self.compute_ep(acv, d=m)
+        return ep[max(0, m1) : n1 + m1, max(0, m2) : m2 + n2]
 
     def cov_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """

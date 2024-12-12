@@ -23,6 +23,14 @@ In practice, this is implemented using the Fast Fourier Transform.
 
 ::: debiased_spatial_whittle.periodogram.ExpectedPeriodogram
 
+
+## multivariate_periodogram.py
+
+This module provides a class for the definition of a multi-variate periodogram.
+
+::: debiased_spatial_whittle.multivariate_periodogram.Periodogram
+
+
 ## likelihood.py
 This module provides tools to define the Debiased Whittle Likelihood
 and the associated estimator. More specifically, the Debiased Whittle Likelihood

@@ -17,18 +17,22 @@ class Periodogram:
         self.fold = True
         self.taper = lambda x: np.ones_like(x)
 
-    def __call__(self, z: List[np.ndarray], return_fft: bool = False):
+    def __call__(self, z: List[np.ndarray], return_fft: bool = False) -> np.ndarray:
         """
         Compute the multivariate periodogram. The data z is expected to be a list
         of p arrays with the same shape, where p is the number of variates.
+
         Parameters
         ----------
         z
-        return_fft
+            Data, list of arrays corresponding to the distinct variates
 
+        return_fft
+            If true, returns the Discrete Fourier Transform rather than the periodogram
         Returns
         -------
-
+        periodogram
+            Shape (n1, n2, ..., nd, p, p) if the data is p-variate and over d spatial dimensions.
         """
         n_spatial_dims = z[0].ndim
         z = np.stack(z, axis=-1)

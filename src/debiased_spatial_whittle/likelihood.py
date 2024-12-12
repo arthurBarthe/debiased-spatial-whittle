@@ -279,6 +279,33 @@ class DebiasedWhittle:
 
     expected_periodogram: ExpectedPeriodogram
         Object used to compute the expectation of the periodogram
+
+    frequency_mask: ndarray
+        mask of zero and ones to select frequencies over which the summation is carried out in the computation of
+        the Whittle.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.random.seed(1712)
+    >>> from debiased_spatial_whittle.grids import RectangularGrid
+    >>> from debiased_spatial_whittle.models import SquaredExponentialModel
+    >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+    >>> from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+    >>> grid = RectangularGrid(shape=(256, 256))
+    >>> model1 = SquaredExponentialModel()
+    >>> model1.rho = 12
+    >>> model1.sigma = 1
+    >>> model2 = SquaredExponentialModel()
+    >>> model2.rho = 4
+    >>> model2.sigma = 1
+    >>> sampler = SamplerOnRectangularGrid(model1, grid)
+    >>> per = Periodogram()
+    >>> ep = ExpectedPeriodogram(grid, per)
+    >>> dbw = DebiasedWhittle(per, ep)
+    >>> sample = sampler()
+    >>> dbw(sample, model1), dbw(sample, model2)
+    (-8.37515633567113, -7.315812857735173)
     """
 
     def __init__(

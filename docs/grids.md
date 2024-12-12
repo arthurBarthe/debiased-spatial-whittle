@@ -10,6 +10,8 @@ grids using circulant embeddings and the Fast Fourier Transform.
 
 ::: debiased_spatial_whittle.simulation.SamplerOnRectangularGrid
 
+::: debiased_spatial_whittle.simulation.SamplerBUCOnRectangularGrid
+
 
 ## spatial_kernel.py
 This module provides the function that allows to compute the kernel of a grid of observations.
