@@ -64,3 +64,4 @@ nav:
       - Grids: grids.md
       - Models: models.md
       - Estimation: periodogram.md
+  - Contributing: contribute.md

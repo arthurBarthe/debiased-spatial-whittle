@@ -232,7 +232,7 @@ class HashableArray:
 
 
 class ExpectedPeriodogram:
-    """
+    r"""
     Provides the capability to compute the expected periodogram on a fixed grid for
     any covariance model.
 
@@ -244,6 +244,34 @@ class ExpectedPeriodogram:
     periodogram: Periodogram
         periodogram for which we require the expectation. This is necessary to account for tapering for instance.
 
+    Notes
+    -----
+    In dimension 1, the formula for the expected periodogram can be written as,
+
+    $$
+        \overline{I}(\omega_k) =
+        \sum_{\tau=-n + 1}^{n - 1}
+        c_g(\tau)
+        c_X(\tau)
+        e^{i \omega_k \tau},
+    $$
+
+    or equivalently,
+
+    $$
+        \overline{I}(\omega_k) =
+        \sum_{\tau=0}^{2n - 1}
+        \left[
+            c_g(\tau)
+            c_X(\tau)
+            +
+            c_g(- n + \tau)
+            c_X(- n + \tau)
+        \right]
+        e^{i \omega_k \tau}.
+    $$
+
+    The latter can naturally be implemented via FFT and generalizes to higher-dimension domains.
     """
 
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
@@ -287,6 +315,7 @@ class ExpectedPeriodogram:
         ep: ndarray
             Shape  (n1, n2, ..., nk).
             The expected periodogram on the grid of Fourier frequencies.
+
             If the fold attribute of the periodogram is False, the shape of the returned array is instead
             (2 * n1 + 1, ..., 2 * nk + 1).
         """
@@ -303,9 +332,10 @@ class ExpectedPeriodogram:
 
         Parameters
         ----------
-        acv: ndarray (2 * n1 + 1, ..., 2 * nk + 1)
-            Autocovariance evaluated on the grid. Here (n1, ..., nk) is the shape of the grid. The standard way to
-            obtain acv is through the call of the autocov method of a rectangular grid.
+        acv: ndarray
+            Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd) acv should have shape
+            (2 * n1 - 1, ..., 2 * nd - 1).
+            The standard way to obtain acv is through the call of the autocov method of a rectangular grid.
         fold
             Whether to apply folding of the expected periodogram
         d
@@ -313,10 +343,12 @@ class ExpectedPeriodogram:
 
         Returns
         -------
-        np.ndarray
+        ep: np.ndarray
             Expectation of the periodogram.
-            - shape (2 * n1 + 1, ..., 2 * nk + 1) is the fold attribute of self.periodogram is False
-            - shape (n1, ..., nk) if fold is True
+
+            - shape (2 * n1 - 1, ..., 2 * nd - 1) is the fold attribute of self.periodogram is False
+
+            - shape (n1, ..., nd) if fold is True
 
         Notes
         -----

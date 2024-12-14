@@ -1,3 +1,7 @@
+The Debiased Whittle Likelihood estimator is based on the periodogram
+of the data and the expected periodogram corresponding to the combination
+of a sampling grid and covariance model.
+
 ## periodogram.py
 This module provides tools to define a periodogram and to obtain
 its expectation, the expected periodogram.
@@ -15,7 +19,7 @@ I(\mathbf{k}) =
     }
 \right|^2
 $$
-where the summation if over grid points, and where $g_{\mathbf{s}}$
+where the summation is over grid points, and where $g_{\mathbf{s}}$
 is obtained from both the grid mask and the periodogram taper function.
 In practice, this is implemented using the Fast Fourier Transform.
 

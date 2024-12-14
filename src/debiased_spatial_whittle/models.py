@@ -249,10 +249,14 @@ class CovarianceModel(ABC):
         x: ndarray
             Array of spatial lags. The first dimension is used to index the dimensions of the domain.
 
+            Shape (ndim, m1, ..., mk)
+
         Returns
         -------
         cov: ndarray
             Covariance model evaluated at the passed lags
+
+            Shape (m1, ..., mk)
 
         Notes
         -----
@@ -721,6 +725,26 @@ class SquaredExponentialModel(CovarianceModel):
         self.nugget = 0.0
 
     def __call__(self, lags: np.ndarray):
+        """
+        Evaluate the Squared Exponential Covariance model at the passed lags.
+
+        Parameters
+        ----------
+        lags
+            Array of lags
+
+        Returns
+        -------
+        Exponential covariance function evaluated at the passed lags.
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]))
+        array([1.9881    , 1.75449209, 1.75449209, 1.54833384])
+        """
         d2 = np.sum(lags**2, axis=0)
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = (
@@ -914,11 +938,10 @@ class BivariateUniformCorrelation(CovarianceModel):
 
         Returns
         -------
-            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
+            Covariance values with shape (m1, m2, ..., mk, 2, 2)
 
         """
         acv11 = self.base_model(lags)
-        # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
         out = np.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11
@@ -934,6 +957,7 @@ class BivariateUniformCorrelation(CovarianceModel):
         ----------
         x
             shape (ndim, m1, ..., mk)
+
         Returns
         -------
         gradient
