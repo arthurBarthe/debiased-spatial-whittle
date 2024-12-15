@@ -1,17 +1,50 @@
-import numpy as np
+# In this notebook we demonstrate the use of the Debiased Spatial Whittle for a simulated random field on an
+# incomplete grid, where the sampling region follows the shape of the territory of France.
+
+# ##Imports
+
+from debiased_spatial_whittle.backend import BackendManager
+
+BackendManager.set_backend("numpy")
 import matplotlib.pyplot as plt
-import scipy.linalg
+import debiased_spatial_whittle.grids as grids
+from debiased_spatial_whittle.models import SquaredExponentialModel
+from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
-from debiasedwhittle import sim_circ_embedding, sq_exp_cov, exp_cov, exp_cov, fit
-import debiasedwhittle.grids as grids
 
-cov = sq_exp_cov
-shape = (620 * 1, 620 * 1)
-cov_func = lambda lags: cov(lags, rho=32.)
-img = grids.ImgGrid(shape).get_new()
-z = sim_circ_embedding(cov_func, shape)[0] * img
-est = fit(z, img, cov, [1., ])
-print(est)
+# ##Model specification
 
-plt.imshow(z, origin='lower', cmap='Spectral')
+model = SquaredExponentialModel()
+model.rho = 35
+model.sigma = 2
+model.nugget = 0.0
+
+# ##Grid specification
+
+shape = (1024 * 1, 1024 * 1)
+mask_france = grids.ImgGrid(shape).get_new()
+grid_france = RectangularGrid(shape)
+grid_france.mask = mask_france
+sampler = SamplerOnRectangularGrid(model, grid_france)
+
+# ##Sample generation
+
+z = sampler()
+plt.figure()
+plt.imshow(z, origin="lower", cmap="RdBu")
 plt.show()
+
+# ##Inference
+
+periodogram = Periodogram()
+expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
+debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
+estimator = Estimator(debiased_whittle)
+
+model_est = SquaredExponentialModel()
+model_est.nugget = None
+estimate = estimator(model_est, z)
+print(estimate)

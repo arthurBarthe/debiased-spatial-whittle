@@ -1,0 +1,67 @@
+site_name: Documentation Debiased Spatial Whittle
+
+use_directory_urls: false
+
+theme:
+  name: "material"
+  features:
+    - content.code.copy
+
+plugins:
+- mkdocs-jupyter:
+    include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
+    '3dexponential.py']
+    execute: true
+- mkdocstrings:
+    handlers:
+      python:
+        options:
+          show_properties: true
+          show_signature_annotations: false
+          docstring_style: numpy
+          merge_init_into_class: true
+          show_root_heading: true
+          show_root_full_path: false
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          members_order: source
+          separate_signature: true
+          show_source: false
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css
+
+nav:
+  - Home: index.md
+  - 'Getting started':
+      - Installation: install.md
+      - Backend selection: backend.md
+  - 'Example notebooks':
+      - France: france.py
+      - Circle: circle.py
+      - Anisotropic: non-isotropic.py
+      - 3d exponential model: 3dexponential.py
+      - Multivariate:
+          - 'Same grid': multivariate_simple.py
+          - 'Non-overlapping grids': multivariate_two_grids.py
+  - Reference:
+      - Grids: grids.md
+      - Models: models.md
+      - Estimation: periodogram.md
+  - Contributing: contribute.md
