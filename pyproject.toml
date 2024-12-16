@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "debiased-spatial-whittle"
-version = "0.3.6"
+version = "0.4.0"
 description = "Spatial Debiased Whittle likelihood for fast inference of spatio-temporal covariance models from gridded data"
 readme = "README.md"
 authors = ["arthur <ahw795@qmul.ac.uk>"]
