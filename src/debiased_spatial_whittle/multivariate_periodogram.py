@@ -45,7 +45,7 @@ class Periodogram:
         if return_fft:
             return j_vec
         # first dimensions are spatial dimensions
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             j_vec_transpose = np.conj(np.transpose(j_vec, (0, 1, -1, -2)))
         elif BackendManager.backend_name == "torch":
             j_vec_transpose = np.conj(np.transpose(j_vec, -1, -2))
