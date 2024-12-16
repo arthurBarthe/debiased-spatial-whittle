@@ -187,7 +187,7 @@ class MultivariateDebiasedWhittle:
         ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
         ratio = np.matmul(ep_inv, p)
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == "torch":
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
