@@ -85,27 +85,102 @@ class ModelParameter(param.Parameter):
         self.bounds = kwargs.pop('bounds')
         super().__init__(*args, allow_refs=True, per_instance=True, **kwargs)
 
+    @property
+    def free(self) -> bool:
+        """true is the model parameter is free, i.e. not readonly and not constant"""
+        return not (self.readonly or self.constant)
+
+
+class MModelInterface(ABC):
+    """
+    Class defining the general interface for covariance models. This should remain implementation-independent.
+
+    Attributes
+    ----------
+    """
+    def __call__(self, lags: np.ndarray):
+        """
+        Evaluate covariance model at passed array of lags.
+
+        Parameters
+        ----------
+        lags
+            Array of lags. Shap (ndim, n1, ..., nk)
+
+        Returns
+        -------
+        cov
+            covariance values. Shape (n1, ..., nk)
+        """
+        pass
+
+    def free_parameter_values_to_array(self) -> np.ndarray:
+        """
+        Provide the values of the model's free parameters as an array.
+        Useful for use by numerical optimizer.
+
+        Returns
+        -------
+        param_values
+            array of free parameter values
+        """
+        pass
+
+    def update_free_parameters_from_array(self, param_array: np.ndarray):
+        """
+        Update the model's free parameters from an array of values.
+        Useful for use by numerical optimizers.
+
+        Parameters
+        ----------
+        param_array
+            array of parameter values
+
+        Returns
+        -------
+
+        """
+        pass
 
 class ModelInterface(param.Parameterized):
+    """
+    Class defining the general interface for covariance models
+
+    Attributes
+    ----------
+
+    """
     free_only = param.Boolean(per_instance=True, default=True)
 
     @abstractmethod
     def __call__(self, lags: np.ndarray):
+        """
+        Evaluate the covariance model at the passed lags.
+
+        Parameters
+        ----------
+        lags
+            array of lags. Shape (ndim, n1, ..., nk) where ndim is the number of spatial dimensions.
+
+        Returns
+        -------
+        cov
+            covariances. Shape (n1, ..., nk)
+        """
         pass
 
     @property
     def free_parameters(self):
-        """free parameters of the model"""
+        """free parameters of the model - not deep"""
         out = []
         for p in self.param.objects().values():
-            if (not p.readonly) and (not p.constant):
-                if isinstance(p, ModelParameter):
-                    out.append(p.name)
+            if isinstance(p, ModelParameter) and p.free:
+                out.append(p.name)
         return out
 
     @property
     def n_free_parameters(self):
-        """number of free parameters of the model"""
+        """number of free parameters of the model - not deep"""
         return len(self.free_parameters)
 
     @abstractproperty
@@ -116,19 +191,19 @@ class ModelInterface(param.Parameterized):
     @abstractmethod
     def update_free_parameters(self, param_values: np.ndarray):
         """Update free parameters of the model recursively from array values.
-        Useful for optimization."""
+        Useful for numerical optimization."""
         pass
 
     @abstractmethod
     def free_parameter_values_to_array_deep(self):
-        """provide the free parameter values. Useful to pass to the x0 of
-        an optimizer"""
+        """provide the free parameter values. Useful to pass to the x0 parameter of
+        a numerical optimizer"""
         pass
 
     @abstractmethod
     def free_parameter_bounds_to_list_deep(self):
-        """provide the free parameter bounds as a list. Useful to pass to the x0 of
-        an optimizer"""
+        """provide the free parameter bounds as a list. Useful to pass to bounds parameter of
+        a numerical optimizer"""
         pass
 
     def set_param_bounds(self, bounds: dict[str, tuple[float, float]]):
@@ -169,6 +244,13 @@ class ModelInterface(param.Parameterized):
 
 
 class Model(ModelInterface):
+    """
+    Class to define low-level covariance modes (e.g. exponential, squared exponential).
+
+    Attributes
+    ----------
+
+    """
     @property
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
