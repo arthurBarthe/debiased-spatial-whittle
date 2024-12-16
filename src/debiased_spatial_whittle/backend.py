@@ -95,8 +95,10 @@ class BackendManager:
     def convert(cls, a):
         if BackendManager.backend_name == "torch":
             return torch.tensor(a).to(device=BackendManager.device)
-        else:
-            return np.asarray(a)
+        elif BackendManager.backend_name == "numpy":
+            return a
+        elif BackendManager.backend_name == "cupy":
+            return cupy.asarray(a)
 
     @classmethod
     def get_zeros(cls):
