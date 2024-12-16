@@ -295,7 +295,10 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        self._taper = HashableArray(value.taper(self.grid.n))
+        if self.grid.nvars == 1:
+            self._taper = HashableArray(value.taper(self.grid.n))
+        else:
+            self._taper = HashableArray(value.taper(self.grid.n + (self.grid.nvars,)))
 
     @property
     def taper(self):
