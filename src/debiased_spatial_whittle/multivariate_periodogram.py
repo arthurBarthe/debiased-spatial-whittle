@@ -15,7 +15,7 @@ class Periodogram:
     def __init__(self):
         # TODO allow for tapering in multivariate case
         self.fold = True
-        self.taper = lambda x: np.ones_like(x)
+        self.taper = lambda x: np.ones(x)
 
     def __call__(self, z: List[np.ndarray], return_fft: bool = False) -> np.ndarray:
         """
