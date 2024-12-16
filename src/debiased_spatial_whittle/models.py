@@ -1258,6 +1258,113 @@ class MaternCovarianceModelFrederik(CovarianceModel):
         raise NotImplementedError()
 
 
+class SpectralModel(CovarianceModel, ABC):
+    @abstractmethod
+    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Abstract method that must provide the spectral density function evaluated at the passed frequencies
+
+        Parameters
+        ----------
+        frequencies
+            shape (d, n1, ..., nk)
+
+        Returns
+        -------
+        sdf
+            shape (n1, ..., nk). Values of the spectral density function
+        """
+        raise NotImplementedError()
+
+    def __call__(self, lags: np.ndarray):
+        """
+        Compute an approximation to the covariance function evaluated at the passed lags based on the spectral
+        density function.
+
+        Parameters
+        ----------
+        lags
+            shape (d, n1, n2, ..., nk)
+
+        Returns
+        -------
+        cov
+            shape (n1, ..., nk). Approximate values of the covariance function
+        """
+        raise NotImplementedError()
+
+    def call_on_rectangular_grid(self, grid):
+        fftfreq = np.fft.fftfreq
+        ndim = len(grid.n)
+        n = grid.n
+        delta = grid.delta
+        mesh = np.meshgrid(
+            *[fftfreq(3 * n_i + 1, d_i / 2) for n_i, d_i in zip(n, delta)],
+            indexing="ij",
+        )
+        freqs = np.stack(mesh, axis=-1)  # / (2 * np.pi)
+        sdf = self.spectral_density(freqs)
+        out = np.real(fftn(sdf)) / np.prod(np.array([(5 * n_i + 1) / 4 for n_i in n]))
+        for i_dim in range(ndim):
+            n_i = n[i_dim]
+            # out = np.take(out, np.concatenate((np.arange(0, 4 * n_i, 4), np.arange(- 4 * (n_i - 1), 0, 4))), i_dim)
+            out = np.take(
+                out,
+                np.concatenate(
+                    (
+                        arange(0, 2 * n_i, 2),
+                        arange(out.shape[i_dim] - 2 * (n_i - 1), out.shape[i_dim], 2),
+                    )
+                ),
+                i_dim,
+            )
+        return out
+
+
+class SpectralMatern(SpectralModel):
+    """
+    Implement a spectral domain version of the Matern, which is approximate but much more efficient than the
+    spatial domain version for non half integer values of the slope parameter.
+    """
+
+    def __init__(self):
+        sigma = Parameter("sigma", (0.01, 1000))
+        rho = Parameter("rho", (0.01, 1000))
+        nu = Parameter("nu", (0.01, 100))
+        nugget = Parameter("nugget", (1e-10, 10))
+        parameters = Parameters([sigma, nu, rho, nugget])
+        super(SpectralMatern, self).__init__(parameters)
+
+    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Implements the spectral density of the Matern.
+
+        Parameters
+        ----------
+        frequencies
+            shape (d, n1, ..., nk).
+
+        Returns
+        -------
+
+        """
+        ndim = frequencies.shape[-1]
+        f2 = np.sum(frequencies**2, -1)
+        sigma, rho, nu = self.sigma.value, self.rho.value, self.nu.value
+        term1 = (
+            2**ndim
+            * np.pi ** (ndim / 2)
+            * gamma(nu + ndim / 2)
+            * (2 * nu) ** nu
+            / (gamma(nu) * rho ** (2 * nu))
+        )
+        term2 = (2 * nu / rho**2 + 4 * np.pi**2 * f2) ** (-nu - ndim / 2)
+        return sigma**2 * term1 * term2
+
+    def _gradient(self, x: np.ndarray):
+        raise NotImplementedError()
+
+
 def test_gradient_cov():
     """
     This test verifies that the analytical gradient of the covariance is close to a
