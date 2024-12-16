@@ -194,7 +194,7 @@ class MultivariateDebiasedWhittle:
         whittle = np.mean(term1 + term2)
         whittle = np.real(whittle)
         if not params_for_gradient:
-            return np.item(whittle)
+            return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
         ep_inv = np.expand_dims(ep_inv, 2)
