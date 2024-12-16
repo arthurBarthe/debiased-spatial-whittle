@@ -96,7 +96,7 @@ class BackendManager:
         if BackendManager.backend_name == "torch":
             return torch.tensor(a).to(device=BackendManager.device)
         else:
-            return a
+            return np.asarray(a)
 
     @classmethod
     def get_zeros(cls):
