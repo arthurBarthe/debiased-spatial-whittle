@@ -7,6 +7,7 @@ from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
+arange = BackendManager.get_arange()
 
 import numpy
 
