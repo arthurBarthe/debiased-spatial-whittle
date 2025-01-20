@@ -52,14 +52,4 @@ def video_plot_3d(
         fig, ims, interval=interval, blit=True, repeat_delay=repeat_delay
     )
 
-    # To save the animation, use e.g.
-    #
-    # ani.save("movie.mp4")
-    #
-    # or
-    #
-    # writer = animation.FFMpegWriter(
-    #     fps=15, metadata=dict(artist='Me'), bitrate=1800)
-    # ani.save("movie.mp4", writer=writer)
-    # plt.show()
     return ani
