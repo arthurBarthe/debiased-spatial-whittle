@@ -10,22 +10,16 @@ tags:
 authors:
   - name: Arthur P. Guillaumin
     orcid: 0000-0000-0000-0000
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
+    affiliation: 1
   - name: Adam M. Sykulski
     orcid: 0000-0000-0000-0000
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
+    affiliation: 2
   - name: Sofia C. Olhede
     orcid: 0000-0000-0000-0000
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
+    affiliation: 3
   - name: Frederik J. Simons
     orcid: 0000-0000-0000-0000
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
-  - name: Author Without ORCID
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
-    affiliation: 2
-  - name: Author with no affiliation
-    corresponding: true # (This is how to denote the corresponding author)
-    affiliation: 3
+    affiliation: 4
 affiliations:
  - name: Queen Mary University of London, United Kingdom
    index: 1
@@ -42,38 +36,42 @@ bibliography: paper.bib
 The Debiased Spatial Whittle Likelihood (DSWL) package is an open-source Python
 package that implements the eponym paper [@guillaumin_debiased_2022].
 The methodology allows users to efficiently infer the parameters of stationary
+spatial and
 spatio-temporal covariance models for univariate or multivariate processes from gridded data.
 It leverages the Fast Fourier Transform, and therefore can benefit from further computational
-gains from GPU implementations offered by PyTorch or Cupy.
+gains from GPU implementations offered by PyTorch or Cupy, both made available within
+the package as alternative backends to Numpy.
 
 # Statement of need
 Describing patterns of spatial and spatio-temporal covariance is of interest to practitioners in
 a wide range of applied sciences such as geosciences, meteorology or climate
 science. Stationary covariance modelling allows for a first-order approximation
-of the covariance structure, and allows for many practical applications such as
+of the covariance structure, and leads to many practical applications such as
 krigging and forecasting via the conditional Gaussian multivariate
-distributions.
+distribution.
 
 A major hurdle in spatio-temporal modelling is the computation of the
 Gaussian likelihood function. This is particularly relevant for modern spatio-temporal
-datasets, from physics simulations to real-word data, and for complex
+datasets, from physics simulations to real-word data.
+This computational burden also arises from complex
 spatio-temporal covariance models with a large number of parameters
-which require a high number of likelihood evaluations during the optimization process or
+which typically require a high number of likelihood evaluations during the optimization process or
 when running an MCMC sampler.
 
-A common approach is to use approximations to the Gaussian likelihood. Among these,
+A common means to circumvent this computational burden is to use approximations to the Gaussian likelihood.
+Among these,
 the Whittle likelihood is a standard spectral domain method for gridded data.
-However, for spatial and spatio-temporal data where $d\geq 2$, it suffers from a large bias.
-Additionally, it typically does not allow for missing observations.
+However, for spatial and spatio-temporal data where $d\geq 2$, it suffers from a large bias
+and typically does not allow for missing observations.
 
 `DSWL` is a Python implementation of the Debiased Spatial Whittle likelihood
-[@guillaumin_debiased_2022]. It allows to leverage the computational efficiency of the Fast
-Fourier Transform to approximate the log likelihood. While the use
-of the Fast Fourier Transform requires gridded data, the implemented
+[@guillaumin_debiased_2022], a method that addresses the bias of the Whittle likelihood
+[@sykulski_debiased_2019].
+While its use of the Fast Fourier Transform requires gridded data, the implemented
 method allows for missing observations, making it amenable to practical
 applications where a full hypercube of data measurements might not
 be available. Finally, the code is written to allow to switch between several backends,
-Numpy, Cupy and PyTorch. This allows to further benefits from computational
+Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
 
 # Software structure
