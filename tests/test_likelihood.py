@@ -2,11 +2,33 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, SeparableExpectedPeriodogram, ExpectedPeriodogram, compute_ep_old
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram as PeriodogramMulti
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle, Estimator, periodogram, MultivariateDebiasedWhittle
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, sim_circ_embedding, SamplerBUCOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters, BivariateUniformCorrelation
+from debiased_spatial_whittle.periodogram import (
+    Periodogram,
+    SeparableExpectedPeriodogram,
+    ExpectedPeriodogram,
+    compute_ep_old,
+)
+from debiased_spatial_whittle.multivariate_periodogram import (
+    Periodogram as PeriodogramMulti,
+)
+from debiased_spatial_whittle.likelihood import (
+    DebiasedWhittle,
+    whittle,
+    Estimator,
+    periodogram,
+    MultivariateDebiasedWhittle,
+)
+from debiased_spatial_whittle.simulation import (
+    SamplerOnRectangularGrid,
+    sim_circ_embedding,
+    SamplerBUCOnRectangularGrid,
+)
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    Parameters,
+    BivariateUniformCorrelation,
+)
 from debiased_spatial_whittle.cov_funcs import exp_cov
 
 
@@ -51,7 +73,11 @@ def test_whittle_grad():
     model.sigma = 1
     model.rho = 4
     sampler = SamplerOnRectangularGrid(model, g)
-    p = Parameters([model.rho, ])
+    p = Parameters(
+        [
+            model.rho,
+        ]
+    )
     z = sampler()
     lkh, grad = d(z, model, params_for_gradient=p)
     epsilon = 1e-6
@@ -102,7 +128,14 @@ def test_hessian_diagonal():
     model = ExponentialModel()
     model.sigma = 1
     model.rho = rho
-    h = d.fisher(model, Parameters([model.rho, ]))
+    h = d.fisher(
+        model,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )
     print(h)
     # assert h.shape == (2, 2)
     assert np.all(np.diag(h) >= 0)
@@ -127,6 +160,7 @@ def test_fisher_multivariate():
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     h = dbw.fisher(bvm, bvm.params)
     assert np.all(np.diag(h) > 0)
+
 
 def test_jmat():
     """
@@ -163,7 +197,11 @@ def test_jmat():
     # sample_cov_mat = 1 / n_samples * np.dot(estimates.T, estimates)
     print(jmat)
     print(sample_cov_mat)
-    assert_allclose(jmat, sample_cov_mat, 0.15, )
+    assert_allclose(
+        jmat,
+        sample_cov_mat,
+        0.15,
+    )
 
 
 def test_covmat():

@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, Parameters
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    Parameters,
+)
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -30,7 +34,7 @@ z = sampler()
 
 fig = plt.figure()
 ax = fig.add_subplot()
-ax.imshow(z, origin='lower', cmap='Spectral')
+ax.imshow(z, origin="lower", cmap="Spectral")
 plt.show()
 
 # expected hessian
@@ -44,24 +48,28 @@ print(jmat_mcmc)
 print(jmat)
 
 # variance of estimates
-#cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
+# cov_mat_mcmc = db.variance_of_estimates(model, model.params, jmat_mcmc)
 cov_mat_sample = db.variance_of_estimates(model, params, jmat)
 
-print('--------------')
-#print(cov_mat_mcmc)
+print("--------------")
+# print(cov_mat_mcmc)
 print(cov_mat_sample)
 
-if input('Run Monte Carlo simulations to compare with predicted variance (y/n)?') != 'y':
+if (
+    input("Run Monte Carlo simulations to compare with predicted variance (y/n)?")
+    != "y"
+):
     sys.exit(0)
 
 import numpy as np
-n_samples = int(input('Number of Monte Carlo samples?'))
+
+n_samples = int(input("Number of Monte Carlo samples?"))
 
 estimates = np.zeros((n_samples, len(model.params)))
 dw = Estimator(db)
 
 for i in range(n_samples):
-    print('------------')
+    print("------------")
     z = sampler()
     model_est = SquaredExponentialModel()
     model_est.nugget = model.nugget.value

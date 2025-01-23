@@ -35,5 +35,6 @@ def test_mcmc_jmat():
     print(mcmc.partition_function(), mcmc.estimate())
     print(s1)
     import matplotlib.pyplot as plt
+
     plt.plot(mcmc.partition_function_trace())
     plt.show()

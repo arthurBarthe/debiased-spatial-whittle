@@ -1,5 +1,9 @@
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    MaternModel,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 
 
@@ -26,5 +30,5 @@ class TestMultipleSimulations:
         z = sampler()
 
     def test_independent(self):
-        #TODO add this test to check that realizations are i.i.d.
+        # TODO add this test to check that realizations are i.i.d.
         pass

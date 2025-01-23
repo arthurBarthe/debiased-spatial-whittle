@@ -4,9 +4,16 @@ from matplotlib import pyplot as plt
 
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, SeparableModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    SeparableModel,
+)
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid, SamplerSeparable
+from debiased_spatial_whittle.simulation import (
+    SamplerOnRectangularGrid,
+    SamplerSeparable,
+)
 from debiased_spatial_whittle.utils import video_plot_3d
 
 n = (64, 64, 512)
@@ -30,12 +37,12 @@ plt.figure()
 plt.imshow(g)
 plt.show()
 
-model = SeparableModel([model_space, model_time], dims=[(0, 1), (2, )])
-model.merge_parameters(('sigma_0', 'sigma_1'))
-model.free_params['sigma_0 and sigma_1'].value = 1
+model = SeparableModel([model_space, model_time], dims=[(0, 1), (2,)])
+model.merge_parameters(("sigma_0", "sigma_1"))
+model.free_params["sigma_0 and sigma_1"].value = 1
 
 sampler = SamplerOnRectangularGrid(model, grid)
-#sampler = SamplerSeparable(model, grid)
+# sampler = SamplerSeparable(model, grid)
 z = sampler()
 
 y = z * g
@@ -44,16 +51,16 @@ plt.figure()
 plt.imshow(y[..., 0])
 plt.show()
 
-anim = video_plot_3d(y,get_title=lambda i:"", cmap='coolwarm', vmin=-2, vmax=2)
+anim = video_plot_3d(y, get_title=lambda i: "", cmap="coolwarm", vmin=-2, vmax=2)
 plt.show()
 
 # estimation of g and z
-g_hat = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
+g_hat = np.sqrt(np.mean(y**2, axis=-1, keepdims=True))
 z_hat = y / g_hat
 
 plt.figure()
 plt.imshow(g_hat)
-plt.title('g hat')
+plt.title("g hat")
 plt.show()
 
 
@@ -65,16 +72,18 @@ e = Estimator(d, use_gradients=False)
 
 model_space = SquaredExponentialModel()
 model_time = SquaredExponentialModel()
-model = SeparableModel([model_space, model_time], dims=[(0, 1), (2, )])
-model.merge_parameters(('sigma_0', 'sigma_1'))
+model = SeparableModel([model_space, model_time], dims=[(0, 1), (2,)])
+model.merge_parameters(("sigma_0", "sigma_1"))
 print(model.free_params)
-model.free_params['rho_0'].init_guess = 1
-model.free_params['rho_1'].init_guess = 1
+model.free_params["rho_0"].init_guess = 1
+model.free_params["rho_1"].init_guess = 1
 print(model.free_params.init_guesses)
+
 
 def opt_callback(*args, **kargs):
     print(*args)
     print(**kargs)
 
-print('start estimation')
+
+print("start estimation")
 print(e(model, z_hat, opt_callback=opt_callback))

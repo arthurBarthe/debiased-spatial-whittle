@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 import pickle
 from debiased_spatial_whittle.backend import BackendManager
+
 try:
     np = BackendManager.get_backend()
 except:
@@ -17,11 +18,11 @@ def _parameterized_repr_html(p, open):
     if isinstance(p, Parameterized):
         cls = p.__class__
         title = cls.name + "()"
-        value_field = 'Value'
+        value_field = "Value"
     else:
         cls = p
         title = cls.name
-        value_field = 'Default'
+        value_field = "Default"
 
     tooltip_css = """
         .param-doc-tooltip{
@@ -58,31 +59,37 @@ def _parameterized_repr_html(p, open):
     #                   for key, val in param_values)
     contents = ""
     for key, val in param_values:
-        if key in ('name', 'free_only'):
+        if key in ("name", "free_only"):
             continue
         if not p.param[key].readonly:
             contents += _get_param_repr(key, val, p.param[key])
         else:
-            contents += '<tr style="color:coral">' + _get_param_repr(key, val, p.param[key])[4:-7] + '<\tr>'
+            contents += (
+                '<tr style="color:coral">'
+                + _get_param_repr(key, val, p.param[key])[4:-7]
+                + "<\tr>"
+            )
     return (
-        f'<style>{tooltip_css}</style>\n'
-        f'<details {openstr}>\n'
+        f"<style>{tooltip_css}</style>\n"
+        f"<details {openstr}>\n"
         ' <summary style="display:list-item; outline:none;">\n'
-        f'  <tt>{title}</tt>\n'
-        ' </summary>\n'
+        f"  <tt>{title}</tt>\n"
+        " </summary>\n"
         ' <div style="padding-left:10px; padding-bottom:5px;">\n'
         '  <table style="max-width:100%; border:1px solid #AAAAAA;">\n'
         f'   <tr><th style="text-align:left;">Name</th><th style="text-align:left;">{value_field}</th><th style="text-align:left;">Type</th><th>Range</th></tr>\n'
-        f'{contents}\n'
-        '  </table>\n </div>\n</details>\n'
+        f"{contents}\n"
+        "  </table>\n </div>\n</details>\n"
     )
 
 
 class ModelParameter(param.Parameter):
-    __slots__ = ['bounds', ]
+    __slots__ = [
+        "bounds",
+    ]
 
     def __init__(self, *args, **kwargs):
-        self.bounds = kwargs.pop('bounds')
+        self.bounds = kwargs.pop("bounds")
         super().__init__(*args, allow_refs=True, per_instance=True, **kwargs)
 
     @property
@@ -90,57 +97,6 @@ class ModelParameter(param.Parameter):
         """true is the model parameter is free, i.e. not readonly and not constant"""
         return not (self.readonly or self.constant)
 
-
-class MModelInterface(ABC):
-    """
-    Class defining the general interface for covariance models. This should remain implementation-independent.
-
-    Attributes
-    ----------
-    """
-    def __call__(self, lags: np.ndarray):
-        """
-        Evaluate covariance model at passed array of lags.
-
-        Parameters
-        ----------
-        lags
-            Array of lags. Shap (ndim, n1, ..., nk)
-
-        Returns
-        -------
-        cov
-            covariance values. Shape (n1, ..., nk)
-        """
-        pass
-
-    def free_parameter_values_to_array(self) -> np.ndarray:
-        """
-        Provide the values of the model's free parameters as an array.
-        Useful for use by numerical optimizer.
-
-        Returns
-        -------
-        param_values
-            array of free parameter values
-        """
-        pass
-
-    def update_free_parameters_from_array(self, param_array: np.ndarray):
-        """
-        Update the model's free parameters from an array of values.
-        Useful for use by numerical optimizers.
-
-        Parameters
-        ----------
-        param_array
-            array of parameter values
-
-        Returns
-        -------
-
-        """
-        pass
 
 class ModelInterface(param.Parameterized):
     """
@@ -150,6 +106,7 @@ class ModelInterface(param.Parameterized):
     ----------
 
     """
+
     free_only = param.Boolean(per_instance=True, default=True)
 
     @abstractmethod
@@ -218,25 +175,51 @@ class ModelInterface(param.Parameterized):
         new_left, new_right = bounds
         if left is not None:
             if (new_left is None) or (new_left < left):
-                raise ValueError('New bounds should not extend former bounds')
+                raise ValueError("New bounds should not extend former bounds")
         if right is not None:
             if (new_right is None) or (new_right > right):
-                raise ValueError('New bounds should not extend former bounds')
-        setattr(getattr(self.param, param_name), 'bounds', bounds)
+                raise ValueError("New bounds should not extend former bounds")
+        setattr(getattr(self.param, param_name), "bounds", bounds)
 
     def link_param(self, param_name, other_param):
         """link a parameter to another. The former becomes readonly, and therefore is
         not free anymore"""
         setattr(self, param_name, other_param)
-        setattr(getattr(self.param, param_name), 'readonly', True)
+        setattr(getattr(self.param, param_name), "readonly", True)
 
     def fix_parameter(self, param_name):
-        setattr(getattr(self.param, param_name), 'constant', True)
-        setattr(getattr(self.param, param_name), 'readonly', True)
+        setattr(getattr(self.param, param_name), "constant", True)
+        setattr(getattr(self.param, param_name), "readonly", True)
 
     def pickle(self, file: str):
-        with open(file, 'wb') as f:
+        with open(file, "wb") as f:
             pickle.dump(self, f)
+
+    def gradient(self, lags: np.ndarray, params: list[ModelParameter]) -> np.ndarray:
+        """
+        Compute the gradient of the model with respect to the passed parameters
+
+        Parameters
+        ----------
+        lags
+
+
+        params
+            parameters for which we require the derivative
+
+        Returns
+        -------
+        gradient
+            last dimension indexes the parameters passed in params
+        """
+        grad = self._gradient(lags)
+        out = []
+        for p in params:
+            out.append(grad[p.name])
+        return np.stack(out, -1)
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
 
     @abstractmethod
     def _repr_html_(self):
@@ -251,13 +234,17 @@ class Model(ModelInterface):
     ----------
 
     """
+
     @property
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
 
     def update_free_parameters(self, param_values: np.ndarray):
         """In the case of a simple model, we simply update the free parameters"""
-        a, b = param_values[:self.n_free_parameters], param_values[self.n_free_parameters:]
+        a, b = (
+            param_values[: self.n_free_parameters],
+            param_values[self.n_free_parameters :],
+        )
         for p_name, value in zip(self.free_parameters, a):
             setattr(self, p_name, value)
 
@@ -297,13 +284,16 @@ class CompoundModel(ModelInterface):
         return out
 
     def update_free_parameters(self, param_values):
-        a, b = param_values[:self.n_free_parameters], param_values[self.n_free_parameters:]
+        a, b = (
+            param_values[: self.n_free_parameters],
+            param_values[self.n_free_parameters :],
+        )
         for p_name, value in zip(self.free_parameters, a):
             setattr(self, p_name, value)
         # update parameters of children
         for child in self.children:
             child.update_free_parameters(b)
-            b = b[child.n_free_parameters_deep:]
+            b = b[child.n_free_parameters_deep :]
 
     def free_parameter_values_to_array_deep(self):
         list_values = []
@@ -311,7 +301,11 @@ class CompoundModel(ModelInterface):
             list_values.append(getattr(self, p))
         array_values = np.array(list_values)
         return np.concatenate(
-            [array_values, ] + [child.free_parameter_values_to_array_deep() for child in self.children])
+            [
+                array_values,
+            ]
+            + [child.free_parameter_values_to_array_deep() for child in self.children]
+        )
 
     def free_parameter_bounds_to_list_deep(self):
         list_bounds = []
@@ -322,10 +316,13 @@ class CompoundModel(ModelInterface):
         return list_bounds
 
     def _repr_html_(self):
-        return (_parameterized_repr_html(self, True) +
-                '<div style="margin-left:15px;padding-left:75px; border-left:solid gray 5px">' +
-                ''.join([child._repr_html_() for child in self.children]) +
-                '</div>')
+        return (
+            _parameterized_repr_html(self, True)
+            + '<div style="margin-left:15px;padding-left:75px; border-left:solid gray 5px">'
+            + "".join([child._repr_html_() for child in self.children])
+            + "</div>"
+        )
+
     def _compute(self, lags: np.ndarray):
         raise NotImplementedError()
 
@@ -336,6 +333,7 @@ class CompoundModel(ModelInterface):
 
 class SumModel(CompoundModel):
     """Class that allows to define a new model as the sum of several models."""
+
     sigma = ModelParameter(default=1.0, bounds=(0, None))
 
     def __init__(self, children, *args, **kwargs):
@@ -344,33 +342,39 @@ class SumModel(CompoundModel):
     def _compute(self, lags: np.ndarray):
         values = (child(lags) for child in self.children)
         out = sum(values)
-        return out / self._norm_constant() * self.sigma ** 2
+        return out / self._norm_constant() * self.sigma**2
 
     def _norm_constant(self):
         try:
             sigmas = np.stack([child.sigma for child in self.children])
         except TypeError:
             sigmas = np.array([child.sigma for child in self.children])
-        out = np.sum(sigmas ** 2, axis=0)
+        out = np.sum(sigmas**2, axis=0)
         return out
 
 
 class ExponentialModel(Model):
-    rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
-    sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
+    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
-        d = np.sqrt(np.sum(lags ** 2, 0)) / self.rho
-        return self.sigma ** 2 * np.exp(- d)
+        d = np.sqrt(np.sum(lags**2, 0)) / self.rho
+        return self.sigma**2 * np.exp(-d)
+
+    def _gradient(self, lags: np.ndarray):
+        d = np.sqrt(sum((lag**2 for lag in lags)))
+        d_rho = (self.sigma / self.rho) ** 2 * d * np.exp(-d / self.rho)
+        d_sigma = 2 * self.sigma * np.exp(-d / self.rho)
+        return dict(rho=d_rho, sigma=d_sigma)
 
 
 class SquaredExponentialModel(Model):
-    rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
-    sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
+    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
-        d = np.sum(lags ** 2, 0) / (2 * self.rho ** 2)
-        return self.sigma ** 2 * np.exp(- d)
+        d = np.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * np.exp(-d)
 
 
 class NuggetModel(CompoundModel):
@@ -386,11 +390,21 @@ class NuggetModel(CompoundModel):
     nugget: ModelParameter
         Proportion of variance explained by the nugget
     """
-    sigma = ModelParameter(default=1., bounds=(0, None), doc='Amplitude')
-    nugget = ModelParameter(default=0., bounds=(0, 1), doc='Nugget amplitude')
+
+    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude")
+    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
     def __init__(self, model, *args, **kwargs):
-        super().__init__([model, ], *args, **kwargs)
+        super().__init__(
+            [
+                model,
+            ],
+            *args,
+            **kwargs,
+        )
 
     def _compute(self, lags: np.ndarray):
-        return (np.all(lags == 0, 0) * self.nugget + (1 - self.nugget) * self.children[0](lags)) * self.sigma ** 2
+        return (
+            np.all(lags == 0, 0) * self.nugget
+            + (1 - self.nugget) * self.children[0](lags)
+        ) * self.sigma**2

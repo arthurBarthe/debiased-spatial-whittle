@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import ChiSquaredModel, MaternCovarianceModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import (
+    ChiSquaredModel,
+    MaternCovarianceModel,
+    SquaredExponentialModel,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import ChiSquaredSamplerOnRectangularGrid
 
@@ -24,7 +28,7 @@ sampler = ChiSquaredSamplerOnRectangularGrid(model, grid)
 z = sampler()
 
 plt.figure()
-plt.imshow(z, cmap='hot')
+plt.imshow(z, cmap="hot")
 plt.show()
 
 # compute periodogram and show residuals
@@ -36,6 +40,7 @@ ep = expected_periodogram(model)
 
 import numpy as np
 from numpy.fft import fftshift
+
 plt.figure()
 plt.imshow(10 * np.log10(fftshift((per / ep))))
 plt.colorbar()

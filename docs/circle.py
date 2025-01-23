@@ -23,9 +23,9 @@ model.nugget = 0.025
 m = 256
 shape = (m * 1, m * 1)
 x_0, y_0, diameter = m // 2, m // 2, m
-x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing='ij')
-circle = ((x - x_0)**2 + (y - y_0)**2) <= 1 / 4 * diameter**2
-circle = circle * 1.
+x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
+circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
+circle = circle * 1.0
 grid_circle = RectangularGrid(shape)
 grid_circle.mask = circle
 
@@ -46,5 +46,5 @@ model_est.nugget = None
 estimate = estimator(model_est, z)
 print(estimate)
 
-plt.imshow(z, origin='lower', cmap='Spectral')
+plt.imshow(z, origin="lower", cmap="Spectral")
 plt.show()

@@ -5,10 +5,12 @@ from abc import ABC, abstractmethod
 
 
 class ModelParameter(param.Parameter):
-    __slots__ = ['bounds', ]
+    __slots__ = [
+        "bounds",
+    ]
 
     def __init__(self, *args, **kwargs):
-        self.bounds = kwargs.pop('bounds')
+        self.bounds = kwargs.pop("bounds")
         super().__init__(*args, allow_refs=True, per_instance=True, **kwargs)
 
     @property
@@ -37,6 +39,7 @@ class ModelInterface:
     n_free_parameters: int
         number of free parameters
     """
+
     @property
     def parameters(self) -> dict[str, ModelParameter]:
         pass
@@ -108,10 +111,29 @@ class ModelInterface:
             list of min, max bounds for the model's free parameters
         """
 
+    def gradient(self, lags: np.ndarray, params: list[ModelParameter]):
+        """
+        Compute the gradient of the model with respect to the passed parameters
+
+        Parameters
+        ----------
+        lags
+
+
+        params
+            parameters for which we require the derivative
+
+        Returns
+        -------
+
+        """
+
+
 class BaseModel(Parameterized, ModelInterface):
     """
     Class to define low-level covariance models (e.g. exponential, squared exponential).
     """
+
     @property
     def parameters(self):
         return self.param.objects()
@@ -130,7 +152,7 @@ class BaseModel(Parameterized, ModelInterface):
 
     def update_free_parameters_from_array(self, param_values: np.ndarray):
         """In the case of a simple model, we simply update the free parameters"""
-        a = param_values[:self.n_free_parameters]
+        a = param_values[: self.n_free_parameters]
         for p_name, value in zip(self.free_parameters, a):
             setattr(self, p_name, value)
 
@@ -159,6 +181,7 @@ class CompoundModel(ModelInterface, Parameterized):
     children: list[ModelInterface]
         list of child covariance models
     """
+
     def __init__(self, children, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.children = children
@@ -185,7 +208,7 @@ class CompoundModel(ModelInterface, Parameterized):
         # update parameters of children
         for child in self.children:
             child.update_free_parameters_from_array(b)
-            b = b[child.n_free_parameters:]
+            b = b[child.n_free_parameters :]
 
     def free_parameter_values_to_array(self):
         list_values = []
@@ -193,7 +216,11 @@ class CompoundModel(ModelInterface, Parameterized):
             list_values.append(getattr(self, p))
         array_values = np.array(list_values)
         return np.concatenate(
-            [array_values, ] + [child.free_parameter_values_to_array() for child in self.children])
+            [
+                array_values,
+            ]
+            + [child.free_parameter_values_to_array() for child in self.children]
+        )
 
     def free_parameter_bounds_to_list(self):
         list_bounds = []
@@ -215,25 +242,26 @@ class CompoundModel(ModelInterface, Parameterized):
 
 
 class ExponentialModel(BaseModel):
-    rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
-    sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
+    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
 
     def __call__(self, lags: np.ndarray):
-        d = np.sqrt(np.sum(lags ** 2, 0)) / self.rho
-        return self.sigma ** 2 * np.exp(- d)
+        d = np.sqrt(np.sum(lags**2, 0)) / self.rho
+        return self.sigma**2 * np.exp(-d)
 
 
 class SquaredExponentialModel(BaseModel):
-    rho = ModelParameter(default=1., bounds=(0, None), doc='Range parameter')
-    sigma = ModelParameter(default=1., bounds=(0, 1), doc='Amplitude parameter')
+    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
 
     def __call__(self, lags: np.ndarray):
-        d = np.sum(lags ** 2, 0) / (2 * self.rho ** 2)
-        return self.sigma ** 2 * np.exp(- d)
+        d = np.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * np.exp(-d)
 
 
 class SumModel(CompoundModel):
     """Class that allows to define a new model as the sum of several models."""
+
     sigma = ModelParameter(default=1.0, bounds=(0, None))
 
     def __init__(self, children, *args, **kwargs):
@@ -242,14 +270,14 @@ class SumModel(CompoundModel):
     def __call__(self, lags: np.ndarray):
         values = (child(lags) for child in self.children)
         out = sum(values)
-        return out / self._norm_constant() * self.sigma ** 2
+        return out / self._norm_constant() * self.sigma**2
 
     def _norm_constant(self):
         try:
             sigmas = np.stack([child.sigma for child in self.children])
         except TypeError:
             sigmas = np.array([child.sigma for child in self.children])
-        out = np.sum(sigmas ** 2, axis=0)
+        out = np.sum(sigmas**2, axis=0)
         return out
 
 
@@ -266,11 +294,21 @@ class NuggetModel(CompoundModel):
     nugget: ModelParameter
         Proportion of variance explained by the nugget
     """
-    sigma = ModelParameter(default=1., bounds=(0, None), doc='Amplitude')
-    nugget = ModelParameter(default=0., bounds=(0, 1), doc='Nugget amplitude')
+
+    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude")
+    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
     def __init__(self, model, *args, **kwargs):
-        super().__init__([model, ], *args, **kwargs)
+        super().__init__(
+            [
+                model,
+            ],
+            *args,
+            **kwargs,
+        )
 
     def __call__(self, lags: np.ndarray):
-        return (np.all(lags == 0, 0) * self.nugget + (1 - self.nugget) * self.children[0](lags)) * self.sigma ** 2
+        return (
+            np.all(lags == 0, 0) * self.nugget
+            + (1 - self.nugget) * self.children[0](lags)
+        ) * self.sigma**2

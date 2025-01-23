@@ -1,7 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternCovarianceModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    MaternCovarianceModel,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -11,7 +15,7 @@ from debiased_spatial_whittle.diagnostics import GoodnessOfFit
 model = ExponentialModel()
 model.nugget = 0.1
 model.rho = 10
-model.sigma = 1.
+model.sigma = 1.0
 
 m = 256
 shape = (m * 1, m * 1)
@@ -25,7 +29,7 @@ fig = plt.figure()
 ax = fig.add_subplot()
 
 for i_sample in range(1):
-    print(f'---------Sample {i_sample}------------')
+    print(f"---------Sample {i_sample}------------")
     z = sampler()
 
     periodogram = Periodogram()

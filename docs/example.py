@@ -5,10 +5,18 @@ import matplotlib.pyplot as plt
 from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, MaternModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    MaternModel,
+)
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram, compute_ep
+from debiased_spatial_whittle.periodogram import (
+    Periodogram,
+    ExpectedPeriodogram,
+    compute_ep,
+)
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
 from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
@@ -20,9 +28,9 @@ fftn = np.fft.fftn
 # np.random.seed(1252147)
 
 n = (64, 64)
-rho, sigma, nugget = 10., np.sqrt(1.), 0.1
+rho, sigma, nugget = 10.0, np.sqrt(1.0), 0.1
 
-nu = 5/2
+nu = 5 / 2
 
 grid = RectangularGrid(n)
 model = MaternModel()
@@ -46,13 +54,13 @@ I = per(z)
 
 fig = plt.figure()
 ax = fig.add_subplot()
-ax.imshow(z, origin='lower', cmap='Spectral')
+ax.imshow(z, origin="lower", cmap="Spectral")
 plt.show()
 # stop
 
-params = np.log([rho,sigma, nu])
+params = np.log([rho, sigma, nu])
 
-model = MaternModel()                   # cant optimize with nu
+model = MaternModel()  # cant optimize with nu
 # model.nu = nu
 dw = DeWhittle(z, grid, model, nugget=nugget)
 dw.fit(params, prior=False)
@@ -68,10 +76,11 @@ dw.fit(params, prior=False, approx_grad=True)
 # print(dw.logpost(params))
 
 from autograd import grad, hessian
+
 ll = lambda x: dw(x)
 # print(grad(ll)(params))
 
-niter=10000
+niter = 10000
 
 dw.fit(None, prior=False)
 dewhittle_post, A = dw.RW_MH(niter)
@@ -79,16 +88,23 @@ MLEs = dw.estimate_standard_errors_MLE(np.exp(dw.res.x), monte_carlo=True, niter
 dw.prepare_curvature_adjustment()
 adj_dewhittle_post, A = dw.RW_MH(niter, adjusted=True)
 
-title = 'posterior comparisons'
-legend_labels = ['deWhittle', 'adj deWhittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+title = "posterior comparisons"
+legend_labels = ["deWhittle", "adj deWhittle"]
+plot_marginals(
+    [dewhittle_post, adj_dewhittle_post],
+    params,
+    title,
+    [r"log$\rho$", r"log$\sigma$"],
+    legend_labels,
+    shape=(1, 2),
+)
 
 stop
 
-model = MaternModel()                   # cant optimize with nu
+model = MaternModel()  # cant optimize with nu
 model.nu = nu
 
-whittle = Whittle(z, grid, model, nugget=nugget, infsum_shape=(3,3))
+whittle = Whittle(z, grid, model, nugget=nugget, infsum_shape=(3, 3))
 whittle.fit(None, False)
 whittle_post, A = whittle.RW_MH(niter)
 whittle.estimate_standard_errors_MLE(np.exp(whittle.res.x), monte_carlo=True, niter=200)
@@ -96,9 +112,16 @@ whittle.prepare_curvature_adjustment()
 adj_whittle_post, A = whittle.RW_MH(niter, adjusted=True)
 
 
-title = 'posterior comparisons'
-legend_labels = ['deWhittle', 'adj deWhittle', 'Whittle', 'adj Whittle']
-plot_marginals([dewhittle_post, adj_dewhittle_post, whittle_post, adj_whittle_post], params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2))
+title = "posterior comparisons"
+legend_labels = ["deWhittle", "adj deWhittle", "Whittle", "adj Whittle"]
+plot_marginals(
+    [dewhittle_post, adj_dewhittle_post, whittle_post, adj_whittle_post],
+    params,
+    title,
+    [r"log$\rho$", r"log$\sigma$"],
+    legend_labels,
+    shape=(1, 2),
+)
 
 stop
 
@@ -107,14 +130,19 @@ stop
 # print(gauss(params))
 
 
-
-
-dfs = list(range(5,15+1)) + list(range(20,55,5)) + [9999]
+dfs = list(range(5, 15 + 1)) + list(range(20, 55, 5)) + [9999]
 # dfs = [5,6]
 MLEs = [dw.sim_MLEs(params, 500, t_random_field=True, nu=df) for df in dfs]
 
 
-title = 'DeWhittle t-random field MLE distribution'
-legend_labels = [rf'$\nu={nu}$' for nu in dfs]
-plot_marginals(MLEs, params, title, [r'log$\rho$', r'log$\sigma$'], legend_labels, shape=(1,2), cmap='Spectral')
-
+title = "DeWhittle t-random field MLE distribution"
+legend_labels = [rf"$\nu={nu}$" for nu in dfs]
+plot_marginals(
+    MLEs,
+    params,
+    title,
+    [r"log$\rho$", r"log$\sigma$"],
+    legend_labels,
+    shape=(1, 2),
+    cmap="Spectral",
+)

@@ -16,11 +16,12 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 
 # load the topography data and standardize by the std
 import os
+
 print(os.getcwd())
-z = scipy.io.loadmat('docs/data/Frederik53.mat')['topodata']
+z = scipy.io.loadmat("docs/data/Frederik53.mat")["topodata"]
 z = (z - np.mean(z)) / np.std(z)
 plt.figure()
-plt.imshow(z, origin='lower', cmap='bwr')
+plt.imshow(z, origin="lower", cmap="bwr")
 plt.show()
 
 grid = RectangularGrid(z.shape)
@@ -32,9 +33,10 @@ estimator = Estimator(debiased_whittle)
 # ##frequency mask corresponding to the data processing
 
 from numpy.fft import fftfreq
+
 m, n = z.shape
-x, y = np.meshgrid(fftfreq(m) * 2 * np.pi, fftfreq(n) * 2 * np.pi, indexing='ij')
-freq_norm = np.sqrt(x ** 2 + y ** 2)
+x, y = np.meshgrid(fftfreq(m) * 2 * np.pi, fftfreq(n) * 2 * np.pi, indexing="ij")
+freq_norm = np.sqrt(x**2 + y**2)
 frequency_mask = freq_norm < np.pi
 print(z.shape, frequency_mask.shape)
 
@@ -61,8 +63,9 @@ print(model)
 print(estimator(model, z))
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+
 sampler = SamplerOnRectangularGrid(model, grid)
 z_sim = sampler()
 plt.figure()
-plt.imshow(z_sim, cmap='bwr')
+plt.imshow(z_sim, cmap="bwr")
 plt.show()

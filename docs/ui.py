@@ -1,17 +1,23 @@
 import tkinter
 from tkinter import ttk
 
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg, NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
 
 import numpy as np
 from numpy.fft import fftshift
-from debiased_spatial_whittle import sim_circ_embedding, fit, matern, periodogram, compute_ep
+from debiased_spatial_whittle import (
+    sim_circ_embedding,
+    fit,
+    matern,
+    periodogram,
+    compute_ep,
+)
 
 cov = matern
+
 
 class App(tkinter.Tk):
     def __init__(self):
@@ -23,7 +29,7 @@ class App(tkinter.Tk):
         self.z = None
         self.cov = None
         self.g = None
-        self.plot_names = ['data', 'periodogram', 'e_periodogram']
+        self.plot_names = ["data", "periodogram", "e_periodogram"]
         self.plot_vars = dict()
         self.create_top_frame()
         self.create_middle_frame()
@@ -44,7 +50,7 @@ class App(tkinter.Tk):
         try:
             return float(self.rho_entry.get())
         except ValueError:
-            return 10.
+            return 10.0
 
     @property
     def nu(self):
@@ -56,7 +62,7 @@ class App(tkinter.Tk):
     def create_top_frame(self):
         top_frame = tkinter.Frame(self.root)
         # Simulation button
-        b = ttk.Button(text='New simulation')
+        b = ttk.Button(text="New simulation")
         b.pack()
         b.config(command=self.update_data)
 
@@ -69,24 +75,26 @@ class App(tkinter.Tk):
         y_label.pack(side=tkinter.LEFT)
         n_entry.pack(side=tkinter.LEFT)
 
-        rho_label = ttk.Label(top_frame, text='rho')
+        rho_label = ttk.Label(top_frame, text="rho")
         rho_entry = ttk.Entry(top_frame)
         rho_label.pack(side=tkinter.LEFT)
         rho_entry.pack(side=tkinter.LEFT)
 
-        nu_label = ttk.Label(top_frame, text='nu')
+        nu_label = ttk.Label(top_frame, text="nu")
         nu_entry = ttk.Entry(top_frame)
         nu_label.pack(side=tkinter.LEFT)
         nu_entry.pack(side=tkinter.RIGHT)
         self.m_entry, self.n_entry = m_entry, n_entry
-        self.rho_entry, self.nu_entry= rho_entry, nu_entry
+        self.rho_entry, self.nu_entry = rho_entry, nu_entry
         top_frame.pack()
 
     def create_middle_frame(self):
         middle_frame = tkinter.Frame(self.root)
         for p_name in self.plot_names:
             self.plot_vars[p_name] = self._make_matplotlib_canvas(middle_frame)
-            self.plot_vars[p_name][0].get_tk_widget().pack(side=tkinter.LEFT, fill=tkinter.BOTH, expand=1)
+            self.plot_vars[p_name][0].get_tk_widget().pack(
+                side=tkinter.LEFT, fill=tkinter.BOTH, expand=1
+            )
         middle_frame.pack()
 
     def _make_matplotlib_canvas(self, parent_frame):
@@ -104,16 +112,16 @@ class App(tkinter.Tk):
 
     def update_plot(self):
         for name, (canvas, ax) in self.plot_vars.items():
-            plot_func = getattr(self, 'plot_' + name)
+            plot_func = getattr(self, "plot_" + name)
             plot_func(ax)
             canvas.draw()
 
     def plot_data(self, ax):
-        ax.imshow(self.z, cmap='Spectral', origin='lower')
+        ax.imshow(self.z, cmap="Spectral", origin="lower")
 
     def plot_periodogram(self, ax):
         e_per = compute_ep(self.cov_func, self.g)
-        vmin, vmax = np.min(10*np.log10(e_per)), np.max(10*np.log10(e_per))
+        vmin, vmax = np.min(10 * np.log10(e_per)), np.max(10 * np.log10(e_per))
         per = periodogram(self.z)
         ax.imshow(fftshift(10 * np.log10(per)), vmin=vmin, vmax=vmax)
 
@@ -122,6 +130,5 @@ class App(tkinter.Tk):
         ax.imshow(fftshift(10 * np.log10(e_per)))
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = App()

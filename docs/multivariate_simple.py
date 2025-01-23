@@ -8,9 +8,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle.backend import BackendManager
-BackendManager.set_backend('numpy')
 
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel, BivariateUniformCorrelation
+BackendManager.set_backend("numpy")
+
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    BivariateUniformCorrelation,
+)
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
@@ -44,9 +49,9 @@ data = s()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
-ax.imshow(data[..., 0], cmap='Spectral')
+ax.imshow(data[..., 0], cmap="Spectral")
 ax = fig.add_subplot(1, 2, 2)
-ax.imshow(data[..., 1], cmap='Spectral')
+ax.imshow(data[..., 1], cmap="Spectral")
 plt.show()
 
 # ##Profile likelihood plot for the correlation parameter
@@ -66,7 +71,7 @@ for i, r in enumerate(rs):
     lkhs[i] = db(data, bvm)
 
 plt.figure()
-plt.plot(rs, lkhs, '-')
+plt.plot(rs, lkhs, "-")
 plt.show()
 
 print(np.cov(data[..., 0].flatten(), data[..., 1].flatten()))
@@ -84,11 +89,11 @@ print(e(bvm, data))
 # ##Hypothesis test of zero-correlation
 
 from debiased_spatial_whittle.hypothesis_tests import FixedParametersHT
+
 bvm.r_0 = None
 bvm.rho_1 = None
 bvm.f_0 = None
 bvm.sigma_1 = None
-hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.), db)
+hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.0), db)
 test_result = hypothesis_test(z=data)
 print(test_result)
-
