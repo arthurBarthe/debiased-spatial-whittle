@@ -325,8 +325,30 @@ class ExpectedPeriodogram:
         acv = self.grid.autocov(model)
         return self.compute_ep(acv, self.periodogram.fold)
 
+    def _reshape_acv(self, acv):
+        """
+        TODO: NOT USED. TO BE DELETED
+        Method for internal call that ensures acv has the right number of dimensions before applying the algorithm
+        that computes the expected periodogram. Specifically, if d is the number of spatial dimensions, p the number
+        of variates (including p=1, in which case acv might typically have (n1, ..., nd) or (n1, ..., nd, m)
+        for m model parameters), then the returned shape should be (n1, ..., nd, m, p, p). In the multivariate case
+        acv will have shape (n1, ..., nd, p, p) or (n1, ..., nd, m, p, p). Again the returned shape should be
+        (n1, ..., nd, m, p, p)
+        """
+        ndim = self.grid.ndim
+        p = self.grid.nvars
+        acv_shape, acv_ndim = acv.shape, acv.ndim
+        if acv.ndim == ndim:
+            return np.reshape(acv, acv_shape + (1, 1, 1))
+        if acv.ndim == ndim + 1:
+            return np.reshape(acv, acv_shape + (1, 1))
+
     def compute_ep(
-        self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)
+        self,
+        acv: np.ndarray,
+        fold: bool = True,
+        d: Tuple[int, int] = (0, 0),
+        apply_cg: bool = True,
     ):
         """
         Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
@@ -336,9 +358,16 @@ class ExpectedPeriodogram:
         Parameters
         ----------
         acv: ndarray
-            Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd) acv should have shape
-            (2 * n1 - 1, ..., 2 * nd - 1).
+            Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd), the first d dimensions
+            of acv should have sizes (2 * n1 - 1, ..., 2 * nd - 1).
             The standard way to obtain acv is through the call of the autocov method of a rectangular grid.
+            acv may have extra dimensions. The following cases are standard:
+            1. Univariate data, multiple model parameter vectors. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, m)
+            where m is the number of model parameter vectors.
+            2. Multivariate data, unique model parameter vector. acv will have shape
+            (2 * n1 - 1, ..., 2 * nd - 1, p, p) where p is the number of variates
+            3. Multivariate data, multiple model parameter vectors. acv will have shape
+            (2 * n1 - 1, ..., 2 * nd - 1, m, p, p)
         fold
             Whether to apply folding of the expected periodogram
         d
@@ -367,22 +396,30 @@ class ExpectedPeriodogram:
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
-        if grid.nvars == 1:
-            cg = np.expand_dims(cg, (-1, -2))
-            acv = np.expand_dims(acv, (-1, -2))
-        cbar = cg * acv
-        # now we need to "fold"
+        if p == 1:
+            cg = np.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
+        else:
+            cg = np.reshape(
+                cg, cg.shape[:n_dim] + (1,) * (acv.ndim - n_dim - 2) + (p, p)
+            )
+        cbar = acv
+        if apply_cg:
+            cbar = cg * acv
+        # now we need to "fold" the spatial dimensions
+        zeros_ = ((0, 0),) * (acv.ndim - n_dim)
         if fold:
             if BackendManager.backend_name == "torch":
                 result = np.zeros(
-                    grid.n + (p, p), dtype=np.complex128, device=BackendManager.device
+                    shape + acv.shape[n_dim:],
+                    dtype=np.complex128,
+                    device=BackendManager.device,
                 )
             else:
-                result = np.zeros(grid.n + (p, p), dtype=np.complex128)
+                result = np.zeros(shape + acv.shape[n_dim:], dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                    result += np.pad(res, ((i, 0), (0, 0), (0, 0)), mode="constant")
+                    result += np.pad(res, ((i, 0),) + zeros_, mode="constant")
 
             elif n_dim == 2:
                 for i in range(2):
@@ -392,7 +429,13 @@ class ExpectedPeriodogram:
                             j * shape[1] : (j + 1) * shape[1],
                         ]
                         result += np.pad(
-                            res, ((i, 0), (j, 0), (0, 0), (0, 0)), mode="constant"
+                            res,
+                            (
+                                (i, 0),
+                                (j, 0),
+                            )
+                            + zeros_,
+                            mode="constant",
                         )  # autograd solution
 
             elif n_dim == 3:
@@ -406,7 +449,12 @@ class ExpectedPeriodogram:
                             ]
                             result += np.pad(
                                 res,
-                                ((i, 0), (j, 0), (k, 0), (0, 0), (0, 0)),
+                                (
+                                    (i, 0),
+                                    (j, 0),
+                                    (k, 0),
+                                )
+                                + zeros_,
                                 mode="constant",
                             )
 
@@ -426,7 +474,7 @@ class ExpectedPeriodogram:
         if d == (0, 0):
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
-                out = np.real(np.reshape(out, grid.n))
+                out = np.real(out)
             return out
         out = fftn(result)
         if grid.nvars == 1:

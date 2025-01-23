@@ -18,7 +18,7 @@ PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / "france.jpg")
 
 
 class Grid(ABC):
-    def __init__(self, shape: Tuple[int]):
+    def __init__(self, shape: Tuple[int,]):
         self.shape = shape
 
     @abstractmethod

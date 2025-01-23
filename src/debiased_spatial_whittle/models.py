@@ -188,6 +188,21 @@ class CovarianceModel(ABC):
     def __init__(self, parameters: Parameters):
         self.params = parameters
 
+    def __init_subclass__(cls, **kwargs):
+        """
+        This ensures that with full_dims=True, if the lags passed to the __call__ method have shape (d, n1, ..., nk),
+        the returned array has shape (n1, ..., nk, m, p, p) where m is the number of model parameter vectors, p the
+        number of variates (both potentially equal to 1).
+        """
+        call_method = cls.__call__
+
+        def new_call(self, lags):
+            out = call_method(self, np.expand_dims(lags, -1))
+            out = np.squeeze(out)
+            return out
+
+        cls.__call__ = new_call
+
     @property
     def param_bounds(self):
         """parameter bounds"""

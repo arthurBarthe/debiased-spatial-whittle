@@ -135,7 +135,6 @@ class SamplerOnRectangularGrid:
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
-    # TODO make this work for 1-d and 3-d
     def __call__(self):
         """
         Samples a realization of a Gaussian Process specified by

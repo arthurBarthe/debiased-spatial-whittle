@@ -184,6 +184,10 @@ class MultivariateDebiasedWhittle:
         """Computes the likelihood for this data"""
         p = self.periodogram([z[..., 0], z[..., 1]])
         ep = self.expected_periodogram(model)
+        n_spatial_dim = p.ndim - 2
+        if p.ndim == ep.ndim - 1:
+            # multiple model parameter vectors
+            p = np.expand_dims(p, -3)
         ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
         ratio = np.matmul(ep_inv, p)
@@ -191,7 +195,7 @@ class MultivariateDebiasedWhittle:
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == "torch":
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
-        whittle = np.mean(term1 + term2)
+        whittle = np.mean(term1 + term2, tuple(range(n_spatial_dim)))
         whittle = np.real(whittle)
         if not params_for_gradient:
             return whittle
@@ -360,6 +364,16 @@ class DebiasedWhittle:
         In standard use cases, this method should not be called directly. Instead, one should use the __call__
         method.
         """
+        if periodogram.ndim == expected_periodogram.ndim - 1:
+            # this handles the case of several expected periodograms indexed by the last dimension
+            ndim = expected_periodogram.ndim
+            periodogram = np.expand_dims(periodogram, -1)
+            frequency_mask = np.expand_dims(self.frequency_mask, -1)
+            return np.mean(
+                (np.log(expected_periodogram) + periodogram / expected_periodogram)
+                * frequency_mask,
+                tuple(range(ndim - 1)),
+            )
         return np.mean(
             (np.log(expected_periodogram) + periodogram / expected_periodogram)
             * self.frequency_mask

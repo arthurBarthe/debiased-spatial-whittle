@@ -36,7 +36,7 @@ m.rho = 8
 m.sigma = 1
 m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)
-bvm.r_0 = 0.9
+bvm.r_0 = 0.5
 bvm.f_0 = 1.5
 print(bvm)
 
@@ -58,12 +58,14 @@ p = Periodogram()
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
+print(ep(bvm).shape)
 db = MultivariateDebiasedWhittle(p, ep)
 
 rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
+    print(i)
     bvm.r_0 = r
     lkhs[i] = db(data, bvm)
 

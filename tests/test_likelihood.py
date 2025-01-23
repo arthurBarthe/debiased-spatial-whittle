@@ -57,6 +57,27 @@ def test_oop():
     assert lkh_old == lkh_oop
 
 
+def test_model_array():
+    """
+    In this test we compute the debiased whittle for several model parameter values in a vectorized fashion.
+    """
+    rho = 10
+    g = RectangularGrid((128, 128))
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    d = DebiasedWhittle(p, ep)
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = rho
+    sampler = SamplerOnRectangularGrid(model, g)
+    z = sampler()
+    model.rho = np.arange(1, 20)
+    lkh = d(z, model)
+    print(lkh)
+    assert lkh.shape == (19,)
+    assert lkh[9] < lkh[18]
+
+
 def test_whittle_grad():
     """
     This tests the implementation of the gradient of the Whittle likelihood
@@ -154,7 +175,6 @@ def test_fisher_multivariate():
     bvm.r_0 = 0.3
     bvm.f_0 = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
-    z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     h = dbw.fisher(bvm, bvm.params)
     assert np.all(np.diag(h) > 0)
