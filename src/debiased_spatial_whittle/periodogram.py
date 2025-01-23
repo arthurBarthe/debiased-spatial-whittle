@@ -1,13 +1,12 @@
-from debiased_spatial_whittle.backend import BackendManager
+from .backend import BackendManager
 
 np = BackendManager.get_backend()
 
-from itertools import product
 from typing import Tuple
 
-from debiased_spatial_whittle.spatial_kernel import spatial_kernel
-from debiased_spatial_whittle.models import Parameters
-from debiased_spatial_whittle.utils import prod_list
+from .spatial_kernel import spatial_kernel
+from .models import Parameters
+from .utils import prod_list
 
 fft = np.fft.fft
 fftn = np.fft.fftn
@@ -142,9 +141,6 @@ from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
-ones = BackendManager.get_ones()
-zeros = BackendManager.get_zeros()
-
 
 class Periodogram:
     """
@@ -153,23 +149,15 @@ class Periodogram:
     Attributes
     ----------
     taper: function handle
-        tapering function, takes a single argument, the shape of the grid.
+        tapering function
 
     fold: boolean
         Whether to fold the periodogram.
-
-    Examples
-    --------
-    >>> from numpy import hanning
-    >>> def hanning_taper(shape):
-    ...     m, n = shape
-    ...     return hanning(m).reshape((-1, 1)) * hanning(n).reshape((1, -1))
-    >>> periodogram = Periodogram(hanning_taper)
     """
 
     def __init__(self, taper=None):
         if taper is None:
-            self.taper = lambda shape: ones(shape)
+            self.taper = lambda shape: np.ones(shape)
         self.fold = True
         self._version = 0
 
@@ -192,7 +180,7 @@ class Periodogram:
         Parameters
         ----------
         sample: ndarray | SampleOnRectangularGrid
-            Sampled data on the grid. Can either be a ndarray, or an instance of SampleOnRectangularGrid.
+            Sampled data on the grid. Can either be an ndarray, or an instance of SampleOnRectangularGrid.
             In the latter case, repeated calls to this method will access cached values of the periodogram
             rather than carrying out the same computation again.
 
@@ -201,7 +189,7 @@ class Periodogram:
         periodogram: ndarray
             Periodogram of the data
             - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
-            - shape (n1, ..., nk) if the fold attribute is True (default)
+            - shape (n1, ..., nk) if the fold attribute is True
         """
         if isinstance(sample, SampleOnRectangularGrid):
             if self in sample.periodograms:
@@ -244,7 +232,7 @@ class HashableArray:
 
 
 class ExpectedPeriodogram:
-    """
+    r"""
     Provides the capability to compute the expected periodogram on a fixed grid for
     any covariance model.
 
@@ -255,6 +243,35 @@ class ExpectedPeriodogram:
 
     periodogram: Periodogram
         periodogram for which we require the expectation. This is necessary to account for tapering for instance.
+
+    Notes
+    -----
+    In dimension 1, the formula for the expected periodogram can be written as,
+
+    $$
+        \overline{I}(\omega_k) =
+        \sum_{\tau=-n + 1}^{n - 1}
+        c_g(\tau)
+        c_X(\tau)
+        e^{i \omega_k \tau},
+    $$
+
+    or equivalently,
+
+    $$
+        \overline{I}(\omega_k) =
+        \sum_{\tau=0}^{2n - 1}
+        \left[
+            c_g(\tau)
+            c_X(\tau)
+            +
+            c_g(- n + \tau)
+            c_X(- n + \tau)
+        \right]
+        e^{i \omega_k \tau}.
+    $$
+
+    The latter can naturally be implemented via FFT and generalizes to higher-dimension domains.
     """
 
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
@@ -278,7 +295,10 @@ class ExpectedPeriodogram:
     @periodogram.setter
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        self._taper = HashableArray(value.taper(self.grid.n))
+        if self.grid.nvars == 1:
+            self._taper = HashableArray(value.taper(self.grid.n))
+        else:
+            self._taper = HashableArray(value.taper(self.grid.n + (self.grid.nvars,)))
 
     @property
     def taper(self):
@@ -298,14 +318,37 @@ class ExpectedPeriodogram:
         ep: ndarray
             Shape  (n1, n2, ..., nk).
             The expected periodogram on the grid of Fourier frequencies.
+
             If the fold attribute of the periodogram is False, the shape of the returned array is instead
             (2 * n1 + 1, ..., 2 * nk + 1).
         """
         acv = self.grid.autocov(model)
         return self.compute_ep(acv, self.periodogram.fold)
 
+    def _reshape_acv(self, acv):
+        """
+        TODO: NOT USED. TO BE DELETED
+        Method for internal call that ensures acv has the right number of dimensions before applying the algorithm
+        that computes the expected periodogram. Specifically, if d is the number of spatial dimensions, p the number
+        of variates (including p=1, in which case acv might typically have (n1, ..., nd) or (n1, ..., nd, m)
+        for m model parameters), then the returned shape should be (n1, ..., nd, m, p, p). In the multivariate case
+        acv will have shape (n1, ..., nd, p, p) or (n1, ..., nd, m, p, p). Again the returned shape should be
+        (n1, ..., nd, m, p, p)
+        """
+        ndim = self.grid.ndim
+        p = self.grid.nvars
+        acv_shape, acv_ndim = acv.shape, acv.ndim
+        if acv.ndim == ndim:
+            return np.reshape(acv, acv_shape + (1, 1, 1))
+        if acv.ndim == ndim + 1:
+            return np.reshape(acv, acv_shape + (1, 1))
+
     def compute_ep(
-        self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)
+        self,
+        acv: np.ndarray,
+        fold: bool = True,
+        d: Tuple[int, int] = (0, 0),
+        apply_cg: bool = True,
     ):
         """
         Computes the expected periodogram, and more generally any diagonal of the covariance matrix of the Discrete
@@ -314,22 +357,30 @@ class ExpectedPeriodogram:
 
         Parameters
         ----------
-        acv: ndarray (2 * n1 + 1, ..., 2 * nk + 1)
-            Autocovariance evaluated on the grid. Here (n1, ..., nk) is the shape of the grid. The standard way to
-            obtain acv is through the call of the autocov method of a rectangular grid.
-            In the case of p-multivariate random fields, acv should have two extra dimensions at the end both of size p,
-            hence acv should have overall shape (2 * n1 + 1, ... 2 * nk + 1, p, p) in the p-multivariate case.
+        acv: ndarray
+            Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd), the first d dimensions
+            of acv should have sizes (2 * n1 - 1, ..., 2 * nd - 1).
+            The standard way to obtain acv is through the call of the autocov method of a rectangular grid.
+            acv may have extra dimensions. The following cases are standard:
+            1. Univariate data, multiple model parameter vectors. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, m)
+            where m is the number of model parameter vectors.
+            2. Multivariate data, unique model parameter vector. acv will have shape
+            (2 * n1 - 1, ..., 2 * nd - 1, p, p) where p is the number of variates
+            3. Multivariate data, multiple model parameter vectors. acv will have shape
+            (2 * n1 - 1, ..., 2 * nd - 1, m, p, p)
         fold
             Whether to apply folding of the expected periodogram
         d
-            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT in the 2d case.
+            Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
 
         Returns
         -------
-        np.ndarray
+        ep: np.ndarray
             Expectation of the periodogram.
-            - shape (2 * n1 + 1, ..., 2 * nk + 1) is the fold attribute of self.periodogram is False
-            - shape (n1, ..., nk) if fold is True
+
+            - shape (2 * n1 - 1, ..., 2 * nd - 1) is the fold attribute of self.periodogram is False
+
+            - shape (n1, ..., nd) if fold is True
 
         Notes
         -----
@@ -345,24 +396,30 @@ class ExpectedPeriodogram:
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
-        if grid.nvars == 1:
-            cg = np.expand_dims(cg, -1)
-            cg = np.expand_dims(cg, -1)
-            acv = np.expand_dims(acv, -1)
-            acv = np.expand_dims(acv, -1)
-        cg = np.expand_dims(cg, -3)
-        cbar = cg * acv
-        q = acv.shape[-3]
-        result_shape = grid.n + (q, p, p)
-        # now we need to "fold"
+        if p == 1:
+            cg = np.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
+        else:
+            cg = np.reshape(
+                cg, cg.shape[:n_dim] + (1,) * (acv.ndim - n_dim - 2) + (p, p)
+            )
+        cbar = acv
+        if apply_cg:
+            cbar = cg * acv
+        # now we need to "fold" the spatial dimensions
+        zeros_ = ((0, 0),) * (acv.ndim - n_dim)
         if fold:
-            result = zeros(result_shape, dtype=np.complex128)
+            if BackendManager.backend_name == "torch":
+                result = np.zeros(
+                    shape + acv.shape[n_dim:],
+                    dtype=np.complex128,
+                    device=BackendManager.device,
+                )
+            else:
+                result = np.zeros(shape + acv.shape[n_dim:], dtype=np.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                    result += np.pad(
-                        res, ((i, 0), (0, 0), (0, 0), (0, 0)), mode="constant"
-                    )
+                    result += np.pad(res, ((i, 0),) + zeros_, mode="constant")
 
             elif n_dim == 2:
                 for i in range(2):
@@ -373,9 +430,13 @@ class ExpectedPeriodogram:
                         ]
                         result += np.pad(
                             res,
-                            ((i, 0), (j, 0), (0, 0), (0, 0), (0, 0)),
+                            (
+                                (i, 0),
+                                (j, 0),
+                            )
+                            + zeros_,
                             mode="constant",
-                        )
+                        )  # autograd solution
 
             elif n_dim == 3:
                 for i in range(2):
@@ -388,9 +449,15 @@ class ExpectedPeriodogram:
                             ]
                             result += np.pad(
                                 res,
-                                ((i, 0), (j, 0), (k, 0), (0, 0), (0, 0), (0, 0)),
+                                (
+                                    (i, 0),
+                                    (j, 0),
+                                    (k, 0),
+                                )
+                                + zeros_,
                                 mode="constant",
                             )
+
             # else:
             #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
             #     for ijk in indexes:
@@ -405,16 +472,10 @@ class ExpectedPeriodogram:
             result[:m, n + 1 :] = cbar[:m, n:]
 
         if d == (0, 0):
-            # this is the standard case
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
-                # if uni-variate we remove the extra dimensions
-                out = np.squeeze(out, (-2, -1))
-            if q == 1:
-                # if single model remove extra dimension
-                out = np.squeeze(out, -1)
-            return np.real(out)
-
+                out = np.real(out)
+            return out
         out = fftn(result)
         if grid.nvars == 1:
             out = np.reshape(out, grid.n)
@@ -442,58 +503,20 @@ class ExpectedPeriodogram:
         Notes
         -----
         This requires that the model's _gradient method be implemented.
-
-        Examples
-        --------
-        >>> from debiased_spatial_whittle.models import SquaredExponentialModel
-        >>> from debiased_spatial_whittle.grids import RectangularGrid
-        >>> grid = RectangularGrid((64, 128))
-        >>> ep = ExpectedPeriodogram(grid, Periodogram())
-        >>> model = SquaredExponentialModel()
-        >>> model.sigma = 1
-        >>> model.rho = 16
-        >>> ep.gradient(model, model.params).shape
-        (64, 128, 3)
         """
         lags = self.grid.lags_unique
         d_acv = model.gradient(lags, params)
-        print(d_acv.shape)
-        aux = ifftshift(d_acv, axes=list(range(lags.shape[0])))
-        return self.compute_ep(aux, self.periodogram.fold)
-
-    def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
-        """Returns the covariance of the DFT over a given diagonal.
-
-        Parameters
-        ----------
-        model
-            Covariance model. The covariance matrix of the DFT will depend on both the model and the sampling.
-
-        m
-            Offset in Fourier frequency indices. More precisely, m = (m1, m2) is the offset
-            between two frequencies. In dimension 1 this would correspond to i2 - i1 = m1 in terms of
-            the indices of Fourier frequencies.
-
-        Returns
-        -------
-        cov_dft: ndarray
-            The covariance of the DFT between Fourier frequencies separated by the offset.
-
-        Notes
-        -----
-        When m is zero everywhere, this is just the expected periodogram.
-        """
-        # TODO only works for 2d
-        m1, m2 = m
-        n1, n2 = self.grid.n
-        acv = self.grid.autocov(model)
-        ep = self.compute_ep(acv, d=m)
-        return ep[max(0, m1) : n1 + m1, max(0, m2) : m2 + n2]
+        d_ep = []
+        for p_name in params.names:
+            aux = ifftshift(d_acv[p_name], axes=list(range(lags.shape[0])))
+            d_ep.append(self.compute_ep(aux, self.periodogram.fold))
+        return np.stack(d_ep, axis=-1)
 
     def cov_dft_matrix(self, model: CovarianceModel):
-        """
-        Provides the covariance matrix of the Discrete Fourier Transform. Computed using matrix products,
-        hence not viable for large grid sizes.
+        r"""
+        Provides the complex-valued covariance matrix of the Discrete Fourier Transform.
+        Implemented via FFT, but still requires the full covariance matrix of the data,
+        hence this is not viable for large grids.
 
         Parameters
         ----------
@@ -502,8 +525,19 @@ class ExpectedPeriodogram:
 
         Returns
         -------
-        cov_dft: ndarray (n1, n2, ..., nk)
+        cov_dft: ndarray (n1, n2, ..., nd)
             Covariance matrix of the Discrete Fourier Transform of the data.
+
+        Notes
+        -----
+        The result of this method corresponds to,
+
+        $$
+            E[\mathbf{J} \mathbf{J}^*] = E[U^* \mathbf{X} \mathbf{X}^* U]=U^* E[\mathbf{X} \mathbf{X}^T] U= U^* C_X U
+        $$
+
+        where $\mathbf{J}$ is the Discrete Fourier Transform (DFT) of the data $\mathbf{X}$,
+        whose covariance matrix is denoted by $C_X$, and $U$ is the DFT matrix.
         """
         n = self.grid.n
 
@@ -552,6 +586,35 @@ class ExpectedPeriodogram:
         temp2 = transpose(temp2)
         return temp2 / n[0] / n[1]
 
+    def cov_dft_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
+        """Returns the covariance of the DFT over a given diagonal.
+
+        Parameters
+        ----------
+        model
+            Covariance model. The covariance matrix of the DFT will depend on both the model and the sampling.
+
+        m
+            Offset in Fourier frequency indices. More precisely, m = (m1, m2) is the offset
+            between two frequencies. In dimension 1 this would correspond to i2 - i1 = m1 in terms of
+            the indices of Fourier frequencies.
+
+        Returns
+        -------
+        cov_dft: ndarray
+            The covariance of the DFT between Fourier frequencies separated by the offset.
+
+        Notes
+        -----
+        When m is zero everywhere, this is just the expected periodogram.
+        """
+        # TODO only works for 2d
+        m1, m2 = m
+        n1, n2 = self.grid.n
+        acv = self.grid.autocov(model)
+        ep = self.compute_ep(acv, d=m)
+        return ep[max(0, m1) : n1 + m1, max(0, m2) : m2 + n2]
+
     def cov_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """
         Returns the covariance of the periodogram (valid only in 2d)
@@ -590,20 +653,6 @@ class ExpectedPeriodogram:
         m
         """
         return np.abs(self.cov_dft_antidiagonals(model, m)) ** 2
-
-
-class SmoothedExpectedPeriodogram:
-    def __init__(self, grid: RectangularGrid, periodogram):
-        self.grid = grid
-        self.periodogram = periodogram
-        self.subgrid = RectangularGrid(tuple([n_i // 4 for n_i in grid.n]), grid.delta)
-        self.subep = ExpectedPeriodogram(self.subgrid, periodogram)
-
-    def __call__(self, model: CovarianceModel):
-        ep = self.subep(model)
-        for i_dim in range(self.grid.ndim):
-            ep = np.repeat(ep, 4, i_dim)
-        return ep
 
 
 class SeparableExpectedPeriodogram(ExpectedPeriodogram):
@@ -676,3 +725,4 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         -------
 
         """
+        raise NotImplementedError("This has not been implemented yet.")

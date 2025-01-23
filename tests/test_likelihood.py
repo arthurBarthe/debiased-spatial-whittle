@@ -4,7 +4,6 @@ from numpy.testing import assert_allclose
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import (
     Periodogram,
-    SeparableExpectedPeriodogram,
     ExpectedPeriodogram,
     compute_ep_old,
 )
@@ -20,7 +19,6 @@ from debiased_spatial_whittle.likelihood import (
 )
 from debiased_spatial_whittle.simulation import (
     SamplerOnRectangularGrid,
-    sim_circ_embedding,
     SamplerBUCOnRectangularGrid,
 )
 from debiased_spatial_whittle.models import (
@@ -57,6 +55,27 @@ def test_oop():
     e_per = compute_ep_old(cov_func, g)
     lkh_old = whittle(periodogram(z, g), e_per)
     assert lkh_old == lkh_oop
+
+
+def test_model_array():
+    """
+    In this test we compute the debiased whittle for several model parameter values in a vectorized fashion.
+    """
+    rho = 10
+    g = RectangularGrid((128, 128))
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    d = DebiasedWhittle(p, ep)
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = rho
+    sampler = SamplerOnRectangularGrid(model, g)
+    z = sampler()
+    model.rho = np.arange(1, 20)
+    lkh = d(z, model)
+    print(lkh)
+    assert lkh.shape == (19,)
+    assert lkh[9] < lkh[18]
 
 
 def test_whittle_grad():
@@ -156,7 +175,6 @@ def test_fisher_multivariate():
     bvm.r_0 = 0.3
     bvm.f_0 = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
-    z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     h = dbw.fisher(bvm, bvm.params)
     assert np.all(np.diag(h) > 0)

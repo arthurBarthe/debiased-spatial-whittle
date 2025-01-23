@@ -1,7 +1,6 @@
 from debiased_spatial_whittle.models import (
     BivariateUniformCorrelation,
     ExponentialModel,
-    SquaredExponentialModel,
 )
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 from debiased_spatial_whittle.grids import RectangularGrid

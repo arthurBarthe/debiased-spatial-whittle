@@ -8,7 +8,7 @@ from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend("numpy")
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.new_models import SquaredExponentialModel
+from debiased_spatial_whittle.models import SquaredExponentialModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -17,8 +17,10 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
 # ##Model specification
 
-model = SquaredExponentialModel(rho=16)
-print(model.param.pprint())
+model = SquaredExponentialModel()
+model.rho = 15
+model.sigma = 2
+model.nugget = 0.0
 
 # ##Grid specification
 
@@ -42,6 +44,7 @@ expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
-model_est = SquaredExponentialModel(rho=11)
-estimator(model_est, z)
-print(model_est.param.pprint())
+model_est = SquaredExponentialModel()
+model_est.nugget = None
+estimate = estimator(model_est, z)
+print(estimate)

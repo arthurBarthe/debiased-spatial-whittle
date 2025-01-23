@@ -3,7 +3,6 @@
 
 # ##Imports
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,7 +12,6 @@ BackendManager.set_backend("numpy")
 
 from debiased_spatial_whittle.models import (
     ExponentialModel,
-    SquaredExponentialModel,
     BivariateUniformCorrelation,
 )
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
@@ -26,7 +24,7 @@ from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
 # Note that we use the argument nvars=2 to specify that we observe a bivariate random field
 
-g = RectangularGrid((64, 64), nvars=2)
+g = RectangularGrid((128, 128), nvars=2)
 
 
 # ##Model specification
@@ -38,7 +36,7 @@ m.rho = 8
 m.sigma = 1
 m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)
-bvm.r_0 = 0.9
+bvm.r_0 = 0.5
 bvm.f_0 = 1.5
 print(bvm)
 
@@ -57,16 +55,17 @@ plt.show()
 # ##Profile likelihood plot for the correlation parameter
 
 p = Periodogram()
-p.taper = lambda x: x
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
+print(ep(bvm).shape)
 db = MultivariateDebiasedWhittle(p, ep)
 
 rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
+    print(i)
     bvm.r_0 = r
     lkhs[i] = db(data, bvm)
 

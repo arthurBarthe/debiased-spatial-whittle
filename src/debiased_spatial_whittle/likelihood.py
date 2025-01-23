@@ -132,7 +132,6 @@ def fit(
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 from debiased_spatial_whittle.models import CovarianceModel, Parameters
-from debiased_spatial_whittle.new_models import Model, ModelParameter
 from typing import Callable, Union, Optional
 
 from debiased_spatial_whittle.multivariate_periodogram import (
@@ -185,14 +184,18 @@ class MultivariateDebiasedWhittle:
         """Computes the likelihood for this data"""
         p = self.periodogram([z[..., 0], z[..., 1]])
         ep = self.expected_periodogram(model)
+        n_spatial_dim = p.ndim - 2
+        if p.ndim == ep.ndim - 1:
+            # multiple model parameter vectors
+            p = np.expand_dims(p, -3)
         ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
         ratio = np.matmul(ep_inv, p)
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == "torch":
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
-        whittle = np.mean(term1 + term2)
+        whittle = np.mean(term1 + term2, tuple(range(n_spatial_dim)))
         whittle = np.real(whittle)
         if BackendManager.backend_name == "torch":
             whittle = whittle.item()
@@ -278,10 +281,37 @@ class DebiasedWhittle:
     Attributes
     ----------
     periodogram: Periodogram
-        Multivariate periodogram applied to the multivariate random field
+        Periodogram applied to the data
 
     expected_periodogram: ExpectedPeriodogram
         Object used to compute the expectation of the periodogram
+
+    frequency_mask: ndarray
+        mask of zero and ones to select frequencies over which the summation is carried out in the computation of
+        the Whittle.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.random.seed(1712)
+    >>> from debiased_spatial_whittle.grids import RectangularGrid
+    >>> from debiased_spatial_whittle.models import SquaredExponentialModel
+    >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+    >>> from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+    >>> grid = RectangularGrid(shape=(256, 256))
+    >>> model1 = SquaredExponentialModel()
+    >>> model1.rho = 12
+    >>> model1.sigma = 1
+    >>> model2 = SquaredExponentialModel()
+    >>> model2.rho = 4
+    >>> model2.sigma = 1
+    >>> sampler = SamplerOnRectangularGrid(model1, grid)
+    >>> per = Periodogram()
+    >>> ep = ExpectedPeriodogram(grid, per)
+    >>> dbw = DebiasedWhittle(per, ep)
+    >>> sample = sampler()
+    >>> dbw(sample, model1), dbw(sample, model2)
+    (-8.37515633567113, -7.315812857735173)
     """
 
     def __init__(
@@ -336,13 +366,15 @@ class DebiasedWhittle:
         In standard use cases, this method should not be called directly. Instead, one should use the __call__
         method.
         """
-        if periodogram.ndim < expected_periodogram.ndim:
+        if periodogram.ndim == expected_periodogram.ndim - 1:
+            # this handles the case of several expected periodograms indexed by the last dimension
+            ndim = expected_periodogram.ndim
             periodogram = np.expand_dims(periodogram, -1)
-            reduce_axis = tuple(range(periodogram.ndim - 1))
+            frequency_mask = np.expand_dims(self.frequency_mask, -1)
             return np.mean(
                 (np.log(expected_periodogram) + periodogram / expected_periodogram)
-                * self.frequency_mask,
-                axis=reduce_axis,
+                * frequency_mask,
+                tuple(range(ndim - 1)),
             )
         return np.mean(
             (np.log(expected_periodogram) + periodogram / expected_periodogram)
@@ -354,7 +386,7 @@ class DebiasedWhittle:
         sample: np.ndarray,
         model: CovarianceModel,
         params_for_gradient: Parameters = None,
-    ):
+    ) -> np.float64:
         """
         Computes the Debiased Whittle likelihood for these data
 
@@ -413,7 +445,7 @@ class DebiasedWhittle:
 
     def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
         """
-        Provides the Fisher Information Matrix
+        Provides the Fisher Information Matrix.
 
         Parameters
         ----------
@@ -427,6 +459,22 @@ class DebiasedWhittle:
         -------
         fisher: ndarray
             Fisher covariance matrix
+
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 30
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> dbw.fisher(model, model.params)
+        array([[ 1.03736229e-03, -4.49238561e-02, -6.01436043e-01],
+               [-4.49238561e-02,  2.01197123e+00,  2.58931333e+01],
+               [-6.01436043e-01,  2.58931333e+01,  4.49900628e+02]])
         """
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
@@ -436,7 +484,6 @@ class DebiasedWhittle:
                 d_ep1 = d_ep[..., i1]
                 d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
-        # TODO ugly
         return h / self.expected_periodogram.grid.n_points
 
     def jmatrix(
@@ -520,6 +567,24 @@ class DebiasedWhittle:
         -------
         np.ndarray
             Sample covariance matrix of the gradient of the likelihood
+
+        Examples
+        --------
+        >>> import numpy.random as nrrandom
+        >>> nrrandom.seed(1712)
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 12
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> dbw.jmatrix_sample(model, model.params, n_sims=20)
+        array([[ 1.79844275e-06, -3.36165062e-05, -1.46535796e-04],
+               [-3.36165062e-05,  8.20809861e-04,  2.89073624e-03],
+               [-1.46535796e-04,  2.89073624e-03,  1.53001387e-02]])
         """
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
@@ -553,6 +618,25 @@ class DebiasedWhittle:
         -------
         cov_mat
             Covariance matrix of the parameter estimates.
+
+        Examples
+        --------
+        >>> import numpy.random as nrrandom
+        >>> nrrandom.seed(1712)
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> model = ExponentialModel()
+        >>> model.rho = 12
+        >>> model.sigma = 1.41
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((67, 192))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> dbw = DebiasedWhittle(periodogram, ep)
+        >>> jmat = dbw.jmatrix_sample(model, model.params, n_sims=20)
+        >>> dbw.variance_of_estimates(model, model.params, jmat)
+        array([[9.09922893e+00, 4.94112586e-01, 4.83568479e-03],
+               [4.94112586e-01, 2.75659859e-02, 1.70142181e-04],
+               [4.83568479e-03, 1.70142181e-04, 1.67758253e-05]])
         """
         hmat = self.fisher(model, params)
         if jmat is None:
@@ -579,7 +663,7 @@ class Estimator:
         Additional options passed to the optimizer.
 
     method: string
-        Optimization procedure
+        Optimization procedure. Should be one of the methods available in scipy's local or global optimizers.
     """
 
     def __init__(
@@ -587,7 +671,7 @@ class Estimator:
         likelihood: DebiasedWhittle,
         use_gradients: bool = False,
         max_iter: int = 100,
-        optim_options=dict(),
+        optim_options: dict = dict(),
         method: str = "L-BFGS-B",
     ):
         """
@@ -619,7 +703,7 @@ class Estimator:
 
     def __call__(
         self,
-        model: Model,
+        model: CovarianceModel,
         sample: Union[np.ndarray, SampleOnRectangularGrid],
         opt_callback: Callable = None,
         x0: Optional[np.ndarray] = None,

@@ -1,15 +1,18 @@
 import numpy
 import warnings
 
+TORCH_INSTALLED = True
+CUPY_INSTALLED = True
+
 try:
     import torch
 except ModuleNotFoundError:
-    warnings.warn("Module Pytorch not found, will not be available as backend.")
+    TORCH_INSTALLED = False
 
 try:
     import cupy
 except ModuleNotFoundError:
-    warnings.warn("Module cupy not found, will not be available as backend.")
+    CUPY_INSTALLED = False
 
 
 def func(x):
@@ -49,15 +52,21 @@ class BackendManager:
 
     @classmethod
     def set_backend(cls, name: str):
+        if name == "cupy" and (not CUPY_INSTALLED):
+            warnings.warn("Module Cupy not found, will not be available as backend.")
+        elif name == "torch" and (not TORCH_INSTALLED):
+            warnings.warn("Module Torch not found, will not be available as backend.")
         cls.backend_name = name
 
     @classmethod
     def get_backend(cls):
         if cls.backend_name == "numpy":
             numpy.to_cpu = lambda x: x
+            numpy.item = lambda x: x
             return numpy
         elif cls.backend_name == "cupy":
             cupy.to_cpu = lambda x: x.get()
+            cupy.item = lambda x: x.item()
             return cupy
         elif cls.backend_name == "autograd":
             import autograd.numpy
@@ -65,7 +74,8 @@ class BackendManager:
             return autograd.numpy
         elif cls.backend_name == "torch":
             torch.to_cpu = lambda x: x.cpu()
-            torch.set_default_dtype(torch.float64)
+            torch.item = lambda x: x.item()
+            torch.set_default_tensor_type(torch.DoubleTensor)
             torch.array = lambda x: torch.tensor(
                 x, dtype=torch.float64, device=cls.device
             )
@@ -85,8 +95,10 @@ class BackendManager:
     def convert(cls, a):
         if BackendManager.backend_name == "torch":
             return torch.tensor(a).to(device=BackendManager.device)
-        else:
+        elif BackendManager.backend_name == "numpy":
             return a
+        elif BackendManager.backend_name == "cupy":
+            return cupy.asarray(a)
 
     @classmethod
     def get_zeros(cls):
@@ -96,17 +108,6 @@ class BackendManager:
             return cupy.zeros
         elif cls.backend_name == "torch":
             return lambda *args, **kargs: torch.zeros(
-                *args, **kargs, device=BackendManager.device
-            )
-
-    @classmethod
-    def get_ones(cls):
-        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
-            return numpy.ones
-        if cls.backend_name == "cupy":
-            return cupy.ones
-        elif cls.backend_name == "torch":
-            return lambda *args, **kargs: torch.ones(
                 *args, **kargs, device=BackendManager.device
             )
 
@@ -174,19 +175,6 @@ class BackendManager:
             fftn = cls._changes_keyword(torch.fft.fftn, "axes", "dim")
             ifftn = cls._changes_keyword(torch.fft.ifftn, "axes", "dim")
             return fftn, ifftn
-
-    @classmethod
-    def get_fftfreq(cls):
-        if cls.backend_name == "numpy":
-            return numpy.fft.fftfreq
-        elif cls.backend_name == "cupy":
-            return cupy.fft.fftfreq
-        elif cls.backend_name == "torch":
-
-            def new_fftfreq(*args, **kargs):
-                return torch.fft.fftfreq(*args, **kargs).to(device=cls.device)
-
-            return new_fftfreq
 
     @classmethod
     def get_fftshift_methods(cls):

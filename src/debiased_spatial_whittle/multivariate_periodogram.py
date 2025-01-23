@@ -6,13 +6,6 @@ fftn = np.fft.fftn
 
 from typing import List
 
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
-from debiased_spatial_whittle.models import (
-    BivariateUniformCorrelation,
-    TransformedModel,
-)
-
 
 class Periodogram:
     """
@@ -22,20 +15,24 @@ class Periodogram:
     def __init__(self):
         # TODO allow for tapering in multivariate case
         self.fold = True
-        self.taper = lambda x: np.ones_like(x)
+        self.taper = lambda shape: np.ones(shape)
 
-    def __call__(self, z: List[np.ndarray], return_fft: bool = False):
+    def __call__(self, z: List[np.ndarray], return_fft: bool = False) -> np.ndarray:
         """
         Compute the multivariate periodogram. The data z is expected to be a list
         of p arrays with the same shape, where p is the number of variates.
+
         Parameters
         ----------
         z
-        return_fft
+            Data, list of arrays corresponding to the distinct variates
 
+        return_fft
+            If true, returns the Discrete Fourier Transform rather than the periodogram
         Returns
         -------
-
+        periodogram
+            Shape (n1, n2, ..., nd, p, p) if the data is p-variate and over d spatial dimensions.
         """
         n_spatial_dims = z[0].ndim
         z = np.stack(z, axis=-1)
@@ -48,7 +45,7 @@ class Periodogram:
         if return_fft:
             return j_vec
         # first dimensions are spatial dimensions
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             j_vec_transpose = np.conj(np.transpose(j_vec, (0, 1, -1, -2)))
         elif BackendManager.backend_name == "torch":
             j_vec_transpose = np.conj(np.transpose(j_vec, -1, -2))

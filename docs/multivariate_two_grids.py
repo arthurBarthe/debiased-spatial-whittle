@@ -3,7 +3,6 @@
 
 # ##Imports
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,7 +11,6 @@ from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend("numpy")
 
 from debiased_spatial_whittle.models import (
-    ExponentialModel,
     SquaredExponentialModel,
     BivariateUniformCorrelation,
 )
@@ -24,7 +22,7 @@ from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
 
 # ##Grid specification
 
-g = RectangularGrid((256, 256), nvars=2)
+g = RectangularGrid((128, 128), nvars=2)
 g.mask = np.random.rand(*g.mask.shape) > 0.2
 x, y = g.grid_points
 g.mask[..., 0] = np.mod(x, 40) <= 20
@@ -58,7 +56,6 @@ plt.show()
 # ##Inference
 
 p = Periodogram()
-p.taper = lambda x: x
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)

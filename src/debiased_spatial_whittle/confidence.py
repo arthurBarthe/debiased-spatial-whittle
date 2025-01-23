@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Tuple
 
 from debiased_spatial_whittle.backend import BackendManager
 

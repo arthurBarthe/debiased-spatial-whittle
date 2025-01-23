@@ -2,17 +2,8 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
 np = BackendManager.get_backend()
-
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import (
-    Periodogram,
-    SeparableExpectedPeriodogram,
-    ExpectedPeriodogram,
-)
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, whittle
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.models import (
     ExponentialModel,
     SquaredExponentialModel,

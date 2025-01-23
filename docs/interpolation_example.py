@@ -1,25 +1,11 @@
 import autograd.numpy as np
-from autograd import grad
-from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
-from scipy.linalg import inv
 
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
-    SquaredExponentialModel,
-    MaternModel,
-)
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
+from debiased_spatial_whittle.models import SquaredExponentialModel
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import (
-    Periodogram,
-    ExpectedPeriodogram,
-    compute_ep,
-)
-from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.plotting_funcs import plot_marginals
-from debiased_spatial_whittle.bayes import DeWhittle, Whittle, Gaussian
+from debiased_spatial_whittle.bayes import DeWhittle
 # from debiased_spatial_whittle.bayes_old import DeWhittle2
 
 

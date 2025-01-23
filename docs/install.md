@@ -1,27 +1,40 @@
-The package can be installed via one of the following methods. Note that in
-all cases, since the repository is currently private, git needs to be configured
-on your machine with an SSH key linking your machine to your github account.
-
-## Poetry
-Via the use of Poetry (https://python-poetry.org/), by adding
-the following line to the dependencies listed in the pyproject.toml
-of your project:
-
-
-    debiased-spatial-whittle = {git = "git@github.com:arthurBarthe/dbw_private.git", branch="master"}
-
+The package can be installed via one of the following methods.
 
 ## pip
-Otherwise you should be able to directly install via pip:
 
+    pip install debiased-spatial-whittle
 
-    pip install git+https://github.com/arthurBarthe/dbw_private.git
+If you want to install the optional Cupy and Pytorch dependencies for GPU computations,
+you need to add the optional gpu dependency:
 
-## Developement
+    pip install debiased-spatial-whittle[gpu]
 
-Install for developement - in this case you need to clone the github repository and (assuming you already have poetry installed) run
+Otherwise, you should be able to directly install this repository:
+
+    pip install git@github.com:arthurBarthe/debiased-spatial-whittle
+
+## Poetry
+Via the use of Poetry (https://python-poetry.org/) by running
+
+    poetry add debiased-spatial-whittle
+
+Or, to add optional gpu dependencies,
+
+    poetry add debiased-spatial-whittle -E gpu
+
+You can also use the latest github version by adding the following dependency in your pyproject.toml:
+
+    debiased-spatial-whittle = {git = "git@github.com:arthurBarthe/debiased-spatial-whittle", branch="master"}
+
+## Development
+
+Install for development - in this case you need to clone the github repository and (assuming you already have poetry installed) run
 ```
 poetry install
 ```
 which will install an environment based on the dependencies listed in the lock
 file.
+
+To install with gpu dependencies,
+
+    poetry install -E gpu

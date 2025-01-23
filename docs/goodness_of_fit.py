@@ -1,11 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
-    SquaredExponentialModel,
-    MaternCovarianceModel,
-)
+from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram

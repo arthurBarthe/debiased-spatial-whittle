@@ -11,9 +11,11 @@ from debiased_spatial_whittle.periodogram import (
     ExpectedPeriodogram,
 )
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.new_models import (
+from debiased_spatial_whittle.models import (
     ExponentialModel,
     SquaredExponentialModel,
+    SeparableModel,
+    Parameters,
 )
 from debiased_spatial_whittle.confidence import CovarianceFFT
 
@@ -138,6 +140,26 @@ def test_compare_to_mean_3d():
     assert_allclose(mean_per, e_per, rtol=0.05)
 
 
+def test_compare_to_mean_1d():
+    shape = (256,)
+    grid = RectangularGrid(shape)
+    model = ExponentialModel()
+    sampler = SamplerOnRectangularGrid(model, grid)
+    model.rho = 5
+    model.sigma = 1
+    n_samples = 10000
+    periodogram = Periodogram()
+    expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+    mean_per = np.zeros(shape)
+    for i in range(n_samples):
+        z = sampler()
+        per = periodogram(z)
+        mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
+    e_per = expected_periodogram(model)
+    print(mean_per / e_per)
+    assert_allclose(mean_per, e_per, rtol=0.05)
+
+
 def test_compare_to_average_masked_grid():
     """
     Compare the sample average of periodograms over independent realizations
@@ -236,15 +258,16 @@ def test_gradient_expected_periodogram():
     model.rho = 4
     epsilon = 1e-6
     ep1 = ep_op(model)
-    model.rho = model.rho + epsilon
+    model.rho = model.rho.value + epsilon
     ep2 = ep_op(model)
     g = ep_op.gradient(
         model,
-        [
-            model.param.rho,
-        ],
-    )
-    print(g.shape)
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )[:, :, 0]
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
 

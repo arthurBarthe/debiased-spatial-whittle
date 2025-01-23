@@ -15,6 +15,7 @@ from debiased_spatial_whittle.simulation import (
     SamplerOnRectangularGrid,
     SamplerSeparable,
 )
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.utils import video_plot_3d
 
 # ##Grid and model specification

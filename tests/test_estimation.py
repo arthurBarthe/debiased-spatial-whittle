@@ -1,30 +1,11 @@
 import numpy as np
 from numpy.testing import assert_almost_equal
 from debiased_spatial_whittle.cov_funcs import exp_cov
-from debiased_spatial_whittle.periodogram import autocov
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import (
-    Periodogram,
-    SeparableExpectedPeriodogram,
-    ExpectedPeriodogram,
-    compute_ep_old,
-)
-from debiased_spatial_whittle.likelihood import (
-    DebiasedWhittle,
-    Estimator,
-    fit,
-    whittle,
-    periodogram,
-)
-from debiased_spatial_whittle.simulation import (
-    SamplerOnRectangularGrid,
-    sim_circ_embedding,
-)
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
-    ExponentialModelUniDirectional,
-    SeparableModel,
-)
+from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit
+from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.models import ExponentialModel, SeparableModel
 
 
 def test_expcov():
@@ -139,6 +120,32 @@ def test_optim_with_gradient():
     e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
     est_rho = model_est.rho.value
     assert abs(est_rho - 10) < 2
+
+
+def test_estimation_1d():
+    """
+    Tests estimation in the case of 1-dimensional data
+    """
+    # oop version
+    g = RectangularGrid((128,))
+    p = Periodogram()
+    ep = ExpectedPeriodogram(g, p)
+    d = DebiasedWhittle(p, ep)
+    e = Estimator(d)
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = 10
+    sampler = SamplerOnRectangularGrid(model, g)
+    model_est = ExponentialModel()
+    model_est.sigma = 1
+    estimates = []
+    for i in range(100):
+        model_est.rho = None
+        model_est.rho.init_guess = 0.1
+        z = sampler()
+        e(model_est, z)
+        estimates.append(model_est.rho.value)
+    assert np.abs(np.mean(estimates) - model.rho.value) <= 2
 
 
 """

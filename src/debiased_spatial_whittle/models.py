@@ -7,7 +7,6 @@ from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
-fftfreq = BackendManager.get_fftfreq()
 arange = BackendManager.get_arange()
 
 import numpy
@@ -159,13 +158,54 @@ class ParametersUnion(Parameters):
 
 
 class CovarianceModel(ABC):
-    """Abstract class for the definition of a covariance model."""
+    """
+    Abstract class for the definition of a covariance model.
+
+    Attributes
+    ----------
+    n_params
+        number of parameters of the model
+
+    param_names
+        names of the model's parameters
+
+    param_bounds
+        bounds of the model's parameters
+
+    param_values
+        values of the model's parameters
+
+    free_params
+        parameters whose value is not fixed
+
+    has_free_params
+        true if the model has any free parameter
+
+    free_param_bounds
+        bounds of the free parameters
+    """
 
     def __init__(self, parameters: Parameters):
         self.params = parameters
 
+    def __init_subclass__(cls, **kwargs):
+        """
+        This ensures that with full_dims=True, if the lags passed to the __call__ method have shape (d, n1, ..., nk),
+        the returned array has shape (n1, ..., nk, m, p, p) where m is the number of model parameter vectors, p the
+        number of variates (both potentially equal to 1).
+        """
+        call_method = cls.__call__
+
+        def new_call(self, lags):
+            out = call_method(self, np.expand_dims(lags, -1))
+            out = np.squeeze(out)
+            return out
+
+        cls.__call__ = new_call
+
     @property
     def param_bounds(self):
+        """parameter bounds"""
         return self.params.bounds
 
     @property
@@ -189,7 +229,8 @@ class CovarianceModel(ABC):
         return self.params.free_params()
 
     @property
-    def free_param_bounds(self):
+    def free_param_bounds(self) -> list:
+        """free parameters's bounds"""
         return self.free_params.bounds
 
     @property
@@ -224,10 +265,14 @@ class CovarianceModel(ABC):
         x: ndarray
             Array of spatial lags. The first dimension is used to index the dimensions of the domain.
 
+            Shape (ndim, m1, ..., mk)
+
         Returns
         -------
         cov: ndarray
             Covariance model evaluated at the passed lags
+
+            Shape (m1, ..., mk)
 
         Notes
         -----
@@ -251,14 +296,14 @@ class CovarianceModel(ABC):
         Parameters
         ----------
         x1
-            shape (N1, d), first set of locations
+            shape (n1, d), first set of locations
         x2
-            shape (N2, d), second set of locations
+            shape (n2, d), second set of locations
 
         Returns
         -------
         covmat
-            shape (N1, N2), covariance matrix
+            shape (n1, n2), covariance matrix
         """
         if x2 is None:
             x2 = x1
@@ -268,9 +313,32 @@ class CovarianceModel(ABC):
         lags = np.transpose(lags, (2, 0, 1))
         return self(lags)
 
-    def gradient(self, x: np.ndarray, params: Parameters):
-        """Provides the gradient of the covariance functions at the passed lags with respect to
-        the passed parameters"""
+    def gradient(self, x: np.ndarray, params: Parameters) -> dict[str, np.ndarray]:
+        """
+        Provides the gradient of the covariance functions at the passed lags with respect to
+        the passed parameters
+
+        Parameters
+        ----------
+        x
+            array of lags
+
+        params
+            parameters with respect to which we request the gradient
+
+        Returns
+        -------
+        gradient
+            dictionary whose keys are the parameter names, and values are the derivatives
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.21931151, 0.21931151, 0.38708346]), 'nugget': array([1., 0., 0., 0.])}
+        """
         gradient = dict([(p.name, 0) for p in params.param_dict.values()])
         g = self._gradient(x)
         for i, p in enumerate(self.params):
@@ -307,6 +375,7 @@ class CovarianceModel(ABC):
     def __getstate__(self):
         """
         Necessary for pickling and unpiclking
+
         Returns
         -------
         State as a dictionary
@@ -484,6 +553,25 @@ class ExponentialModel(CovarianceModel):
         self.nugget = 0.0
 
     def __call__(self, lags: np.ndarray):
+        """
+
+        Parameters
+        ----------
+        lags
+            Array of lags
+
+        Returns
+        -------
+        Exponential covariance function evaluated at the passed lags.
+
+        Examples
+        --------
+        >>> model = ExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]))
+        array([1.9881    , 1.2058436 , 1.2058436 , 0.98026987])
+        """
         d = np.sqrt(sum((lag**2 for lag in lags)))
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = self.sigma.value**2 * np.exp(-d / self.rho.value) + nugget_effect
@@ -491,7 +579,17 @@ class ExponentialModel(CovarianceModel):
 
     def _gradient(self, lags: np.ndarray):
         """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
-        the model's parameters"""
+        the model's parameters. The user should not call this method directly in general, instead they should
+        use the gradient method.
+
+        Examples
+        --------
+        >>> model = ExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.3014609 , 0.3014609 , 0.34657773]), 'nugget': array([1., 0., 0., 0.])}
+        """
         d = np.sqrt(sum((lag**2 for lag in lags)))
         d_rho = (
             (self.sigma.value / self.rho.value) ** 2 * d * np.exp(-d / self.rho.value)
@@ -536,7 +634,6 @@ class ExponentialModelUniDirectional(CovarianceModel):
         return np.stack((d_rho, d_sigma), axis=-1)
 
 
-import scipy
 from scipy.special import kv
 
 try:
@@ -644,6 +741,26 @@ class SquaredExponentialModel(CovarianceModel):
         self.nugget = 0.0
 
     def __call__(self, lags: np.ndarray):
+        """
+        Evaluate the Squared Exponential Covariance model at the passed lags.
+
+        Parameters
+        ----------
+        lags
+            Array of lags
+
+        Returns
+        -------
+        Exponential covariance function evaluated at the passed lags.
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]))
+        array([1.9881    , 1.75449209, 1.75449209, 1.54833384])
+        """
         d2 = np.sum(lags**2, axis=0)
         nugget_effect = self.nugget.value * np.all(lags == 0, axis=0)
         acf = (
@@ -678,9 +795,18 @@ class SquaredExponentialModel(CovarianceModel):
         return np.sum(f, axis=(1, 2)).reshape(shape) + self.nugget.value
 
     def _gradient(self, lags: np.ndarray):
-        """Provides the derivatives of the covariance model evaluated at the passed lags with respect to
-        the model's parameters"""
-        # TODO: include nugget
+        """
+        Provides the derivatives of the covariance model evaluated at the passed lags with respect to
+        the model's parameters.
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel()
+        >>> model.rho = 2
+        >>> model.sigma = 1.41
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), Parameters([model.rho, model.nugget]))
+        {'rho': array([0.        , 0.21931151, 0.21931151, 0.38708346]), 'nugget': array([1., 0., 0., 0.])}
+        """
         d2 = sum((lag**2 for lag in lags))
         d_rho = (
             self.rho.value ** (-3)
@@ -828,11 +954,10 @@ class BivariateUniformCorrelation(CovarianceModel):
 
         Returns
         -------
-            Covariance values with shape (ndim, m1, m2, ..., mk, 2, 2)
+            Covariance values with shape (m1, m2, ..., mk, 2, 2)
 
         """
         acv11 = self.base_model(lags)
-        # TODO looks ugly that we use r_0. Reconsider implementation of parameters?
         out = np.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11
@@ -848,6 +973,7 @@ class BivariateUniformCorrelation(CovarianceModel):
         ----------
         x
             shape (ndim, m1, ..., mk)
+
         Returns
         -------
         gradient
@@ -934,7 +1060,7 @@ class NewTransformedModel(CovarianceModel):
         f = fftn(acv, axes=(0, 1))
         # apply the frequency-domain mapping
         transform = self.transform_on_grid(grid.fourier_frequencies2)
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             transform_transpose = np.transpose(transform, (0, 1, -1, -2))
         elif BackendManager.backend_name == "torch":
             transform_transpose = np.transpose(transform, -1, -2).to(
@@ -1003,7 +1129,7 @@ class MaternCovarianceModel(CovarianceModel):
         Amplitude parameter
 
     nu: Parameter
-        Slope parameter. Faster for values 0.5 and 1.5.
+        Slope parameter. Faster for values 0.5, 1.5 and 2.5.
 
     Examples
     --------
@@ -1148,35 +1274,6 @@ class MaternCovarianceModelFrederik(CovarianceModel):
         raise NotImplementedError()
 
 
-def test_gradient_cov():
-    """
-    This test verifies that the analytical gradient of the covariance is close to a
-    numerical approximation to that gradient.
-    :return:
-    """
-    from numpy.testing import assert_allclose
-    from .grids import RectangularGrid
-
-    g = RectangularGrid((64, 64))
-    model = ExponentialModel()
-    model.sigma = 1
-    model.rho = 10
-    epsilon = 1e-3
-    acv1 = model(g.lags_unique)
-    model.rho = 10 + epsilon
-    acv2 = model(g.lags_unique)
-    g = model.gradient(
-        g.lags_unique,
-        Parameters(
-            [
-                model.rho,
-            ]
-        ),
-    )["rho"]
-    g2 = (acv2 - acv1) / epsilon
-    assert_allclose(g, g2, rtol=1e-3)
-
-
 class SpectralModel(CovarianceModel, ABC):
     @abstractmethod
     def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
@@ -1218,7 +1315,7 @@ class SpectralModel(CovarianceModel, ABC):
         n = grid.n
         delta = grid.delta
         mesh = np.meshgrid(
-            *[fftfreq(5 * n_i + 1, d_i / 4) for n_i, d_i in zip(n, delta)],
+            *[fftfreq(3 * n_i + 1, d_i / 2) for n_i, d_i in zip(n, delta)],
             indexing="ij",
         )
         freqs = np.stack(mesh, axis=-1)  # / (2 * np.pi)
@@ -1231,68 +1328,8 @@ class SpectralModel(CovarianceModel, ABC):
                 out,
                 np.concatenate(
                     (
-                        arange(0, 4 * n_i, 4),
-                        arange(out.shape[i_dim] - 4 * (n_i - 1), out.shape[i_dim], 4),
-                    )
-                ),
-                i_dim,
-            )
-        return out
-
-
-class AliasedSpectralModel(CovarianceModel):
-    @abstractmethod
-    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
-        """
-        Abstract method that must provide the spectral density function evaluated at the passed frequencies
-
-        Parameters
-        ----------
-        frequencies
-            shape (n1, ..., nk, d)
-
-        Returns
-        -------
-        sdf
-            shape (n1, ..., nk). Values of the spectral density function
-        """
-        raise NotImplementedError()
-
-    def __call__(self, lags: np.ndarray):
-        """
-        Compute an approximation to the covariance function evaluated at the passed lags based on the spectral
-        density function.
-
-        Parameters
-        ----------
-        lags
-            shape (d, n1, n2, ..., nk)
-
-        Returns
-        -------
-        cov
-            shape (n1, ..., nk). Approximate values of the covariance function
-        """
-        raise NotImplementedError()
-
-    def call_on_rectangular_grid(self, grid):
-        ndim = len(grid.n)
-        n = grid.n
-        delta = grid.delta
-        mesh = np.meshgrid(
-            *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(n, delta)], indexing="ij"
-        )
-        freqs = np.stack(mesh, axis=-1)
-        sdf = self.spectral_density(freqs)
-        out = np.real(fftn(sdf)) / np.prod(np.array(sdf.shape)) * (2 * np.pi) ** ndim
-        for i_dim in range(ndim):
-            n_i = n[i_dim]
-            out = np.take(
-                out,
-                np.concatenate(
-                    (
-                        arange(0, n_i),
-                        arange(out.shape[i_dim] - (n_i - 1), out.shape[i_dim], 1),
+                        arange(0, 2 * n_i, 2),
+                        arange(out.shape[i_dim] - 2 * (n_i - 1), out.shape[i_dim], 2),
                     )
                 ),
                 i_dim,
@@ -1342,3 +1379,32 @@ class SpectralMatern(SpectralModel):
 
     def _gradient(self, x: np.ndarray):
         raise NotImplementedError()
+
+
+def test_gradient_cov():
+    """
+    This test verifies that the analytical gradient of the covariance is close to a
+    numerical approximation to that gradient.
+    :return:
+    """
+    from numpy.testing import assert_allclose
+    from .grids import RectangularGrid
+
+    g = RectangularGrid((64, 64))
+    model = ExponentialModel()
+    model.sigma = 1
+    model.rho = 10
+    epsilon = 1e-3
+    acv1 = model(g.lags_unique)
+    model.rho = 10 + epsilon
+    acv2 = model(g.lags_unique)
+    g = model.gradient(
+        g.lags_unique,
+        Parameters(
+            [
+                model.rho,
+            ]
+        ),
+    )["rho"]
+    g2 = (acv2 - acv1) / epsilon
+    assert_allclose(g, g2, rtol=1e-3)
