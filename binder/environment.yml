@@ -1,0 +1,12 @@
+name: binder-env
+channels:
+  - pyPI
+dependencies:
+  - python=3.11
+  - debiased_spatial_whittle
+  - kagglehub
+  - ipywidgets
+  - matplotlib
+  - ipympl
+  - jupyter_contrib_nbextensions
+  - jupyter_nbextensions_configurator
