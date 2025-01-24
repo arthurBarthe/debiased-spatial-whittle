@@ -1,6 +1,4 @@
 name: binder-env
-channels:
-  - pyPI
 dependencies:
   - python=3.11
   - debiased_spatial_whittle
