@@ -2,10 +2,6 @@
 ## models.py
 This module provides tools to define covariance models.
 
-::: debiased_spatial_whittle.models.Parameter
-
-::: debiased_spatial_whittle.models.Parameters
-
 ::: debiased_spatial_whittle.models.CovarianceModel
 
 ::: debiased_spatial_whittle.models.ExponentialModel
@@ -16,7 +12,5 @@ This module provides tools to define covariance models.
         - _gradient
 
 ::: debiased_spatial_whittle.models.SquaredExponentialModel
-
-::: debiased_spatial_whittle.models.MaternCovarianceModel
 
 ::: debiased_spatial_whittle.models.BivariateUniformCorrelation
