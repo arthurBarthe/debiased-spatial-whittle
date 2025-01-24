@@ -225,8 +225,32 @@ class ModelInterface(param.Parameterized):
     def _repr_html_(self):
         pass
 
+    def cov_mat_x1_x2(self, x1: np.ndarray, x2: np.ndarray = None) -> np.ndarray:
+        """
+        Compute the covariance matrix between between points in x1 and points in x2.
 
-class Model(ModelInterface):
+        Parameters
+        ----------
+        x1
+            shape (n1, d), first set of locations
+        x2
+            shape (n2, d), second set of locations
+
+        Returns
+        -------
+        covmat
+            shape (n1, n2), covariance matrix
+        """
+        if x2 is None:
+            x2 = x1
+        x1 = np.expand_dims(x1, axis=1)
+        x2 = np.expand_dims(x2, axis=0)
+        lags = x1 - x2
+        lags = np.transpose(lags, (2, 0, 1))
+        return self(lags)
+
+
+class CovarianceModel(ModelInterface):
     """
     Class to define low-level covariance modes (e.g. exponential, squared exponential).
 
@@ -234,6 +258,16 @@ class Model(ModelInterface):
     ----------
 
     """
+
+    def __init_subclass__(cls, **kwargs):
+        call_method = cls.__call__
+
+        def new_call(self, lags: np.ndarray):
+            out = call_method(self, np.expand_dims(lags, -1))
+            out = np.squeeze(out)
+            return out
+
+        cls.__call__ = new_call
 
     @property
     def n_free_parameters_deep(self):
@@ -353,9 +387,9 @@ class SumModel(CompoundModel):
         return out
 
 
-class ExponentialModel(Model):
+class ExponentialModel(CovarianceModel):
     rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
         d = np.sqrt(np.sum(lags**2, 0)) / self.rho
@@ -368,13 +402,34 @@ class ExponentialModel(Model):
         return dict(rho=d_rho, sigma=d_sigma)
 
 
-class SquaredExponentialModel(Model):
+class SquaredExponentialModel(CovarianceModel):
     rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, 1), doc="Amplitude parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
         return self.sigma**2 * np.exp(-d)
+
+    def _gradient(self, lags: np.ndarray):
+        """
+        Provides the derivatives of the covariance model evaluated at the passed lags with respect to
+        the model's parameters.
+
+        Examples
+        --------
+        >>> model = SquaredExponentialModel(rho=2, sigma=1.41)
+        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), [model.param.rho, model.param.sigma])
+        array([[0.        , 2.82      ],
+               [0.21931151, 2.48864127],
+               [0.21931151, 2.48864127],
+               [0.38708346, 2.19621821]])
+        """
+        d2 = sum((lag**2 for lag in lags))
+        d_rho = (
+            self.rho ** (-3) * d2 * self.sigma**2 * np.exp(-1 / 2 * d2 / self.rho**2)
+        )
+        d_sigma = 2 * self.sigma * np.exp(-1 / 2 * d2 / self.rho**2)
+        return dict(rho=d_rho, sigma=d_sigma)
 
 
 class NuggetModel(CompoundModel):
@@ -408,3 +463,113 @@ class NuggetModel(CompoundModel):
             np.all(lags == 0, 0) * self.nugget
             + (1 - self.nugget) * self.children[0](lags)
         ) * self.sigma**2
+
+
+class BivariateUniformCorrelation(CompoundModel):
+    """
+    This class defines the simple case of a bivariate covariance model where a given univariate covariance model is
+    used in parallel to a uniform correlation parameter.
+
+    Attributes
+    ----------
+    base_model: CovarianceModel
+        Base univariate covariance model
+
+    r_0: Parameter
+        Correlation parameter, float between -1 and 1
+
+    f_0: Parameter
+        Amplitude ratio, float, positive
+
+    Examples
+    --------
+    >>> base_model = ExponentialModel()
+    >>> base_model.rho = 12.
+    >>> base_model.sigma = 1.
+    >>> bivariate_model = BivariateUniformCorrelation(base_model)
+    >>> bivariate_model.r_0 = 0.75
+    >>> bivariate_model.f_0 = 2.3
+    """
+
+    r = ModelParameter(default=0.0, bounds=(-1, 1), doc="Correlation")
+    f = ModelParameter(default=1.0, bounds=(0, np.infty), doc="Amplitude ratio")
+
+    def __init__(self, base_model: CovarianceModel):
+        super(BivariateUniformCorrelation, self).__init__(
+            [
+                base_model,
+            ]
+        )
+
+    @property
+    def base_model(self):
+        return self.children[0]
+
+    @base_model.setter
+    def base_model(self, model):
+        raise AttributeError("Base model cannot be set")
+
+    def __call__(self, lags: np.ndarray):
+        """
+        Evaluates the covariance model at the passed lags. Since the model is bivariate,
+        the returned array has two extra dimensions compared to the array lags, both of size
+        two.
+
+        Parameters
+        ----------
+        lags: ndarray
+            lag array with shape (ndim, m1, m2, ..., mk)
+
+        Returns
+        -------
+            Covariance values with shape (m1, m2, ..., mk, 2, 2)
+
+        """
+        acv11 = self.base_model(lags)
+        out = np.zeros(acv11.shape + (2, 2))
+        out = BackendManager.convert(out)
+        out[..., 0, 0] = acv11
+        out[..., 1, 1] = acv11 * self.f**2
+        out[..., 0, 1] = acv11 * self.r * self.f
+        out[..., 1, 0] = acv11 * self.r * self.f
+        return out
+
+    def _gradient(self, x: np.ndarray):
+        """
+
+        Parameters
+        ----------
+        x
+            shape (ndim, m1, ..., mk)
+
+        Returns
+        -------
+        gradient
+            shape (m1, ..., mk, 2, 2, p + 2)
+            where p is the number of parameters of the base model.
+        """
+        acv11 = self.base_model(x)
+        gradient_base_model = self.base_model._gradient(x)
+        # gradient 11
+        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
+        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
+        # gradient 12
+        temp = np.stack((acv11 * self.f, acv11 * self.r), axis=-1)
+        gradient_12 = np.concatenate(
+            (temp, gradient_base_model * self.r * self.f), axis=-1
+        )
+        # gradient 21
+        gradient_21 = gradient_12
+        # gradient 22
+        temp = np.stack((np.zeros_like(acv11), 2 * self.f * acv11), axis=-1)
+        gradient_22 = np.concatenate((temp, gradient_base_model * self.f**2), axis=-1)
+        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
+        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
+        return np.stack((row1, row2), axis=x.ndim - 1)
+
+
+# TODO temporary fix
+TMultivariateModel = None
+SquaredModel = None
+ChiSquaredModel = None
+SeparableModel = None

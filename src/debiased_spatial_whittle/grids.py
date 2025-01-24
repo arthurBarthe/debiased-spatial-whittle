@@ -111,7 +111,7 @@ class ImgGrid(Grid):
 
 
 ###NEW OOP VERSION
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
+from debiased_spatial_whittle.models import CovarianceModel
 from typing import List, Tuple
 
 fftn = np.fft.fftn
@@ -420,7 +420,7 @@ class RectangularGrid:
             return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
-    def autocov_separable(self, model: SeparableModel):
+    def autocov_separable(self, model):
         """
         Compute the autocovariance, making use of separability of the model for increased computational efficiency.
 

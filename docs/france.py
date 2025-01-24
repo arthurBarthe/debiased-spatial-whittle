@@ -17,14 +17,11 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
 # ##Model specification
 
-model = SquaredExponentialModel()
-model.rho = 15
-model.sigma = 2
-model.nugget = 0.0
+model = SquaredExponentialModel(rho=15, sigma=0.9)
 
 # ##Grid specification
 
-shape = (512 * 1, 512 * 1)
+shape = (512, 512)
 mask_france = grids.ImgGrid(shape).get_new()
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france
@@ -45,6 +42,7 @@ debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
 model_est = SquaredExponentialModel()
-model_est.nugget = None
+model_est.sigma = 0.9
+model_est.fix_parameter("sigma")
 estimate = estimator(model_est, z)
-print(estimate)
+print(estimate.rho)

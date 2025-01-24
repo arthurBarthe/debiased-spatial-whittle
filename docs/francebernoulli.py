@@ -8,12 +8,9 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
-shape = (620 * 1, 620 * 1)
+shape = (620, 620)
 
-model = SquaredExponentialModel()
-model.rho = 16
-model.sigma = 1
-model.nugget = 0.0
+model = SquaredExponentialModel(rho=16, sigma=1)
 
 p_obs = 0.9
 mask_bernoulli = np.random.rand(*shape) <= p_obs
@@ -32,9 +29,8 @@ debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle, use_gradients=True)
 
 model_est = SquaredExponentialModel()
-model_est.nugget = None
 estimate = estimator(model_est, z)
-print(estimate)
+print(estimate.rho)
 
 z[mask_france == 0] = np.nan
 plt.imshow(z, origin="lower", cmap="Spectral")

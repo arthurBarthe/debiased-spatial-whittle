@@ -13,10 +13,7 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
 # ##Model Specification
 
-model = SquaredExponentialModel()
-model.rho = 20
-model.sigma = 2
-model.nugget = 0.025
+model = SquaredExponentialModel(rho=10, sigma=0.9)
 
 # ##Grid specification
 
@@ -39,12 +36,12 @@ z = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_circle, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-estimator = Estimator(debiased_whittle, use_gradients=True)
+estimator = Estimator(debiased_whittle, use_gradients=False)
 
-model_est = SquaredExponentialModel()
-model_est.nugget = None
+model_est = SquaredExponentialModel(sigma=0.9)
+model_est.fix_parameter("sigma")
 estimate = estimator(model_est, z)
-print(estimate)
+print("Estimated range parameter:", model_est.rho)
 
 plt.imshow(z, origin="lower", cmap="Spectral")
 plt.show()

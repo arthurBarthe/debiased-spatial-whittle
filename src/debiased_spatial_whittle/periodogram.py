@@ -4,9 +4,8 @@ np = BackendManager.get_backend()
 
 from typing import Tuple
 
-from .spatial_kernel import spatial_kernel
-from .models import Parameters
-from .utils import prod_list
+from debiased_spatial_whittle.spatial_kernel import spatial_kernel
+from debiased_spatial_whittle.utils import prod_list
 
 fft = np.fft.fft
 fftn = np.fft.fftn
@@ -137,7 +136,7 @@ def compute_ep_old(cov_func, grid, fold=True):
 
 ####NEW OOP VERSION
 from typing import Union
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
+from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
@@ -481,7 +480,7 @@ class ExpectedPeriodogram:
             out = np.reshape(out, grid.n)
         return out
 
-    def gradient(self, model: CovarianceModel, params: Parameters) -> ndarray:
+    def gradient(self, model: CovarianceModel, params: list[ModelParameter]) -> ndarray:
         """
         Provides the gradient of the expected periodogram with respect to the parameters of the model
         at all frequencies of the Fourier grid. The last dimension of the returned array indexes the parameters.
@@ -506,11 +505,8 @@ class ExpectedPeriodogram:
         """
         lags = self.grid.lags_unique
         d_acv = model.gradient(lags, params)
-        d_ep = []
-        for p_name in params.names:
-            aux = ifftshift(d_acv[p_name], axes=list(range(lags.shape[0])))
-            d_ep.append(self.compute_ep(aux, self.periodogram.fold))
-        return np.stack(d_ep, axis=-1)
+        aux = ifftshift(d_acv, axes=list(range(lags.shape[0])))
+        return self.compute_ep(aux, self.periodogram.fold)
 
     def cov_dft_matrix(self, model: CovarianceModel):
         r"""
@@ -665,7 +661,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
         super().__init__(grid, periodogram)
 
-    def __call__(self, model: SeparableModel):
+    def __call__(self, model):
         model1, model2 = model.models
         n1, n2 = self.grid.n
         tau1, tau2 = np.arange(n1), np.arange(n2)
@@ -683,7 +679,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         ep2 = 2 * np.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]
         return ep1 * ep2
 
-    def gradient(self, model: SeparableModel):
+    def gradient(self, model):
         """Provides the derivatives of the expected periodogram with respect to the parameters of the model
         at all frequencies of the Fourier grid. The last dimension is used for different parameters."""
         model1, model2 = model.models

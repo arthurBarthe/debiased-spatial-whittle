@@ -24,7 +24,6 @@ from debiased_spatial_whittle.simulation import (
 from debiased_spatial_whittle.models import (
     ExponentialModel,
     SquaredExponentialModel,
-    Parameters,
     BivariateUniformCorrelation,
 )
 from debiased_spatial_whittle.cov_funcs import exp_cov
@@ -38,19 +37,17 @@ def test_oop():
     """
     rho = 10
     rho_lkh = 15
-    g = RectangularGrid((512, 512))
+    g = RectangularGrid((256, 256))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
-    model = ExponentialModel()
-    model.sigma = 1
-    model.rho = rho
+    model = ExponentialModel(rho=rho, sigma=1)
     sampler = SamplerOnRectangularGrid(model, g)
     z = sampler()
     model.rho = rho_lkh
     lkh_oop = d(z, model)
     # old version
-    g = np.ones((512, 512))
+    g = np.ones((256, 256))
     cov_func = lambda x: exp_cov(x, rho_lkh)
     e_per = compute_ep_old(cov_func, g)
     lkh_old = whittle(periodogram(z, g), e_per)
@@ -92,15 +89,13 @@ def test_whittle_grad():
     model.sigma = 1
     model.rho = 4
     sampler = SamplerOnRectangularGrid(model, g)
-    p = Parameters(
-        [
-            model.rho,
-        ]
-    )
+    p = [
+        model.param.rho,
+    ]
     z = sampler()
     lkh, grad = d(z, model, params_for_gradient=p)
     epsilon = 1e-6
-    model.rho = model.rho.value + epsilon
+    model.rho = model.rho + epsilon
     lkh2 = d(z, model)
     grad_num = (lkh2 - lkh) / epsilon
     assert_allclose(grad, grad_num, rtol=0.001)
@@ -149,11 +144,9 @@ def test_hessian_diagonal():
     model.rho = rho
     h = d.fisher(
         model,
-        Parameters(
-            [
-                model.rho,
-            ]
-        ),
+        [
+            model.param.rho,
+        ],
     )
     print(h)
     # assert h.shape == (2, 2)
@@ -184,24 +177,14 @@ def test_jmat():
     """
     Compares the predicted covariance matrix of the score with the sample variance of the score
     obtained from Monte Carlo simulations
-
-    Not passing rn. Different possibilities:
-    1. The covariances of the periodogram are not right. However, a basic check of that (summation) passes.
-    We could check pointwise.
-    2. The normalization is not right. Does not appear to be the case at first sight...
-    3. The derivatives of the expected periodogram are not right
-    4. The indexing in the summation is not right.
-    5. The gradient of the likelihood is not right.
     """
     g = RectangularGrid((16, 16))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
-    model = ExponentialModel()
-    model.sigma = 1
-    model.rho = 2
+    model = ExponentialModel(rho=2, sigma=1)
     sampler = SamplerOnRectangularGrid(model, g)
-    params = model.params
+    params = [model.param.rho, model.param.sigma]
     print(params)
     jmat = d.jmatrix(model, params)
     n_samples = 1000
@@ -244,10 +227,8 @@ def test_jmatrix_sample():
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
-    model = ExponentialModel()
-    model.sigma = 1
-    model.rho = 2
-    jmat = d.jmatrix_sample(model, model.params)
+    model = ExponentialModel(rho=2, sigma=1)
+    jmat = d.jmatrix_sample(model, [model.param.rho, model.param.sigma])
     print(jmat)
 
 
