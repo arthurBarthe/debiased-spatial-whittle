@@ -1,5 +1,10 @@
-name: binder-env
+name: mybinder-env  # Name of your environment
+channels:
+  - conda-forge     # Use conda-forge as the primary channel
 dependencies:
-  - python=3.11
-  - debiased_spatial_whittle
-  - matplotlib
+  - python=3.10     # Specify Python version
+  - numpy           # Conda package
+  - matplotlib      # Conda package
+  - pip             # Ensure pip is available in the environment
+  - pip:
+      - debiased_spatial_whittle==0.3.5
