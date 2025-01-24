@@ -10,6 +10,7 @@ from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
 
+ones = BackendManager.get_ones()
 
 fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
@@ -18,7 +19,7 @@ PATH_TO_FRANCE_IMG = str(Path(__file__).parents[2] / "france.jpg")
 
 
 class Grid(ABC):
-    def __init__(self, shape: Tuple[int]):
+    def __init__(self, shape: Tuple[int,]):
         self.shape = shape
 
     @abstractmethod
@@ -110,8 +111,8 @@ class ImgGrid(Grid):
 
 
 ###NEW OOP VERSION
-from debiased_spatial_whittle.models import CovarianceModel, SeparableModel
-from typing import Tuple
+from debiased_spatial_whittle.models import CovarianceModel
+from typing import List, Tuple
 
 fftn = np.fft.fftn
 ifftn = np.fft.ifftn
@@ -257,15 +258,16 @@ class RectangularGrid:
     @mask.setter
     def mask(self, value: np.ndarray):
         if value is None:
-            value = np.ones(self.n)
+            value = ones(self.n)
             if self.nvars > 1:
-                value = np.ones(self.n + (self.nvars,))
+                value = ones(self.n + (self.nvars,))
         if self.nvars == 1:
             assert (
                 value.shape == self.n
             ), "The shape of the mask should be the same as the shape of the grid"
         else:
             assert value.shape == self.n + (self.nvars,), "Invalid shape of grid mask."
+        # TODO for torch we should ensure the mask is on the right device.
         self._mask = value
 
     @property
@@ -299,7 +301,9 @@ class RectangularGrid:
             .
         $
         """
-        mesh = np.meshgrid(*[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)])
+        mesh = np.meshgrid(
+            *[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)], indexing="ij"
+        )
         return np.stack(mesh, axis=-1)
 
     @property
@@ -315,7 +319,8 @@ class RectangularGrid:
         $
         """
         mesh = np.meshgrid(
-            *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)]
+            *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)],
+            indexing="ij",
         )
         out = np.stack(mesh, axis=-1)
         return BackendManager.convert(out)
@@ -416,7 +421,7 @@ class RectangularGrid:
             return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
-    def autocov_separable(self, model: SeparableModel):
+    def autocov_separable(self, model):
         """
         Compute the autocovariance, making use of separability of the model for increased computational efficiency.
 

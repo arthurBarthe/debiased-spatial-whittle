@@ -131,7 +131,7 @@ def fit(
 #########NEW OOP version
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
-from debiased_spatial_whittle.models import CovarianceModel, Parameters
+from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
 from typing import Callable, Union, Optional
 
 from debiased_spatial_whittle.multivariate_periodogram import (
@@ -178,23 +178,29 @@ class MultivariateDebiasedWhittle:
         self,
         z: np.ndarray,
         model: CovarianceModel,
-        params_for_gradient: Parameters = None,
+        params_for_gradient: list[ModelParameter] = None,
     ):
         # TODO add a class sample which contains the data and the grid?
         """Computes the likelihood for this data"""
         p = self.periodogram([z[..., 0], z[..., 1]])
         ep = self.expected_periodogram(model)
+        n_spatial_dim = p.ndim - 2
+        if p.ndim == ep.ndim - 1:
+            # multiple model parameter vectors
+            p = np.expand_dims(p, -3)
         ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
         ratio = np.matmul(ep_inv, p)
-        if BackendManager.backend_name == "numpy":
+        if BackendManager.backend_name in ("numpy", "cupy"):
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == "torch":
             term2 = np.sum(np.diagonal(ratio, dim1=-1, dim2=-2), -1)
-        whittle = np.mean(term1 + term2)
+        whittle = np.mean(term1 + term2, tuple(range(n_spatial_dim)))
         whittle = np.real(whittle)
+        if BackendManager.backend_name == "torch":
+            whittle = whittle.item()
         if not params_for_gradient:
-            return np.item(whittle)
+            return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
         ep_inv = np.expand_dims(ep_inv, 2)
@@ -208,7 +214,7 @@ class MultivariateDebiasedWhittle:
         d_whittle = np.mean(d_log_det + d_quad_term, axis=(0, 1))
         return whittle, d_whittle
 
-    def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
+    def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
         """Provides the expectation of the hessian matrix"""
         ep = self.expected_periodogram(model)
         ep_inv = inv(ep)
@@ -230,7 +236,7 @@ class MultivariateDebiasedWhittle:
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        params_for_gradient: Parameters,
+        params_for_gradient: list[ModelParameter],
         n_sims: int = 400,
         block_size: int = 100,
     ) -> np.ndarray:
@@ -360,6 +366,16 @@ class DebiasedWhittle:
         In standard use cases, this method should not be called directly. Instead, one should use the __call__
         method.
         """
+        if periodogram.ndim == expected_periodogram.ndim - 1:
+            # this handles the case of several expected periodograms indexed by the last dimension
+            ndim = expected_periodogram.ndim
+            periodogram = np.expand_dims(periodogram, -1)
+            frequency_mask = np.expand_dims(self.frequency_mask, -1)
+            return np.mean(
+                (np.log(expected_periodogram) + periodogram / expected_periodogram)
+                * frequency_mask,
+                tuple(range(ndim - 1)),
+            )
         return np.mean(
             (np.log(expected_periodogram) + periodogram / expected_periodogram)
             * self.frequency_mask
@@ -369,7 +385,7 @@ class DebiasedWhittle:
         self,
         sample: np.ndarray,
         model: CovarianceModel,
-        params_for_gradient: Parameters = None,
+        params_for_gradient: list[ModelParameter] = None,
     ) -> np.float64:
         """
         Computes the Debiased Whittle likelihood for these data
@@ -427,7 +443,7 @@ class DebiasedWhittle:
         ep_eval = self.expected_periodogram(eval_model)
         return np.sum(np.log(ep_eval) + ep_true / ep_eval)
 
-    def fisher(self, model: CovarianceModel, params_for_gradient: Parameters):
+    def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
         """
         Provides the Fisher Information Matrix.
 
@@ -448,23 +464,21 @@ class DebiasedWhittle:
         --------
         >>> from debiased_spatial_whittle.grids import RectangularGrid
         >>> from debiased_spatial_whittle.models import ExponentialModel
-        >>> model = ExponentialModel()
-        >>> model.rho = 30
-        >>> model.sigma = 1.41
+        >>> model = ExponentialModel(rho=30, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> dbw.fisher(model, model.params)
-        array([[ 1.03736229e-03, -4.49238561e-02, -6.01436043e-01],
-               [-4.49238561e-02,  2.01197123e+00,  2.58931333e+01],
-               [-6.01436043e-01,  2.58931333e+01,  4.49900628e+02]])
+        >>> dbw.fisher(model, [model.param.rho, model.param.sigma])
+        array([[ 1.03736229e-03, -4.49238561e-02],
+               [-4.49238561e-02,  2.01197123e+00]])
         """
+        n_params = len(params_for_gradient)
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = zeros((len(params_for_gradient), len(params_for_gradient)))
-        for i1, p1_name in enumerate(params_for_gradient.names):
-            for i2, p2_name in enumerate(params_for_gradient.names):
+        h = zeros((n_params, n_params))
+        for i1 in range(n_params):
+            for i2 in range(n_params):
                 d_ep1 = d_ep[..., i1]
                 d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.sum(d_ep1 * d_ep2 / ep**2)
@@ -473,7 +487,7 @@ class DebiasedWhittle:
     def jmatrix(
         self,
         model: CovarianceModel,
-        params_for_gradient: Parameters,
+        params_for_gradient: list[ModelParameter],
         mcmc_mode: bool = False,
     ):
         """
@@ -524,7 +538,7 @@ class DebiasedWhittle:
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        params_for_gradient: Parameters,
+        params_for_gradient: list[ModelParameter],
         n_sims: int = 1000,
         block_size: int = 100,
     ) -> np.ndarray:
@@ -558,17 +572,14 @@ class DebiasedWhittle:
         >>> nrrandom.seed(1712)
         >>> from debiased_spatial_whittle.grids import RectangularGrid
         >>> from debiased_spatial_whittle.models import ExponentialModel
-        >>> model = ExponentialModel()
-        >>> model.rho = 12
-        >>> model.sigma = 1.41
+        >>> model = ExponentialModel(rho=12, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> dbw.jmatrix_sample(model, model.params, n_sims=20)
-        array([[ 1.79844275e-06, -3.36165062e-05, -1.46535796e-04],
-               [-3.36165062e-05,  8.20809861e-04,  2.89073624e-03],
-               [-1.46535796e-04,  2.89073624e-03,  1.53001387e-02]])
+        >>> dbw.jmatrix_sample(model, [model.param.rho, model.param.sigma], n_sims=20)
+        array([[ 1.79844275e-06, -3.36165062e-05],
+               [-3.36165062e-05,  8.20809861e-04]])
         """
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
@@ -582,7 +593,10 @@ class DebiasedWhittle:
         return np.real(np.cov(gradients.T))
 
     def variance_of_estimates(
-        self, model: CovarianceModel, params: Parameters, jmat: np.ndarray = None
+        self,
+        model: CovarianceModel,
+        params: list[ModelParameter],
+        jmat: np.ndarray = None,
     ):
         """
         Compute the covariance matrix of the estimated parameters specified by params under the specified
@@ -609,18 +623,15 @@ class DebiasedWhittle:
         >>> nrrandom.seed(1712)
         >>> from debiased_spatial_whittle.grids import RectangularGrid
         >>> from debiased_spatial_whittle.models import ExponentialModel
-        >>> model = ExponentialModel()
-        >>> model.rho = 12
-        >>> model.sigma = 1.41
+        >>> model = ExponentialModel(rho=12., sigma=4.)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> jmat = dbw.jmatrix_sample(model, model.params, n_sims=20)
-        >>> dbw.variance_of_estimates(model, model.params, jmat)
-        array([[9.09922893e+00, 4.94112586e-01, 4.83568479e-03],
-               [4.94112586e-01, 2.75659859e-02, 1.70142181e-04],
-               [4.83568479e-03, 1.70142181e-04, 1.67758253e-05]])
+        >>> jmat = dbw.jmatrix_sample(model, [model.param.rho, model.param.sigma], n_sims=20)
+        >>> dbw.variance_of_estimates(model, [model.param.rho, model.param.sigma], jmat)
+        array([[8.27761908, 1.34780351],
+               [1.34780351, 0.22064392]])
         """
         hmat = self.fisher(model, params)
         if jmat is None:
@@ -719,12 +730,12 @@ class Estimator:
         -----
         This directly updates the parameters of the passed covariance model.
         """
-        free_params = model.free_params
+        free_params = model.free_parameters
 
         # function to be optimized.
         # In the case where the use_gradients property is True, it returns a 2-tuple,
         # the function value and its gradient.
-        func = self._get_opt_func(model, free_params, sample, self.use_gradients)
+        func = self._get_opt_func(model, sample, self.use_gradients)
         if self.use_gradients:
             # TODO: inefficient, we call func twice
             opt_func = lambda x: func(x)[0]
@@ -732,11 +743,9 @@ class Estimator:
         else:
             opt_func = func
 
-        bounds = model.free_param_bounds
-        if x0 is None:
-            init_guess = numpy.array(free_params.init_guesses)
-        else:
-            init_guess = x0.copy()
+        bounds = model.free_parameter_bounds_to_list_deep()
+        # np.to_cpu ensures conversion to numpy array, necessary for the optimizer
+        x0 = np.to_cpu(model.free_parameter_values_to_array_deep())
 
         if self.method in (
             "shgo",
@@ -753,7 +762,7 @@ class Estimator:
             if self.use_gradients:
                 opt_result = minimize(
                     opt_func,
-                    init_guess,
+                    x0,
                     jac=jac,
                     method=self.method,
                     bounds=bounds,
@@ -763,36 +772,33 @@ class Estimator:
             else:
                 opt_result = minimize(
                     opt_func,
-                    init_guess,
+                    x0,
                     method=self.method,
                     bounds=bounds,
                     callback=opt_callback,
                     options=self.optim_options,
                 )
-        model.params.update_values(
-            dict(zip([p.name for p in free_params], opt_result.x))
-        )
+        model.update_free_parameters(opt_result.x)
         self.opt_result = opt_result
         return model
 
-    def _get_opt_func(self, model, free_params, z, use_gradients):
+    def _get_opt_func(self, model: CovarianceModel, z, use_gradients):
         if not use_gradients:
 
             def func(param_values):
-                updates = dict(zip(free_params.names, param_values))
-                free_params.update_values(updates)
+                model.update_free_parameters(param_values)
                 return self.likelihood(z, model).item()
         else:
-
+            # TODO not updated for new models
             def func(param_values):
-                updates = dict(zip(free_params.names, param_values))
-                free_params.update_values(updates)
+                model.update_free_parameters(param_values)
+                free_params = model.get_free_parameters_deep()
                 lkh, grad = self.likelihood(z, model, params_for_gradient=free_params)
                 return lkh.item(), grad
 
         return func
 
-    def covmat(self, model: CovarianceModel, params: Parameters = None):
+    def covmat(self, model: CovarianceModel, params: list[ModelParameter] = None):
         """
         Compute an approximate covariance matrix of the parameter estimates under the specified covariance model.
 

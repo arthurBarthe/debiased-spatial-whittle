@@ -1,109 +1,105 @@
 ---
-title: 'Gala: A Python package for galactic dynamics'
+title: 'DSWL package: a Python implementation of the Debiased Spatial Whittle Likelihood'
 tags:
   - Python
-  - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
+  - spatial
+  - spatio-temporal
+  - likelihood
+  - covariance modelling
+  - gaussian processes
 authors:
-  - name: Adrian M. Price-Whelan
+  - name: Arthur P. Guillaumin
     orcid: 0000-0000-0000-0000
-    equal-contrib: true
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
-  - name: Author Without ORCID
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
+    affiliation: 1
+  - name: Adam M. Sykulski
+    orcid: 0000-0000-0000-0000
     affiliation: 2
-  - name: Author with no affiliation
-    corresponding: true # (This is how to denote the corresponding author)
+  - name: Sofia C. Olhede
+    orcid: 0000-0000-0000-0000
     affiliation: 3
-  - given-names: Ludwig
-    dropping-particle: van
-    surname: Beethoven
-    affiliation: 3
+  - name: Frederik J. Simons
+    orcid: 0000-0000-0000-0000
+    affiliation: 4
 affiliations:
- - name: Lyman Spitzer, Jr. Fellow, Princeton University, USA
+ - name: Queen Mary University of London, United Kingdom
    index: 1
-   ror: 00hx57361
- - name: Institution Name, Country
+ - name: Imperial College London, United Kingdom
    index: 2
- - name: Independent Researcher, Country
+ - name: Ecole Polytechnique Fédérale de Lausanne, Switzerland
    index: 3
-date: 13 August 2017
+ - name: Princeton University, United States of America
+date: 20 January 2025
 bibliography: paper.bib
 ---
 
 # Summary
-Spatio-temporal stochastic processes are of interest to practitioners in
-a wide variety of fields such as geosciences, meteorology or climate
-science. Stationary covariance modelling allows for a first-order description
-of such processes, and allows many practical applications such as
-interpolation and forecasting via conditional Gaussian multivariate
-distributions.
+The Debiased Spatial Whittle Likelihood (DSWL) package is an open-source Python
+package that implements the eponym paper [@guillaumin_debiased_2022].
+The methodology allows users to efficiently infer the parameters of stationary
+spatial and
+spatio-temporal covariance models for univariate or multivariate processes from gridded data.
+It leverages the Fast Fourier Transform, and therefore can benefit from further computational
+gains from GPU implementations offered by PyTorch or Cupy, both made available within
+the package as alternative backends to Numpy.
+
+# Statement of need
+Describing patterns of spatial and spatio-temporal covariance is of interest to practitioners in
+a wide range of applied sciences such as geosciences, meteorology or climate
+science. Stationary covariance modelling allows for a first-order approximation
+of the covariance structure, and leads to many practical applications such as
+krigging and forecasting via the conditional Gaussian multivariate
+distribution.
 
 A major hurdle in spatio-temporal modelling is the computation of the
-likelihood function. This is particularly relevant for modern spatio-temporal
-datasets, from physics simulations to real-word data, and for complex
-spatio-temporal covariance models which require a high number of likelihood
-evaluation during the optimization process.
+Gaussian likelihood function. This is particularly relevant for modern spatio-temporal
+datasets, from physics simulations to real-word data.
+This computational burden also arises from complex
+spatio-temporal covariance models with a large number of parameters
+which typically require a high number of likelihood evaluations during the optimization process or
+when running an MCMC sampler.
 
-`SDW` is a Python implementation of the Spatial Debiased Whittle likelihood
-[REF]. It allows to leverage the computational efficiency of the Fast
-Fourier Transform to approximate the log likelihood. While the use
-of the Fast Fourier Transform requires gridded data, the implemented
+A common means to circumvent this computational burden is to use approximations to the Gaussian likelihood.
+Among these,
+the Whittle likelihood is a standard spectral domain method for gridded data.
+However, for spatial and spatio-temporal data where $d\geq 2$, it suffers from a large bias
+and typically does not allow for missing observations.
+
+`DSWL` is a Python implementation of the Debiased Spatial Whittle likelihood
+[@guillaumin_debiased_2022], a method that addresses the bias of the Whittle likelihood
+[@sykulski_debiased_2019].
+While its use of the Fast Fourier Transform requires gridded data, the implemented
 method allows for missing observations, making it amenable to practical
 applications where a full hypercube of data measurements might not
-be available. We also implement important corrections proposed in [REF]
-that tackle the standard bias issue in spectral-density based estimation
-methods. Finally, the code is written to allow to switch backends between
-Numpy, Cupy and PyTorch. This allows to further benefits from computational
-gains via GPU implementations of the FFT.
+be available. Finally, the code is written to allow to switch between several backends,
+Numpy, Cupy and PyTorch. This allows to further benefit from computational
+gains via GPU implementations of the Fast Fourier Transform.
 
-# Software description
+# Software structure
 
 The software is organized around several modules that can be grouped into the following
 categories:
 
 - grids:
-  - grids.py: allows to define the hypercubic grids where the data sit.
+  - grids.py: allows to define the rectangular grids where the data sit.
   - simulation.py: allows to sample a realization from a model on a grid
 - models:
   - models.py: allows to define a covariance model.
-    Standard covariance models are pre-defined.
+    Standard covariance models are pre-defined, such as the exponential
+    covariance model, the squared exponential covariance model and
+    the Matern covariance model.
 - estimation:
   - periodogram.py: allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model, grid, and periodogram combination.
   - likelihood.py: allows to define the Debiased Whittle Likelihood and the corresponding
     estimator.
 
-
-
-# Citations
-
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
-
-If you want to cite a software repository URL (e.g. something on GitHub without a preferred
-citation) then you can do it with the example BibTeX entry below for @fidgit.
-
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
-
-# Figures
-
-Figures can be included like this:
-![Caption for example figure.\label{fig:example}](figure.png)
-and referenced from text using \autoref{fig:example}.
-
-Figure sizes can be customized by adding an optional second parameter:
-![Caption for example figure.](figure.png){ width=20% }
+A [documentation](https://debiased-spatial-whittle.readthedocs.io/en/latest/index.html)
+including example notebooks is available, and issues can be raised on
+[Github](https://github.com/arthurBarthe/debiased-spatial-whittle).
 
 # Acknowledgements
+This research utilised Queen Mary's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
+In particular, this research made use of the OnDemand portal [@Hudak2018].
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
 
 # References

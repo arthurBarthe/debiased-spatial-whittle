@@ -7,9 +7,20 @@ from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.models import (
     ExponentialModel,
     SquaredExponentialModel,
-    Parameters,
 )
 from debiased_spatial_whittle.models import BivariateUniformCorrelation
+
+
+def test_model():
+    model = SquaredExponentialModel(rho=12, sigma=1)
+    assert model(np.arange(10.0).reshape(1, -1)).shape == (10,)
+
+
+def test_model_array():
+    rhos = np.array([12.0, 15.0])
+    sigmas = np.array([1.0, 1.0])
+    model = SquaredExponentialModel(rho=rhos, sigma=sigmas)
+    assert model(np.arange(10.0).reshape(1, -1)).shape == (10, 2)
 
 
 def test_gradient_cov():
@@ -23,16 +34,14 @@ def test_gradient_cov():
     model.rho = 10
     epsilon = 1e-3
     acv1 = model(g.lags_unique)
-    model.rho = model.rho.value + epsilon
+    model.rho = model.rho + epsilon
     acv2 = model(g.lags_unique)
     g = model.gradient(
         g.lags_unique,
-        Parameters(
-            [
-                model.rho,
-            ]
-        ),
-    )["rho"]
+        [
+            model.param.rho,
+        ],
+    )[..., 0]
     g2 = (acv2 - acv1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
 
@@ -47,16 +56,15 @@ def test_gradient_sqExpCov():
     model = SquaredExponentialModel()
     model.sigma = 1
     model.rho = 25
-    model.nugget = 0.01
     epsilon = 1e-7
     acv1 = model(g.lags_unique)
-    model.rho = model.rho.value + epsilon
+    model.rho = model.rho + epsilon
     acv2 = model(g.lags_unique)
-    model.rho = model.rho.value - epsilon
-    model.sigma = model.sigma.value + epsilon
+    model.rho = model.rho - epsilon
+    model.sigma = model.sigma + epsilon
     acv3 = model(g.lags_unique)
-    gradient = model.gradient(g.lags_unique, Parameters([model.rho, model.sigma]))
-    g_rho, g_sigma = gradient["rho"], gradient["sigma"]
+    gradient = model.gradient(g.lags_unique, [model.param.rho, model.param.sigma])
+    g_rho, g_sigma = gradient[..., 0], gradient[..., 1]
     g2 = (acv2 - acv1) / epsilon
     g3 = (acv3 - acv1) / epsilon
     assert_allclose(g_rho, g2, rtol=1e-5)
@@ -76,10 +84,10 @@ def test_gradient_bivariate():
     model.sigma = 2
     model.nugget = 0.2
     bvm = BivariateUniformCorrelation(model)
-    bvm.r_0 = 0.2
-    bvm.f_0 = 1.5
+    bvm.r = 0.2
+    bvm.f = 1.5
     lags = g.lags_unique
-    gradient = bvm.gradient(lags, bvm.params)
+    gradient = bvm.gradient(lags, [bvm.param.r, bvm.param.f])
     epsilon = 1e-5
     cov = bvm(lags)
     for i, p in enumerate(bvm.params):
@@ -116,35 +124,8 @@ def test_gradient_cov_separable():
 """
 
 
-def test_gradient_cov_merged_params():
-    """
-    This test verifies that the analytical gradient of the covariance is close to a
-    numerical approximation to that gradient, in the case where two parameters are merged into one.
-    """
-    grid = RectangularGrid((64, 64))
-    model = ExponentialModel()
-    model.merge_parameters(("rho", "sigma"))
-    model.sigma = 5
-    g = model.gradient(
-        grid.lags_unique,
-        Parameters(
-            [
-                model.rho,
-            ]
-        ),
-    )["rho and sigma"]
-    epsilon = 1e-3
-    acv1 = model(grid.lags_unique)
-    model.sigma = 5 + epsilon
-    acv2 = model(grid.lags_unique)
-    g2 = (acv2 - acv1) / epsilon
-    assert_allclose(g, g2, rtol=1e-2)
-
-
 def test_cov_mat_x1_x2():
-    model = SquaredExponentialModel()
-    model.rho = 10
-    model.sigma = 1
+    model = SquaredExponentialModel(rho=10, sigma=1)
     x1 = np.random.rand(25, 3) * 100
     x2 = np.random.rand(10, 3) * 100
     mat = model.cov_mat_x1_x2(x1, x2)

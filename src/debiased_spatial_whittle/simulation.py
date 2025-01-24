@@ -42,11 +42,11 @@ from typing import Tuple
 from scipy.stats import multivariate_normal
 from debiased_spatial_whittle.models import (
     CovarianceModel,
-    SeparableModel,
     TMultivariateModel,
     SquaredModel,
     ChiSquaredModel,
     BivariateUniformCorrelation,
+    SeparableModel,
 )
 from debiased_spatial_whittle.grids import RectangularGrid
 
@@ -135,7 +135,6 @@ class SamplerOnRectangularGrid:
             self._f = np.maximum(f, np.zeros_like(f))
         return self._f
 
-    # TODO make this work for 1-d and 3-d
     def __call__(self):
         """
         Samples a realization of a Gaussian Process specified by
@@ -275,9 +274,7 @@ class SamplerBUCOnRectangularGrid:
         assert isinstance(model, BivariateUniformCorrelation)
         self.model = model
         self.grid = grid
-        self.e_dist = multivariate_normal(
-            [0, 0], [[1, model.r_0.value], [model.r_0.value, 1]]
-        )
+        self.e_dist = multivariate_normal([0, 0], [[1, model.r], [model.r, 1]])
         self._f = None
 
     @property
@@ -315,7 +312,7 @@ class SamplerBUCOnRectangularGrid:
         f = self.f
         e = self.e_dist.rvs(size=f.shape + (2,))
         e = BackendManager.convert(e)
-        e[..., -1] *= self.model.f_0.value
+        e[..., -1] *= self.model.f
         e = e[..., 0, :] + 1j * e[..., 1, :]
         f = np.expand_dims(self.f, -1)
         z = np.sqrt(f) * e

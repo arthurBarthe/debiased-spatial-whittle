@@ -10,12 +10,10 @@ from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 
 class TestEpFullGrid:
     grid = RectangularGrid((64, 64), nvars=2)
-    base_model = SquaredExponentialModel()
-    base_model.rho = 4
-    base_model.sigma = 1
+    base_model = SquaredExponentialModel(rho=4, sigma=1)
     bvm = BivariateUniformCorrelation(base_model)
-    bvm.r_0 = 0.3
-    bvm.f_0 = 2.5
+    bvm.r = 0.3
+    bvm.f = 2.5
 
     def test_compare_to_average_periodiogram(self):
         sampler = SamplerBUCOnRectangularGrid(self.bvm, self.grid)

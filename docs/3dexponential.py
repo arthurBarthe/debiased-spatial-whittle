@@ -5,8 +5,16 @@
 from IPython.display import HTML
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
-from debiased_spatial_whittle.models import SquaredExponentialModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    SeparableModel,
+)
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.simulation import (
+    SamplerOnRectangularGrid,
+    SamplerSeparable,
+)
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.utils import video_plot_3d
 

@@ -95,8 +95,10 @@ class BackendManager:
     def convert(cls, a):
         if BackendManager.backend_name == "torch":
             return torch.tensor(a).to(device=BackendManager.device)
-        else:
+        elif BackendManager.backend_name == "numpy":
             return a
+        elif BackendManager.backend_name == "cupy":
+            return cupy.asarray(a)
 
     @classmethod
     def get_zeros(cls):
@@ -106,6 +108,17 @@ class BackendManager:
             return cupy.zeros
         elif cls.backend_name == "torch":
             return lambda *args, **kargs: torch.zeros(
+                *args, **kargs, device=BackendManager.device
+            )
+
+    @classmethod
+    def get_ones(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return numpy.ones
+        if cls.backend_name == "cupy":
+            return cupy.ones
+        elif cls.backend_name == "torch":
+            return lambda *args, **kargs: torch.ones(
                 *args, **kargs, device=BackendManager.device
             )
 
@@ -203,3 +216,12 @@ class BackendManager:
             return a.to(device=cls.device)
         else:
             return a
+
+    @classmethod
+    def to_cpu(cls, a):
+        if cls.backend_name == "numpy":
+            return a
+        if cls.backend_name == "cupy":
+            return a.get()
+        if cls.backend_name == "numpy":
+            return a.cpu()
