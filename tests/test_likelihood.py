@@ -108,25 +108,25 @@ def test_whittle_grad_multi():
     g = RectangularGrid((32, 32), nvars=2)
     p = PeriodogramMulti()
     ep_op = ExpectedPeriodogram(g, p)
-    model = SquaredExponentialModel()
-    model.rho = 3
-    model.sigma = 1
-    model.nugget = 0.2
+    model = SquaredExponentialModel(rho=3, sigma=1)
     bvm = BivariateUniformCorrelation(model)
-    bvm.r_0 = 0.3
-    bvm.f_0 = 1.5
+    bvm.r = 0.3
+    bvm.f = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
     z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     epsilon = 1e-8
-    lkh, grad = dbw(z, bvm, bvm.params)
-    for i, p in enumerate(bvm.params):
-        print(p)
-        p.value = p.value + epsilon
+    params_for_grad = [bvm.param.r, bvm.param.f]
+    lkh, grad = dbw(z, bvm, params_for_grad)
+    for i, p in enumerate(params_for_grad):
+        print(p.name)
+        old_value = getattr(bvm, p.name)
+        new_value = old_value + epsilon
+        setattr(bvm, p.name, new_value)
         lkh2 = dbw(z, bvm)
         grad_num = (lkh2 - lkh) / epsilon
         assert_allclose(grad[i], grad_num, rtol=0.001)
-        p.value = p.value - epsilon
+        setattr(bvm, p.name, old_value)
 
 
 def test_hessian_diagonal():
@@ -165,11 +165,11 @@ def test_fisher_multivariate():
     model.sigma = 1
     model.nugget = 0.2
     bvm = BivariateUniformCorrelation(model)
-    bvm.r_0 = 0.3
-    bvm.f_0 = 1.5
+    bvm.r = 0.3
+    bvm.f = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    h = dbw.fisher(bvm, bvm.params)
+    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.f])
     assert np.all(np.diag(h) > 0)
 
 
@@ -217,7 +217,7 @@ def test_covmat():
     model = ExponentialModel()
     model.sigma = 1
     model.rho = 2
-    covmat = e.covmat(model, model.params)
+    covmat = e.covmat(model, [model.param.rho, model.param.sigma])
     print(covmat)
     assert np.all(np.diag(covmat) >= 0)
 
@@ -241,9 +241,9 @@ def test_jmatrix_sample_multivariate():
     model.sigma = 1
     model.nugget = 0.2
     bvm = BivariateUniformCorrelation(model)
-    bvm.r_0 = 0.3
-    bvm.f_0 = 1.5
+    bvm.r = 0.3
+    bvm.f = 1.5
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    jmat = dbw.jmatrix_sample(bvm, bvm.params)
+    jmat = dbw.jmatrix_sample(bvm, [bvm.param.r, bvm.param.f])
     assert jmat.shape == (5, 5)
     assert np.all(np.diag(jmat) > 0)

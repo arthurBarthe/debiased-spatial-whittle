@@ -216,3 +216,12 @@ class BackendManager:
             return a.to(device=cls.device)
         else:
             return a
+
+    @classmethod
+    def to_cpu(cls, a):
+        if cls.backend_name == "numpy":
+            return a
+        if cls.backend_name == "cupy":
+            return a.get()
+        if cls.backend_name == "numpy":
+            return a.cpu()

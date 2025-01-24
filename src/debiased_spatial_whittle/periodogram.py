@@ -140,6 +140,8 @@ from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 
+ones = BackendManager.get_ones()
+
 
 class Periodogram:
     """
@@ -156,7 +158,7 @@ class Periodogram:
 
     def __init__(self, taper=None):
         if taper is None:
-            self.taper = lambda shape: np.ones(shape)
+            self.taper = lambda shape: ones(shape)
         self.fold = True
         self._version = 0
 

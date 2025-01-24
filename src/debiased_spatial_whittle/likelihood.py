@@ -791,8 +791,8 @@ class Estimator:
         else:
             # TODO not updated for new models
             def func(param_values):
-                updates = dict(zip(free_params.names, param_values))
-                free_params.update_values(updates)
+                model.update_free_parameters(param_values)
+                free_params = model.get_free_parameters_deep()
                 lkh, grad = self.likelihood(z, model, params_for_gradient=free_params)
                 return lkh.item(), grad
 

@@ -267,6 +267,7 @@ class RectangularGrid:
             ), "The shape of the mask should be the same as the shape of the grid"
         else:
             assert value.shape == self.n + (self.nvars,), "Invalid shape of grid mask."
+        # TODO for torch we should ensure the mask is on the right device.
         self._mask = value
 
     @property

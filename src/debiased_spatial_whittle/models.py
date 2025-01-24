@@ -6,6 +6,8 @@ try:
     np = BackendManager.get_backend()
 except:
     import numpy as np
+
+import numpy
 import param
 from param import Parameterized
 from param.parameterized import _get_param_repr
@@ -368,7 +370,7 @@ class CompoundModel(ModelInterface):
 class SumModel(CompoundModel):
     """Class that allows to define a new model as the sum of several models."""
 
-    sigma = ModelParameter(default=1.0, bounds=(0, None))
+    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty))
 
     def __init__(self, children, *args, **kwargs):
         super().__init__(children, *args, **kwargs)
@@ -388,8 +390,10 @@ class SumModel(CompoundModel):
 
 
 class ExponentialModel(CovarianceModel):
-    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
+    sigma = ModelParameter(
+        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
+    )
 
     def _compute(self, lags: np.ndarray):
         d = np.sqrt(np.sum(lags**2, 0)) / self.rho
@@ -403,8 +407,10 @@ class ExponentialModel(CovarianceModel):
 
 
 class SquaredExponentialModel(CovarianceModel):
-    rho = ModelParameter(default=1.0, bounds=(0, None), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
+    sigma = ModelParameter(
+        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
+    )
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
@@ -446,7 +452,7 @@ class NuggetModel(CompoundModel):
         Proportion of variance explained by the nugget
     """
 
-    sigma = ModelParameter(default=1.0, bounds=(0, None), doc="Amplitude")
+    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude")
     nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
     def __init__(self, model, *args, **kwargs):
@@ -492,7 +498,7 @@ class BivariateUniformCorrelation(CompoundModel):
     """
 
     r = ModelParameter(default=0.0, bounds=(-1, 1), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, np.infty), doc="Amplitude ratio")
+    f = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude ratio")
 
     def __init__(self, base_model: CovarianceModel):
         super(BivariateUniformCorrelation, self).__init__(

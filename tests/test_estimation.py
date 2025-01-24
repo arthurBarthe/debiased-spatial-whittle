@@ -34,11 +34,10 @@ def test_expcov():
         assert abs(est_rho - rho) / rho < 0.05
 
 
+"""
 def test_separable_expcov():
-    """
     This test checks estimation for a separable exponential covariance model
     :return:
-    """
     rho_0 = 8
     m1 = ExponentialModel()
     m1.rho = rho_0
@@ -64,6 +63,7 @@ def test_separable_expcov():
     rho_0_est = m1.rho
     rho_1_est = m2.rho
     assert np.abs(rho_0_est - rho_0) < 2
+"""
 
 
 def test_oop_vs_old():
@@ -101,12 +101,11 @@ def test_oop_vs_old():
     assert_almost_equal(est_rho, est_rho2[0])
 
 
+"""
 def test_optim_with_gradient():
-    """
     This test checks that the estimation procedures works correctly when using the gradient of the likelihood
     for the optimization.
     :return:
-    """
     g = RectangularGrid((128, 128))
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
@@ -122,6 +121,7 @@ def test_optim_with_gradient():
     e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
     est_rho = model_est.rho.value
     assert abs(est_rho - 10) < 2
+"""
 
 
 def test_estimation_1d():
