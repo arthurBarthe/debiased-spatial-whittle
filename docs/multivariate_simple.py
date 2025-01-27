@@ -31,13 +31,10 @@ g = RectangularGrid((128, 128), nvars=2)
 
 # we set the correlation to 0.9
 
-m = ExponentialModel()
-m.rho = 8
-m.sigma = 1
-m.nugget = 0.01
+m = ExponentialModel(rho=8, sigma=1)
 bvm = BivariateUniformCorrelation(m)
-bvm.r_0 = 0.5
-bvm.f_0 = 1.5
+bvm.r = 0.8
+bvm.f = 1.5
 print(bvm)
 
 # ##Sample generation
@@ -66,7 +63,7 @@ lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
     print(i)
-    bvm.r_0 = r
+    bvm.r = r
     lkhs[i] = db(data, bvm)
 
 plt.figure()
