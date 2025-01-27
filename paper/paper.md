@@ -40,7 +40,8 @@ spatial and
 spatio-temporal covariance models for univariate or multivariate processes from gridded data.
 It leverages the Fast Fourier Transform, and therefore can benefit from further computational
 gains from GPU implementations offered by PyTorch or Cupy, both made available within
-the package as alternative backends to Numpy.
+the package as alternative backends to Numpy. As such, DSWL on GPU allows to fit
+covariance models to data observed on grids with tens of millions of locations.
 
 # Statement of need
 Describing patterns of spatial and spatio-temporal covariance is of interest to practitioners in
@@ -50,7 +51,7 @@ of the covariance structure, and leads to many practical applications such as
 krigging and forecasting via the conditional Gaussian multivariate
 distribution.
 
-A major hurdle in spatio-temporal modelling is the computation of the
+A major hurdle in spatio-temporal modelling is the computational cost of the
 Gaussian likelihood function. This is particularly relevant for modern spatio-temporal
 datasets, from physics simulations to real-word data.
 This computational burden also arises from complex
@@ -61,16 +62,24 @@ when running an MCMC sampler.
 A common means to circumvent this computational burden is to use approximations to the Gaussian likelihood.
 Among these,
 the Whittle likelihood is a standard spectral domain method for gridded data.
-However, for spatial and spatio-temporal data where $d\geq 2$, it suffers from a large bias
+Along its computational benefits, the Whittle likelihood provides robustness to departures
+from Gaussianity and allows to restrict the second-order model to a specific range
+of spatio-temporal frequencies.
+However, for spatial and spatio-temporal data where $d\geq 2$, the standard Whittle likelihood
+suffers from a large bias
 and typically does not allow for missing observations.
 
 `DSWL` is a Python implementation of the Debiased Spatial Whittle likelihood
 [@guillaumin_debiased_2022], a method that addresses the bias of the Whittle likelihood
 [@sykulski_debiased_2019].
 While its use of the Fast Fourier Transform requires gridded data, the implemented
-method allows for missing observations, making it amenable to practical
+method additionally allows for missing observations, making it amenable to practical
 applications where a full hypercube of data measurements might not
-be available. Finally, the code is written to allow to switch between several backends,
+be available.
+The package allows to treat the case of multivariate data, including where the
+missingness patterns might differ between two variates.
+The code base also includes tapering, the use of which can further
+help alleviate boundary effects[@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
 Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
 
@@ -79,8 +88,10 @@ gains via GPU implementations of the Fast Fourier Transform.
 The software is organized around several modules that can be grouped into the following
 categories:
 
-- grids:
-  - grids.py: allows to define the rectangular grids where the data sit.
+- grids and sampling:
+  - grids.py: allows to define the rectangular grids where the data sit via the
+  class RectangularGrid. A mask of zeros (missing) and ones (not missing) can be
+  set to specify potential missing observations.
   - simulation.py: allows to sample a realization from a model on a grid
 - models:
   - models.py: allows to define a covariance model.
@@ -90,12 +101,14 @@ categories:
 - estimation:
   - periodogram.py: allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model, grid, and periodogram combination.
+  - multivariate_periodogram.py: allows to compute the periodogram for multivariate data.
   - likelihood.py: allows to define the Debiased Whittle Likelihood and the corresponding
     estimator.
 
 A [documentation](https://debiased-spatial-whittle.readthedocs.io/en/latest/index.html)
 including example notebooks is available, and issues can be raised on
-[Github](https://github.com/arthurBarthe/debiased-spatial-whittle).
+[Github](https://github.com/arthurBarthe/debiased-spatial-whittle). Example notebooks can also be run directly in the browser
+via [mybinder.org](https://mybinder.org/v2/gh/arthurBarthe/debiased-spatial-whittle/master).
 
 # Acknowledgements
 This research utilised Queen Mary's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
