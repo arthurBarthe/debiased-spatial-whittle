@@ -312,6 +312,16 @@ class CompoundModel(ModelInterface):
         super().__init__(*args, **kwargs)
         self.children = children
 
+    def __init_subclass__(cls, **kwargs):
+        call_method = cls.__call__
+
+        def new_call(self, lags: np.ndarray):
+            out = call_method(self, np.expand_dims(lags, -1))
+            out = np.squeeze(out)
+            return out
+
+        cls.__call__ = new_call
+
     @property
     def n_free_parameters_deep(self):
         out = self.n_free_parameters
