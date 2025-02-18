@@ -615,7 +615,7 @@ class ExpectedPeriodogram:
 
     def cov_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """
-        Returns the covariance of the periodogram (valid only in 2d)
+        Returns the covariance of the periodogram (valid only in 2d).
 
         Parameters
         ----------

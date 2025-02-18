@@ -12,7 +12,7 @@ from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
 from debiased_spatial_whittle.periodogram import compute_ep_old
-from debiased_spatial_whittle.confidence import CovarianceFFT, McmcDiags
+from debiased_spatial_whittle.confidence import CovarianceFFT
 
 
 fftn = np.fft.fftn
@@ -180,17 +180,17 @@ class MultivariateDebiasedWhittle:
         model: CovarianceModel,
         params_for_gradient: list[ModelParameter] = None,
     ):
-        # TODO add a class sample which contains the data and the grid?
-        """Computes the likelihood for this data"""
+        """Computes the likelihood for these data"""
         p = self.periodogram([z[..., 0], z[..., 1]])
         ep = self.expected_periodogram(model)
         n_spatial_dim = p.ndim - 2
         if p.ndim == ep.ndim - 1:
             # multiple model parameter vectors
             p = np.expand_dims(p, -3)
-        ep_inv = inv(ep)
+        # ep_inv = inv(ep)
         term1 = slogdet(ep)[1]
-        ratio = np.matmul(ep_inv, p)
+        # ratio = np.matmul(ep_inv, p)
+        ratio = np.linalg.solve(ep, p)
         if BackendManager.backend_name in ("numpy", "cupy"):
             term2 = np.trace(ratio, axis1=-2, axis2=-1)
         elif BackendManager.backend_name == "torch":
