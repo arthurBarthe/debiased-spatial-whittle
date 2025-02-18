@@ -261,16 +261,6 @@ class CovarianceModel(ModelInterface):
 
     """
 
-    def __init_subclass__(cls, **kwargs):
-        call_method = cls.__call__
-
-        def new_call(self, lags: np.ndarray):
-            out = call_method(self, np.expand_dims(lags, -1))
-            out = np.squeeze(out)
-            return out
-
-        cls.__call__ = new_call
-
     @property
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
@@ -303,8 +293,10 @@ class CovarianceModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
-        acv = self._compute(lags)
-        return acv
+        out = self._compute(np.expand_dims(lags, -1))
+        if out.shape[-1] == 1:
+            out = np.squeeze(out, -1)
+        return out
 
 
 class CompoundModel(ModelInterface):
@@ -363,8 +355,10 @@ class CompoundModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
-        acv = self._compute(lags)
-        return acv
+        out = self._compute(np.expand_dims(lags, -1))
+        if out.shape[-1] == 1:
+            out = np.squeeze(out, -1)
+        return out
 
 
 class SumModel(CompoundModel):
@@ -376,7 +370,7 @@ class SumModel(CompoundModel):
         super().__init__(children, *args, **kwargs)
 
     def _compute(self, lags: np.ndarray):
-        values = (child(lags) for child in self.children)
+        values = (child._compute(lags) for child in self.children)
         out = sum(values)
         return out / self._norm_constant() * self.sigma**2
 
@@ -467,7 +461,7 @@ class NuggetModel(CompoundModel):
     def _compute(self, lags: np.ndarray):
         return (
             np.all(lags == 0, 0) * self.nugget
-            + (1 - self.nugget) * self.children[0](lags)
+            + (1 - self.nugget) * self.children[0]._compute(lags)
         ) * self.sigma**2
 
 

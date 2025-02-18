@@ -35,8 +35,8 @@ m.rho = 12
 m.sigma = 1
 m.nugget = 0.01
 bvm = BivariateUniformCorrelation(m)
-bvm.r_0 = 0.5
-bvm.f_0 = 1.9
+bvm.r = 0.5
+bvm.f = 1.9
 print(bvm)
 
 # ##Sample generation
@@ -65,16 +65,9 @@ rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
-    bvm.r_0 = r
+    bvm.r = r
     lkhs[i] = db(data, bvm)
 
 plt.figure()
 plt.plot(rs, lkhs, "-")
 plt.show()
-
-e = Estimator(db)
-bvm.r_0 = None
-bvm.rho_1 = None
-bvm.f_0 = None
-bvm.sigma_1 = None
-print(e(bvm, data))
