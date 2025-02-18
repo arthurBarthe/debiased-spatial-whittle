@@ -87,7 +87,7 @@ Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
 
 ![A simulated sample from a Gaussian covariance kernel observed on a circular
-domain.\label{fig:example}]("circle.jpg"){width=50%}
+domain.\label{fig:example}](circle.jpg){width=50%}
 
 # Software structure
 
