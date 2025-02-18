@@ -49,7 +49,8 @@ a wide range of applied sciences such as geosciences, meteorology or climate
 science. Stationary covariance modelling allows for a first-order approximation
 of the covariance structure, and leads to many practical applications such as
 krigging and forecasting via the conditional Gaussian multivariate
-distribution.
+distribution. The inference of parameters for a physics-based
+covariance model can also be of interest in its own right.
 
 A major hurdle in spatio-temporal modelling is the computational cost of the
 Gaussian likelihood function. This is particularly relevant for modern spatio-temporal
@@ -75,13 +76,18 @@ and typically does not allow for missing observations.
 While its use of the Fast Fourier Transform requires gridded data, the implemented
 method additionally allows for missing observations, making it amenable to practical
 applications where a full hypercube of data measurements might not
-be available.
+be available. Missing observations might occur due to natural boundaries or
+due to measurement constraints. As an example, in Figure \autoref{fig:example} we show a simulated
+sample from a Gaussian covariance model observed on a circular domain.
 The package allows to treat the case of multivariate data, including where the
-missingness patterns might differ between two variates.
+missingness patterns might differ between the variates.
 The code base also includes tapering, the use of which can further
-help alleviate boundary effects[@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
+ alleviate boundary effects[@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
 Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
+
+![A simulated sample from a Gaussian covariance kernel observed on a circular
+domain.\label{fig:example}]("circle.jpg"){width=50%}
 
 # Software structure
 
@@ -89,21 +95,25 @@ The software is organized around several modules that can be grouped into the fo
 categories:
 
 - grids and sampling:
-  - grids.py: allows to define the rectangular grids where the data sit via the
+  - grids.py: this module allows to define the rectangular grids where the data sit via the
   class RectangularGrid. A mask of zeros (missing) and ones (not missing) can be
-  set to specify potential missing observations.
-  - simulation.py: allows to sample a realization from a model on a grid
+  set to specify potential missing observations, for instance to account for natural
+  boundaries
+  - simulation.py: this module allows to efficiently sample a realization from a model on a grid
+  via circulant embedding[@dietrich_fast_1997].
 - models:
-  - models.py: allows to define a covariance model.
+  - models.py: this module allows to define a covariance model.
     Standard covariance models are pre-defined, such as the exponential
-    covariance model, the squared exponential covariance model and
-    the Matern covariance model.
+    covariance model, the squared exponential (Gaussian) covariance model and
+    the Matern covariance model. These standard covariance models can also
+    be combined (e.g. via summation) to form more complex covariance models.
 - estimation:
-  - periodogram.py: allows to compute the periodogram of the data, and to obtain
+  - periodogram.py: this module allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model, grid, and periodogram combination.
-  - multivariate_periodogram.py: allows to compute the periodogram for multivariate data.
-  - likelihood.py: allows to define the Debiased Whittle Likelihood and the corresponding
-    estimator.
+  - multivariate_periodogram.py: this module allows to compute the periodogram for multivariate data.
+  - likelihood.py: this module allows to define the Debiased Whittle Likelihood and the corresponding
+    estimator. The optimizer can be selected among those offered by the optimize
+    package of the Scipy library[@virtanen2020scipy].
 
 A [documentation](https://debiased-spatial-whittle.readthedocs.io/en/latest/index.html)
 including example notebooks is available, and issues can be raised on
