@@ -78,7 +78,12 @@ method additionally allows for missing observations, making it amenable to pract
 applications where a full hypercube of data measurements might not
 be available. Missing observations might occur due to natural boundaries or
 due to measurement constraints. As an example, in \autoref{fig:example} we show a simulated
-sample from a Gaussian covariance model observed on a circular domain.
+sample from an exponential covariance model observed on a domain with
+the shape of metropolitan France territory, along with the distribution of estimates
+obtained from 1000 independent samples generated from the same model and the
+predicted distribution of estimates, which can be used to build confidence
+intervals.
+
 The package allows to treat the case of multivariate data, including where the
 missingness patterns might differ between the variates.
 The code base also includes tapering, the use of which can further
@@ -88,12 +93,15 @@ gains via GPU implementations of the Fast Fourier Transform.
 This is shown in \autoref{fig:times} where we observed a $\times 100$
 speed-up with a GPU versus a CPU.
 
-![A simulated sample from a Gaussian covariance kernel observed on a circular
-domain\label{fig:example}](circle.jpg){width=25%}
+![A simulated sample from an exponential covariance kernel observed on a domain
+with the shape of metropolitan France territory (a),
+along with the distribution of estimates obtained from 1000 independent
+realizations from the same model with range parameter $\rho=14$ spatial
+units (b)\label{fig:example}](france.jpeg){width=75%}
 
 ![Computational time of the Debiased Spatial Whittle Likelihood averaged over
 1000 samples on square grids of increasing sizes, compared between CPU and GPU (Cupy)
-\label{fig:times}](times.jpeg){width=25%}
+\label{fig:times}](times.jpeg){width=50%}
 
 # Software structure
 
