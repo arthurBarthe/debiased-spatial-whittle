@@ -77,7 +77,7 @@ While its use of the Fast Fourier Transform requires gridded data, the implement
 method additionally allows for missing observations, making it amenable to practical
 applications where a full hypercube of data measurements might not
 be available. Missing observations might occur due to natural boundaries or
-due to measurement constraints. As an example, in Figure \autoref{fig:example} we show a simulated
+due to measurement constraints. As an example, in \autoref{fig:example} we show a simulated
 sample from a Gaussian covariance model observed on a circular domain.
 The package allows to treat the case of multivariate data, including where the
 missingness patterns might differ between the variates.
@@ -85,9 +85,15 @@ The code base also includes tapering, the use of which can further
  alleviate boundary effects[@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
 Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
+This is shown in \autoref{fig:times} where we observed a $\times 100$
+speed-up with a GPU versus a CPU.
 
 ![A simulated sample from a Gaussian covariance kernel observed on a circular
-domain.\label{fig:example}](circle.jpg){width=50%}
+domain\label{fig:example}](circle.jpg){width=25%}
+
+![Computational time of the Debiased Spatial Whittle Likelihood averaged over
+1000 samples on square grids of increasing sizes, compared between CPU and GPU (Cupy)
+\label{fig:times}](times.jpeg){width=25%}
 
 # Software structure
 
