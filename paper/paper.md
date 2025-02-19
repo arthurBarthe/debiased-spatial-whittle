@@ -104,8 +104,8 @@ along with the distribution of estimates obtained from 1000 independent
 realizations from the same model with range parameter $\rho=14$ spatial
 units (b)\label{fig:example}](france.jpeg){width=75%}
 
-[!An example of a bivariate random field with distinct patterns of missing
-observations \label{fig:bivariate}](bivariate.jpg){width=75%}
+![An example of a bivariate random field with distinct patterns of missing observations
+\label{fig:bivariate}](bivariate.jpg){width=75%}
 
 ![Computational time of the Debiased Spatial Whittle Likelihood averaged over
 1000 samples on square grids of increasing sizes, compared between CPU and GPU (Cupy)
