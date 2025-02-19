@@ -28,6 +28,7 @@ affiliations:
  - name: Ecole Polytechnique Fédérale de Lausanne, Switzerland
    index: 3
  - name: Princeton University, United States of America
+   index: 4
 date: 20 January 2025
 bibliography: paper.bib
 ---
@@ -79,13 +80,17 @@ applications where a full hypercube of data measurements might not
 be available. Missing observations might occur due to natural boundaries or
 due to measurement constraints. As an example, in \autoref{fig:example} we show a simulated
 sample from an exponential covariance model observed on a domain with
-the shape of metropolitan France territory, along with the distribution of estimates
+the shape of metropolitan France (excluding Corsica), along with the distribution of estimates
 obtained from 1000 independent samples generated from the same model and the
 predicted distribution of estimates, which can be used to build confidence
 intervals.
 
 The package allows to treat the case of multivariate data, including where the
-missingness patterns might differ between the variates.
+missingness patterns might differ between the variates. For instance,
+in \autoref{fig:bivariate} we show a realization of a bivariate random field
+with distinct patterns of missing observations between the two variates, for which
+we can still recover the parameters of the model, such as the correlation between
+the two fields.
 The code base also includes tapering, the use of which can further
  alleviate boundary effects[@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
 Numpy, Cupy and PyTorch. This allows to further benefit from computational
@@ -94,10 +99,13 @@ This is shown in \autoref{fig:times} where we observed a $\times 100$
 speed-up with a GPU versus a CPU.
 
 ![A simulated sample from an exponential covariance kernel observed on a domain
-with the shape of metropolitan France territory (a),
+with the shape of metropolitan France (excluding Corsica) (a),
 along with the distribution of estimates obtained from 1000 independent
 realizations from the same model with range parameter $\rho=14$ spatial
 units (b)\label{fig:example}](france.jpeg){width=75%}
+
+[!An example of a bivariate random field with distinct patterns of missing
+observations \label{fig:bivariate}](bivariate.jpg){width=75%}
 
 ![Computational time of the Debiased Spatial Whittle Likelihood averaged over
 1000 samples on square grids of increasing sizes, compared between CPU and GPU (Cupy)
