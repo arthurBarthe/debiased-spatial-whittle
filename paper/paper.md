@@ -113,8 +113,9 @@ units (b)\label{fig:example}](france.jpeg){width=75%}
 \label{fig:times}](times.jpeg){width=50%}
 
 Other approximation techniques are available for the inference of spatio-temporal covariance
-models. Among those, we can mention Vecchia-type likelihood approximations [@katzfuss_general_2021]
-such as those offered in [@jurek2023pymra, @katzfuss2023gpvecchia, @gpGp_rpackage],
+models. Among those, we can mention Vecchia-type likelihood
+approximations [@katzfuss_general_2021]
+such as those offered in [@jurek2023pymra; @katzfuss2023gpvecchia; @gpGp_rpackage],
 covariance tapering [@kaufman_covariance_2008], although for the latter we are not aware of
 open-source implementations.
 
