@@ -86,9 +86,7 @@ class SamplerOnRectangularGrid:
     --------
     >>> from debiased_spatial_whittle.models import ExponentialModel
     >>> from debiased_spatial_whittle.grids import RectangularGrid
-    >>> model = ExponentialModel()
-    >>> model.rho = 12.
-    >>> model.sigma = 1.
+    >>> model = ExponentialModel(rho=12., sigma=1.)
     >>> grid = RectangularGrid((256, 128))
     >>> sampler = SamplerOnRectangularGrid(model, grid)
     >>> sample = sampler()
@@ -96,7 +94,9 @@ class SamplerOnRectangularGrid:
     (256, 128)
     """
 
-    def __init__(self, model: CovarianceModel, grid: RectangularGrid):
+    def __init__(
+        self, model: CovarianceModel, grid: RectangularGrid, exact: bool = True
+    ):
         self.model = model
         self.grid = grid
         self.sampling_grid = grid
@@ -104,12 +104,13 @@ class SamplerOnRectangularGrid:
         self._n_sims = 1
         self._i_sim = 0
         self._z = None
+        self.exact = exact
         try:
             self.f
         except:
             print("up-sampling")
             n = tuple(2 * n for n in self.grid.n)
-            self.sampling_grid = RectangularGrid(n)  # may cause bugs?
+            self.sampling_grid = RectangularGrid(n, grid.delta)
 
     @property
     def n_sims(self):
@@ -125,10 +126,13 @@ class SamplerOnRectangularGrid:
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
+            if not self.exact:
+                cov *= self.sampling_grid.spatial_kernel()
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = np.real(f)
-            min_ = np.min(f)
-            if min_ <= -1e-5:
+            min_, max_ = np.min(f), np.max(f)
+            if min_ <= -1e-2:
+                print(min_, max_)
                 raise ValueError(
                     f"Embedding is not positive definite, min value {min_}."
                 )

@@ -507,7 +507,7 @@ class ExpectedPeriodogram:
         """
         lags = self.grid.lags_unique
         d_acv = model.gradient(lags, params)
-        aux = ifftshift(d_acv, axes=list(range(lags.shape[0])))
+        aux = ifftshift(d_acv, list(range(lags.shape[0])))
         return self.compute_ep(aux, self.periodogram.fold)
 
     def cov_dft_matrix(self, model: CovarianceModel):
@@ -615,7 +615,7 @@ class ExpectedPeriodogram:
 
     def cov_diagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """
-        Returns the covariance of the periodogram (valid only in 2d)
+        Returns the covariance of the periodogram (valid only in 2d).
 
         Parameters
         ----------
