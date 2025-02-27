@@ -35,12 +35,12 @@ bibliography: paper.bib
 
 # Summary
 The Debiased Spatial Whittle Likelihood (DSWL) package is an open-source Python
-package that implements the eponym paper [@guillaumin_debiased_2022].
-The methodology allows users to efficiently infer the parameters of stationary
+package that implements the eponymous paper [@guillaumin_debiased_2022].
+The methodology allows users to efficiently infer the parameters of stationary / homogeneous
 spatial and
 spatio-temporal covariance models for univariate or multivariate processes from gridded data.
 It leverages the Fast Fourier Transform, and therefore can benefit from further computational
-gains from GPU implementations offered by PyTorch [@paszke2019pytorch] or
+gains through GPU implementations offered by PyTorch [@paszke2019pytorch] or
 Cupy [@nishino2017cupy], both made available within
 the package as alternative backends to Numpy [@harris2020array]. As such, DSWL on GPU allows to fit
 covariance models to data observed on grids with tens of millions of locations.
@@ -50,13 +50,13 @@ Describing patterns of spatial and spatio-temporal covariance is of interest to 
 a wide range of applied sciences such as geosciences, meteorology or climate
 science. Stationary covariance modelling allows for a first-order approximation
 of the covariance structure, and leads to many practical applications such as
-krigging and forecasting via the conditional Gaussian multivariate
+kriging and forecasting via the conditional Gaussian multivariate
 distribution. The inference of parameters for a physics-based
 covariance model can also be of interest in its own right.
 
 A major hurdle in spatio-temporal modelling is the computational cost of the
 Gaussian likelihood function. This is particularly relevant for modern spatio-temporal
-datasets, from physics simulations to real-word data.
+datasets, from physics simulations to real-world data.
 The computational burden of parameter inference also arises from complex
 spatio-temporal covariance models with a large number of parameters
 which typically require a high number of likelihood evaluations during the optimization process or
@@ -81,7 +81,7 @@ applications where a full hyperrectangle of data measurements might not
 be available. Missing observations might occur due to natural boundaries or
 due to measurement constraints. As an example, in \autoref{fig:example} we show a simulated
 sample from an exponential covariance model observed on a domain with
-the shape of metropolitan France (excluding Corsica), along with the distribution of estimates
+the shape of metropolitan France (sans Corsica), along with the distribution of estimates
 obtained from 1000 independent samples generated from the same model and the
 predicted distribution of estimates, which can be used to build confidence
 intervals.
@@ -100,7 +100,7 @@ This is shown in \autoref{fig:times} where we observed a $\times 100$
 speed-up with a GPU versus a CPU.
 
 ![A simulated sample from an exponential covariance kernel observed on a domain
-with the shape of metropolitan France (excluding Corsica) (a),
+with the shape of metropolitan France (sans Corsica) (a),
 along with the distribution of estimates obtained from 1000 independent
 realizations from the same model with range parameter $\rho=14$ spatial
 units (b)\label{fig:example}](france.jpeg){width=75%}

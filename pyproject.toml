@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "debiased-spatial-whittle"
-version = "1.0.0"
+version = "1.0.1"
 description = "Spatial Debiased Whittle likelihood for fast inference of spatio-temporal covariance models from gridded data"
 readme = "README.md"
 authors = ["arthur <ahw795@qmul.ac.uk>"]
@@ -13,16 +13,15 @@ python = ">=3.9, <4.0"
 numpy = "^1.21.5"
 matplotlib = "^3.7.0"
 scipy = "^1.7.3"
-autograd = "^1.5"
 progressbar2 = "^4.2.0"
-seaborn = "^0.12.2"
 param = "^2.1.1"
-ruff = "^0.8.2"
-pre-commit = "^4.0.1"
+
+autograd = "^1.5"
+seaborn = "^0.12.2"
 
 cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
-torch= {version="2.2.2", optional=true}
+torch = {version="2.2.2", optional=true}
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]
@@ -30,6 +29,8 @@ gpu11 = ["cupy-cuda11x", "torch"]
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.3.1"
+ruff = "^0.8.2"
+pre-commit = "^4.0.1"
 mkdocs = "*"
 mkdocs-material = "*"
 mkdocstrings-python = "*"
