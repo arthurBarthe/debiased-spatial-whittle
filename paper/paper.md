@@ -38,7 +38,8 @@ The Debiased Spatial Whittle Likelihood (DSWL) package is an open-source Python
 package that implements the eponymous paper [@guillaumin_debiased_2022].
 The methodology allows users to efficiently infer the parameters of stationary / homogeneous
 spatial and
-spatio-temporal covariance models for univariate or multivariate processes from gridded data.
+spatio-temporal covariance models for univariate or multivariate processes from
+gridded data with potential missing observations, e.g. due to natural boundaries.
 It leverages the Fast Fourier Transform, and therefore can benefit from further computational
 gains through GPU implementations offered by PyTorch [@paszke2019pytorch] or
 Cupy [@nishino2017cupy], both made available within
@@ -50,7 +51,7 @@ Describing patterns of spatial and spatio-temporal covariance is of interest to 
 a wide range of applied sciences such as geosciences, meteorology or climate
 science. Stationary covariance modelling allows for a first-order approximation
 of the covariance structure, and leads to many practical applications such as
-kriging and forecasting via the conditional Gaussian multivariate
+kriging [@stein] and forecasting via the conditional Gaussian multivariate
 distribution. The inference of parameters for a physics-based
 covariance model can also be of interest in its own right.
 
@@ -115,8 +116,9 @@ units (b)\label{fig:example}](france.jpeg){width=75%}
 Other approximation techniques are available for the inference of spatio-temporal covariance
 models. Among those, we can mention Vecchia-type likelihood
 approximations [@katzfuss_general_2021]
-such as those offered in [@jurek2023pymra; @katzfuss2023gpvecchia; @gpGp_rpackage],
-covariance tapering [@kaufman_covariance_2008], although for the latter we are not aware of
+such as those offered in `@jurek2023pymra; @katzfuss2023gpvecchia; @gpGp_rpackage`
+and covariance tapering [@kaufman_covariance_2008],
+although for the latter we are not aware of
 open-source implementations.
 
 # Software structure
@@ -125,23 +127,23 @@ The software is organized around several modules that can be grouped into the fo
 categories:
 
 - grids and sampling:
-  - grids.py: this module is used to define the rectangular grids where the data sit via the
+  - `grids.py`: this module is used to define the rectangular grids where the data sit via the
   class RectangularGrid. A mask of zeros (missing) and ones (not missing) can be
   set to specify potential missing observations, for instance to account for natural
   boundaries
-  - simulation.py: this module allows to efficiently sample a realization from a model on a grid
-  via circulant embedding[@dietrich_fast_1997].
+  - `simulation.py`: this module allows to efficiently sample a realization from a model on a grid
+  via circulant embedding [@dietrich_fast_1997].
 - models:
-  - models.py: this module allows to define a covariance model.
+  - `models.py`: this module allows to define a covariance model.
     Standard covariance models are pre-defined, such as the exponential
     covariance model, the squared exponential (Gaussian) covariance model and
-    the Matern covariance model. These standard covariance models can also
+    the Matérn covariance model. These standard covariance models can also
     be combined (e.g. via summation) to form more complex covariance models.
 - estimation:
-  - periodogram.py: this module allows to compute the periodogram of the data, and to obtain
+  - `periodogram.py`: this module allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model, grid, and periodogram combination.
-  - multivariate_periodogram.py: this module allows to compute the periodogram for multivariate data.
-  - likelihood.py: this module allows to define the Debiased Whittle Likelihood and the corresponding
+  - `multivariate_periodogram.py`: this module allows to compute the periodogram for multivariate data.
+  - `likelihood.py`: this module allows to define the Debiased Whittle Likelihood and the corresponding
     estimator. The optimizer can be selected among those offered by the optimize
     package of the Scipy library [@virtanen2020scipy].
 
