@@ -34,15 +34,21 @@ class LeastSquareEstimator:
         x0 = model.free_parameter_values_to_array_deep()
         bounds = np.array(list(zip(*model.free_parameter_bounds_to_list_deep())))
 
-        opt = least_squares(self._get_opt_func(data, model), x0=x0, bounds=bounds)
+        # convert to cpu
+        x0 = np.to_cpu(x0)
+        bounds = np.to_cpu(bounds)
+
+        least_squares(self._get_opt_func(data, model), x0=x0, bounds=bounds)
         return model
 
     def _get_opt_func(self, data, model) -> Callable:
         data_periodogram = self.periodogram(data)
 
         def opt_func(x):
+            # convert to gpu if necessary
+            x = np.asarray(x)
             model.update_free_parameters(x)
             model_ep = self.expected_periodogram(model)
-            return (data_periodogram - model_ep).flatten()
+            return np.to_cpu((data_periodogram - model_ep).flatten())
 
         return opt_func

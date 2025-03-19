@@ -439,14 +439,10 @@ class NuggetModel(CompoundModel):
 
     Properties
     ----------
-    sigma: ModelParameter
-        standard deviation
-
     nugget: ModelParameter
         Proportion of variance explained by the nugget
     """
 
-    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude")
     nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
     def __init__(self, model, *args, **kwargs):
@@ -459,10 +455,11 @@ class NuggetModel(CompoundModel):
         )
 
     def _compute(self, lags: np.ndarray):
-        return (
-            np.all(lags == 0, 0) * self.nugget
-            + (1 - self.nugget) * self.children[0]._compute(lags)
-        ) * self.sigma**2
+        zero_lag = np.expand_dims(np.zeros(lags.ndim), -1)
+        variance = self.children[0]._compute(zero_lag)
+        return np.all(lags == 0, 0) * self.nugget * variance + (
+            1 - self.nugget
+        ) * self.children[0]._compute(lags)
 
 
 class BivariateUniformCorrelation(CompoundModel):
