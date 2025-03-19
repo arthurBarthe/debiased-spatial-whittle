@@ -455,11 +455,53 @@ class NuggetModel(CompoundModel):
         )
 
     def _compute(self, lags: np.ndarray):
-        zero_lag = np.expand_dims(np.zeros(lags.ndim), -1)
+        n_spatial_dim = lags.shape[0]
+        zero_lag = np.zeros((n_spatial_dim, lags.shape[-1]))
         variance = self.children[0]._compute(zero_lag)
         return np.all(lags == 0, 0) * self.nugget * variance + (
             1 - self.nugget
         ) * self.children[0]._compute(lags)
+
+
+class AnisotropicModel(CompoundModel):
+    """
+    Allows to define an anisotropic model based on a base isotropic model via a scaling + rotation transform.
+    Dimension 2.
+    """
+
+    eta = ModelParameter(default=1, bounds=(0, np.inf))
+    phi = ModelParameter(default=0, bounds=(-np.pi / 2, np.pi / 2))
+
+    def __init__(self, base_model: CovarianceModel, *args, **kwargs):
+        super().__init__(
+            [
+                base_model,
+            ],
+            *args,
+            **kwargs,
+        )
+
+    @property
+    def scaling_matrix(self):
+        return np.array([[self.eta, 0], [0, 1 / self.eta]])
+
+    @property
+    def rotation_matrix(self):
+        return np.array(
+            [
+                [np.cos(self.phi), -np.sin(self.phi)],
+                [np.sin(self.phi), np.cos(self.phi)],
+            ]
+        )
+
+    def _compute(self, lags: np.ndarray):
+        lags = np.swapaxes(lags, 0, -1)
+        lags = np.expand_dims(lags, -1)
+        lags = np.matmul(self.rotation_matrix, lags)
+        lags = np.matmul(self.scaling_matrix, lags)
+        lags = np.squeeze(lags, -1)
+        lags = np.swapaxes(lags, 0, -1)
+        return self.children[0]._compute(lags)
 
 
 class BivariateUniformCorrelation(CompoundModel):
