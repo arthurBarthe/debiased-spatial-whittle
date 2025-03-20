@@ -17,16 +17,16 @@ from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 
 import matplotlib.pyplot as plt
 
-grid = RectangularGrid((256, 256))
-model = SquaredExponentialModel(rho=12.0, sigma=2.0)
-model = AnisotropicModel(model, eta=3, phi=np.pi / 4)
+grid = RectangularGrid((512, 512))
+model = SquaredExponentialModel(rho=12.0)
+model = AnisotropicModel(model, eta=1.5, phi=np.pi / 4)
 
 model = NuggetModel(model, nugget=1e-2)
 sampler = SamplerOnRectangularGrid(model, grid)
 data = sampler()
 
 plt.figure()
-plt.pcolor(data, cmap="Spectral")
+plt.pcolor(data, cmap="RdBu")
 plt.show()
 
 periodogram = Periodogram()
@@ -37,7 +37,7 @@ model_est.param.rho.bounds = (5, 100)
 model_est.param.sigma.bounds = (0.1, 10)
 model_est = AnisotropicModel(model_est)
 
-model_est_ = NuggetModel(model_est, nugget=1e-1)
+model_est_ = NuggetModel(model_est, nugget=1e-3)
 
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 

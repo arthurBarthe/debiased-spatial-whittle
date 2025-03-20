@@ -401,6 +401,18 @@ class ExponentialModel(CovarianceModel):
 
 
 class SquaredExponentialModel(CovarianceModel):
+    """
+    Implements the Squared Exponential covariance model, or Gaussian covariance model.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter
+
+    sigma: float
+        amplitude parameter
+    """
+
     rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
     sigma = ModelParameter(
         default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
@@ -432,9 +444,99 @@ class SquaredExponentialModel(CovarianceModel):
         return dict(rho=d_rho, sigma=d_sigma)
 
 
+class Matern32Model(CovarianceModel):
+    """
+    Implements the Matern Covariance kernel with slope parameter 3/2.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, np.infty))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.infty))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.ndarray):
+        d = np.sqrt(np.sum(lags**2, 0))
+        return (
+            self.sigma**2
+            * (1 + np.sqrt(3) * d / self.rho)
+            * np.exp(-np.sqrt(3) * d / self.rho)
+        )
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
+class Matern52Model(CovarianceModel):
+    """
+    Implements the Matern Covariance kernel with slope parameter 5/2.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, np.infty))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.infty))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.ndarray):
+        d = np.sqrt(np.sum(lags**2, 0))
+        temp = np.sqrt(5) * d / self.rho
+        return self.sigma**2 * (1 + temp + temp**2 / 3) * np.exp(-temp)
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
+class RationalQuadraticModel(CovarianceModel):
+    """
+    Implements the Rational Quadratic Covariance Kernel.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    alpha: float
+        alpha parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
+    alpha = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.array):
+        d2 = np.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * np.power(1 + d2 / self.alpha, -self.alpha)
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
 class NuggetModel(CompoundModel):
     """
-    Class to define a covariance modle based on a latent covariance model, and amplitude parameter and a nugget
+    Class to define a covariance model based on a latent covariance model, and amplitude parameter and a nugget
     parameter.
 
     Properties
@@ -467,6 +569,22 @@ class AnisotropicModel(CompoundModel):
     """
     Allows to define an anisotropic model based on a base isotropic model via a scaling + rotation transform.
     Dimension 2.
+
+    Attributes
+    ----------
+    base_model
+        Covariance model
+
+    eta
+        Scaling factor
+
+    phi
+        Rotation angle
+
+    Examples
+    --------
+    >>> base_model = SquaredExponentialModel(rho=10)
+    >>> model = AnisotropicModel(base_model, eta=1.5, phi=np.pi / 3)
     """
 
     eta = ModelParameter(default=1, bounds=(0, np.inf))
@@ -514,20 +632,16 @@ class BivariateUniformCorrelation(CompoundModel):
     base_model: CovarianceModel
         Base univariate covariance model
 
-    r_0: Parameter
+    r: Parameter
         Correlation parameter, float between -1 and 1
 
-    f_0: Parameter
+    f: Parameter
         Amplitude ratio, float, positive
 
     Examples
     --------
-    >>> base_model = ExponentialModel()
-    >>> base_model.rho = 12.
-    >>> base_model.sigma = 1.
-    >>> bivariate_model = BivariateUniformCorrelation(base_model)
-    >>> bivariate_model.r_0 = 0.75
-    >>> bivariate_model.f_0 = 2.3
+    >>> base_model = ExponentialModel(rho=12.)
+    >>> bivariate_model = BivariateUniformCorrelation(base_model, r=0.3, f=2.)
     """
 
     r = ModelParameter(default=0.0, bounds=(-1, 1), doc="Correlation")
