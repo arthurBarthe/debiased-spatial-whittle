@@ -364,7 +364,7 @@ class CompoundModel(ModelInterface):
 class SumModel(CompoundModel):
     """Class that allows to define a new model as the sum of several models."""
 
-    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty))
+    sigma = ModelParameter(default=1.0, bounds=(0, numpy.inf))
 
     def __init__(self, children, *args, **kwargs):
         super().__init__(children, *args, **kwargs)
@@ -384,9 +384,9 @@ class SumModel(CompoundModel):
 
 
 class ExponentialModel(CovarianceModel):
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
     sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
+        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
     )
 
     def _compute(self, lags: np.ndarray):
@@ -413,10 +413,8 @@ class SquaredExponentialModel(CovarianceModel):
         amplitude parameter
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
-    sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
-    )
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
@@ -457,8 +455,8 @@ class Matern32Model(CovarianceModel):
         amplitude parameter of the kernel
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.infty))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.infty))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -488,8 +486,8 @@ class Matern52Model(CovarianceModel):
         amplitude parameter of the kernel
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.infty))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.infty))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -644,14 +642,16 @@ class BivariateUniformCorrelation(CompoundModel):
     >>> bivariate_model = BivariateUniformCorrelation(base_model, r=0.3, f=2.)
     """
 
-    r = ModelParameter(default=0.0, bounds=(-1, 1), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude ratio")
+    r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
+    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
 
-    def __init__(self, base_model: CovarianceModel):
+    def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(
             [
                 base_model,
-            ]
+            ],
+            *args,
+            **kwargs,
         )
 
     @property
@@ -662,7 +662,7 @@ class BivariateUniformCorrelation(CompoundModel):
     def base_model(self, model):
         raise AttributeError("Base model cannot be set")
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         """
         Evaluates the covariance model at the passed lags. Since the model is bivariate,
         the returned array has two extra dimensions compared to the array lags, both of size
@@ -678,7 +678,7 @@ class BivariateUniformCorrelation(CompoundModel):
             Covariance values with shape (m1, m2, ..., mk, 2, 2)
 
         """
-        acv11 = self.base_model(lags)
+        acv11 = self.base_model._compute(lags)
         out = np.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11

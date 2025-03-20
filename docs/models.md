@@ -16,6 +16,9 @@ can be ignored by new users of the package.
 Within the _compute method of a CompoundModel, when evaluating children models at lags,
 you should not use their call method but rather their _compute method (see e.g. SumModel).
 
+For a univariate model, if we pass a lags array with shape
+(ndim, n1, ..., nk),
+
 ::: debiased_spatial_whittle.models.CovarianceModel
 
 ::: debiased_spatial_whittle.models.ExponentialModel
