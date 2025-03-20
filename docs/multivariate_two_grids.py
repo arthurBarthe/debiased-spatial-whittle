@@ -30,21 +30,14 @@ g.mask[..., 1] = np.mod(x, 40) > 20
 
 # ##Model definition
 
-m = SquaredExponentialModel()
-m.rho = 12
-m.sigma = 1
-m.nugget = 0.01
-bvm = BivariateUniformCorrelation(m)
-bvm.r = 0.5
-bvm.f = 1.9
-print(bvm)
+m = SquaredExponentialModel(rho=12.0)
+bvm = BivariateUniformCorrelation(m, r=0.5, f=1.9)
+bvm
 
 # ##Sample generation
 
 s = SamplerBUCOnRectangularGrid(bvm, g)
-
 data = s()
-print(type(data))
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
@@ -70,4 +63,6 @@ for i, r in enumerate(rs):
 
 plt.figure()
 plt.plot(rs, lkhs, "-")
+plt.xlabel("correlation coefficient")
+plt.ylabel("profile negative log-likelihood")
 plt.show()

@@ -32,10 +32,8 @@ g = RectangularGrid((128, 128), nvars=2)
 # we set the correlation to 0.9
 
 m = ExponentialModel(rho=8, sigma=1)
-bvm = BivariateUniformCorrelation(m)
-bvm.r = 0.8
-bvm.f = 1.5
-print(bvm)
+bvm = BivariateUniformCorrelation(m, r=0.8, f=1.5)
+bvm
 
 # ##Sample generation
 
@@ -55,41 +53,25 @@ p = Periodogram()
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
-print(ep(bvm).shape)
 db = MultivariateDebiasedWhittle(p, ep)
 
 rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
-    print(i)
     bvm.r = r
     lkhs[i] = db(data, bvm)
 
 plt.figure()
 plt.plot(rs, lkhs, "-")
+plt.xlabel("correlation coefficient")
+plt.ylabel("profile negative log-likelihood")
 plt.show()
-
-print(np.cov(data[..., 0].flatten(), data[..., 1].flatten()))
-
 
 # ##Inference
 
 e = Estimator(db)
-bvm.r_0 = None
-bvm.rho_1 = None
-bvm.f_0 = None
-bvm.sigma_1 = None
-print(e(bvm, data))
-
-# ##Hypothesis test of zero-correlation
-
-from debiased_spatial_whittle.hypothesis_tests import FixedParametersHT
-
-bvm.r_0 = None
-bvm.rho_1 = None
-bvm.f_0 = None
-bvm.sigma_1 = None
-hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.0), db)
-test_result = hypothesis_test(z=data)
-print(test_result)
+m = ExponentialModel(rho=1, sigma=1)
+bvm = BivariateUniformCorrelation(m, r=0.0, f=1.0)
+e(bvm, data)
+bvm

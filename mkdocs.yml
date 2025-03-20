@@ -10,7 +10,7 @@ theme:
 plugins:
 - mkdocs-jupyter:
     include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    '3dexponential.py']
+    'anisotropic.py']
     execute: true
 - mkdocstrings:
     handlers:
