@@ -27,7 +27,7 @@ you should not use their call method but rather their _compute method (see e.g. 
 
 ::: debiased_spatial_whittle.models.SquaredExponentialModel
 
-::: debiased_spatial_whittle.models.Mater32Model
+::: debiased_spatial_whittle.models.Matern32Model
 
 ::: debiased_spatial_whittle.models.Matern52Model
 
