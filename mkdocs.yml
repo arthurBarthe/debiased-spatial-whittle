@@ -55,7 +55,7 @@ nav:
   - 'Example notebooks':
       - France: france.py
       - Circle: circle.py
-      - Anisotropic: non-isotropic.py
+      - Anisotropic: anisotropic.py
       - 3d exponential model: 3dexponential.py
       - Multivariate:
           - 'Same grid': multivariate_simple.py
