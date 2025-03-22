@@ -17,9 +17,17 @@ Within the _compute method of a CompoundModel, when evaluating children models a
 you should not use their call method but rather their _compute method (see e.g. SumModel).
 
 For a univariate model, if we pass a lags array with shape
-(ndim, n1, ..., nk),
+(ndim, n1, ..., nk), we expect the covariance model to return an array with
+shape (n1, ..., nk).
+
+For a bivariate model, we expect the covariance model to return an array with
+shape (n1, ..., nk, 2, 2).
 
 ::: debiased_spatial_whittle.models.CovarianceModel
+
+::: debiased_spatial_whittle.models.SumModel
+
+::: debiased_spatial_whittle.models.NuggetModel
 
 ::: debiased_spatial_whittle.models.ExponentialModel
     options:

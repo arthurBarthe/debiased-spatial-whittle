@@ -29,6 +29,7 @@ class Periodogram:
 
         return_fft
             If true, returns the Discrete Fourier Transform rather than the periodogram
+
         Returns
         -------
         periodogram
@@ -36,6 +37,7 @@ class Periodogram:
         """
         n_spatial_dims = z[0].ndim
         z = np.stack(z, axis=-1)
+        # TODO generalize to 3d
         j_vec = (
             1
             / np.sqrt(np.array(z.shape[0] * z.shape[1]))

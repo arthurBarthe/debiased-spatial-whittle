@@ -12,13 +12,17 @@ BackendManager.set_backend("numpy")
 
 from debiased_spatial_whittle.models import (
     ExponentialModel,
+    Matern32Model,
     BivariateUniformCorrelation,
 )
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.simulation import (
+    SamplerBUCOnRectangularGrid,
+    MultivariateSamplerOnRectangularGrid,
+)
 
 # ##Grid specification
 
@@ -29,22 +33,22 @@ g = RectangularGrid((128, 128), nvars=2)
 
 # ##Model specification
 
-# we set the correlation to 0.9
+# we set the correlation to 0.8
 
-m = ExponentialModel(rho=8, sigma=1)
+m = Matern32Model(rho=8, sigma=1)
 bvm = BivariateUniformCorrelation(m, r=0.8, f=1.5)
 bvm
 
 # ##Sample generation
 
-s = SamplerBUCOnRectangularGrid(bvm, g)
+s = MultivariateSamplerOnRectangularGrid(bvm, g, p=2)
 data = s()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
-ax.imshow(data[..., 0], cmap="Spectral")
+ax.imshow(data[..., 0], cmap="inferno")
 ax = fig.add_subplot(1, 2, 2)
-ax.imshow(data[..., 1], cmap="Spectral")
+ax.imshow(data[..., 1], cmap="inferno")
 plt.show()
 
 # ##Profile likelihood plot for the correlation parameter
@@ -74,4 +78,4 @@ e = Estimator(db)
 m = ExponentialModel(rho=1, sigma=1)
 bvm = BivariateUniformCorrelation(m, r=0.0, f=1.0)
 e(bvm, data)
-bvm
+print(bvm.r)

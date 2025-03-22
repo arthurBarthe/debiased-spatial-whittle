@@ -298,6 +298,9 @@ class CovarianceModel(ModelInterface):
             out = np.squeeze(out, -1)
         return out
 
+    def __add__(self, other):
+        return SumModel(self, other)
+
 
 class CompoundModel(ModelInterface):
     def __init__(self, children, *args, **kwargs):
@@ -360,30 +363,59 @@ class CompoundModel(ModelInterface):
             out = np.squeeze(out, -1)
         return out
 
+    def __add__(self, other):
+        return SumModel(self, other)
+
 
 class SumModel(CompoundModel):
-    """Class that allows to define a new model as the sum of several models."""
+    """
+    Implements a covariance model defined as the sum of two several covariance models.
 
-    sigma = ModelParameter(default=1.0, bounds=(0, numpy.inf))
+    Examples
+    --------
+    >>> model_1 = SquaredExponentialModel(rho=32)
+    >>> model_2 = ExponentialModel(rho=5)
+    >>> model = model_1 + model_2
+    """
 
-    def __init__(self, children, *args, **kwargs):
-        super().__init__(children, *args, **kwargs)
+    def __new__(cls, *args, **kwargs):
+        children = []
+        for child in args:
+            if isinstance(child, SumModel):
+                children.append(child.children)
+            else:
+                children.append(child)
+        return super(SumModel, cls).__new__(cls)
+
+    def __init__(self, *args, **kwargs):
+        children = args
+        super().__init__(children, **kwargs)
 
     def _compute(self, lags: np.ndarray):
         values = (child._compute(lags) for child in self.children)
         out = sum(values)
-        return out / self._norm_constant() * self.sigma**2
-
-    def _norm_constant(self):
-        try:
-            sigmas = np.stack([child.sigma for child in self.children])
-        except TypeError:
-            sigmas = np.array([child.sigma for child in self.children])
-        out = np.sum(sigmas**2, axis=0)
         return out
 
 
 class ExponentialModel(CovarianceModel):
+    """
+    Implements the Exponential covariance model.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter
+
+    sigma: float
+        amplitude parameter
+
+    Examples
+    --------
+    >>> model = ExponentialModel(rho=5, sigma=1.41)
+    >>> model(np.array([[0., 1.], [0., 0.]]))
+    array([1.9881    , 1.62771861])
+    """
+
     rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
     sigma = ModelParameter(
         default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
@@ -411,6 +443,12 @@ class SquaredExponentialModel(CovarianceModel):
 
     sigma: float
         amplitude parameter
+
+    Examples
+    --------
+    >>> model = SquaredExponentialModel(rho=5, sigma=1.41)
+    >>> model(np.array([[0., 1.], [0., 0.]]))
+    array([1.9881    , 1.94873298])
     """
 
     rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
@@ -453,6 +491,10 @@ class Matern32Model(CovarianceModel):
 
     sigma: float
         amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = Matern32Model(rho=5, sigma=1)
     """
 
     rho = ModelParameter(default=1.0, bounds=(0, np.inf))
@@ -484,6 +526,11 @@ class Matern52Model(CovarianceModel):
 
     sigma: float
         amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = Matern52Model(rho=10)
+    >>> model = Matern52Model(rho=10, sigma=0.9)
     """
 
     rho = ModelParameter(default=1.0, bounds=(0, np.inf))
@@ -515,6 +562,10 @@ class RationalQuadraticModel(CovarianceModel):
 
     sigma: float
         amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
     """
 
     rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
@@ -534,13 +585,23 @@ class RationalQuadraticModel(CovarianceModel):
 
 class NuggetModel(CompoundModel):
     """
-    Class to define a covariance model based on a latent covariance model, and amplitude parameter and a nugget
-    parameter.
+    Allows to add a nugget to a base covariance model. The nugget parameter is between 0 and 1 and characterises the
+    proportion of the variance due to the nugget. For instance, if the base model has variance 2, using a Nugget model
+    on top with nugget parameter 0.1 will result in a model whose variance is still 2, but with a nugget of 0.2.
 
     Properties
     ----------
     nugget: ModelParameter
         Proportion of variance explained by the nugget
+
+    Examples
+    --------
+    >>> model = SquaredExponentialModel(rho=12, sigma=1)
+    >>> model(np.array([[0., 1., 2.]]))
+    array([1.        , 0.9965338 , 0.98620712])
+    >>> model = NuggetModel(model, nugget=0.1)
+    >>> model(np.array([[0., 1., 2.]]))
+    array([1.        , 0.89688042, 0.88758641])
     """
 
     nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")

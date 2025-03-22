@@ -25,10 +25,14 @@ class LeastSquareEstimator:
     """
 
     def __init__(
-        self, periodogram: Periodogram, expected_periodogram: ExpectedPeriodogram
+        self,
+        periodogram: Periodogram,
+        expected_periodogram: ExpectedPeriodogram,
+        verbose: int = 0,
     ):
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
+        self.verbose = verbose
 
     def __call__(self, data: np.array, model: CovarianceModel):
         x0 = model.free_parameter_values_to_array_deep()
@@ -38,7 +42,13 @@ class LeastSquareEstimator:
         x0 = np.to_cpu(x0)
         bounds = np.to_cpu(bounds)
 
-        least_squares(self._get_opt_func(data, model), x0=x0, bounds=bounds)
+        least_squares(
+            self._get_opt_func(data, model),
+            x0=x0,
+            bounds=bounds,
+            verbose=self.verbose,
+            x_scale="jac",
+        )
         return model
 
     def _get_opt_func(self, data, model) -> Callable:
