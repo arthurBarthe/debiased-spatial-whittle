@@ -12,13 +12,17 @@ BackendManager.set_backend("numpy")
 
 from debiased_spatial_whittle.models import (
     ExponentialModel,
+    Matern32Model,
     BivariateUniformCorrelation,
 )
 from debiased_spatial_whittle.multivariate_periodogram import Periodogram
 from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
 from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.simulation import (
+    SamplerBUCOnRectangularGrid,
+    MultivariateSamplerOnRectangularGrid,
+)
 
 # ##Grid specification
 
@@ -29,24 +33,22 @@ g = RectangularGrid((128, 128), nvars=2)
 
 # ##Model specification
 
-# we set the correlation to 0.9
+# we set the correlation to 0.8
 
-m = ExponentialModel(rho=8, sigma=1)
-bvm = BivariateUniformCorrelation(m)
-bvm.r = 0.8
-bvm.f = 1.5
-print(bvm)
+m = Matern32Model(rho=8, sigma=1)
+bvm = BivariateUniformCorrelation(m, r=0.8, f=1.5)
+bvm
 
 # ##Sample generation
 
-s = SamplerBUCOnRectangularGrid(bvm, g)
+s = MultivariateSamplerOnRectangularGrid(bvm, g, p=2)
 data = s()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
-ax.imshow(data[..., 0], cmap="Spectral")
+ax.imshow(data[..., 0], cmap="inferno")
 ax = fig.add_subplot(1, 2, 2)
-ax.imshow(data[..., 1], cmap="Spectral")
+ax.imshow(data[..., 1], cmap="inferno")
 plt.show()
 
 # ##Profile likelihood plot for the correlation parameter
@@ -55,41 +57,25 @@ p = Periodogram()
 p.fold = True
 
 ep = ExpectedPeriodogram(g, p)
-print(ep(bvm).shape)
 db = MultivariateDebiasedWhittle(p, ep)
 
 rs = np.linspace(-0.95, 0.95, 100)
 lkhs = np.zeros_like(rs)
 
 for i, r in enumerate(rs):
-    print(i)
     bvm.r = r
     lkhs[i] = db(data, bvm)
 
 plt.figure()
 plt.plot(rs, lkhs, "-")
+plt.xlabel("correlation coefficient")
+plt.ylabel("profile negative log-likelihood")
 plt.show()
-
-print(np.cov(data[..., 0].flatten(), data[..., 1].flatten()))
-
 
 # ##Inference
 
 e = Estimator(db)
-bvm.r_0 = None
-bvm.rho_1 = None
-bvm.f_0 = None
-bvm.sigma_1 = None
-print(e(bvm, data))
-
-# ##Hypothesis test of zero-correlation
-
-from debiased_spatial_whittle.hypothesis_tests import FixedParametersHT
-
-bvm.r_0 = None
-bvm.rho_1 = None
-bvm.f_0 = None
-bvm.sigma_1 = None
-hypothesis_test = FixedParametersHT(bvm, dict(r_0=0.0), db)
-test_result = hypothesis_test(z=data)
-print(test_result)
+m = ExponentialModel(rho=1, sigma=1)
+bvm = BivariateUniformCorrelation(m, r=0.0, f=1.0)
+e(bvm, data)
+print(bvm.r)

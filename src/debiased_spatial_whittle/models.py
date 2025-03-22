@@ -298,6 +298,9 @@ class CovarianceModel(ModelInterface):
             out = np.squeeze(out, -1)
         return out
 
+    def __add__(self, other):
+        return SumModel(self, other)
+
 
 class CompoundModel(ModelInterface):
     def __init__(self, children, *args, **kwargs):
@@ -360,33 +363,62 @@ class CompoundModel(ModelInterface):
             out = np.squeeze(out, -1)
         return out
 
+    def __add__(self, other):
+        return SumModel(self, other)
+
 
 class SumModel(CompoundModel):
-    """Class that allows to define a new model as the sum of several models."""
+    """
+    Implements a covariance model defined as the sum of two several covariance models.
 
-    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty))
+    Examples
+    --------
+    >>> model_1 = SquaredExponentialModel(rho=32)
+    >>> model_2 = ExponentialModel(rho=5)
+    >>> model = model_1 + model_2
+    """
 
-    def __init__(self, children, *args, **kwargs):
-        super().__init__(children, *args, **kwargs)
+    def __new__(cls, *args, **kwargs):
+        children = []
+        for child in args:
+            if isinstance(child, SumModel):
+                children.append(child.children)
+            else:
+                children.append(child)
+        return super(SumModel, cls).__new__(cls)
+
+    def __init__(self, *args, **kwargs):
+        children = args
+        super().__init__(children, **kwargs)
 
     def _compute(self, lags: np.ndarray):
         values = (child._compute(lags) for child in self.children)
         out = sum(values)
-        return out / self._norm_constant() * self.sigma**2
-
-    def _norm_constant(self):
-        try:
-            sigmas = np.stack([child.sigma for child in self.children])
-        except TypeError:
-            sigmas = np.array([child.sigma for child in self.children])
-        out = np.sum(sigmas**2, axis=0)
         return out
 
 
 class ExponentialModel(CovarianceModel):
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
+    """
+    Implements the Exponential covariance model.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter
+
+    sigma: float
+        amplitude parameter
+
+    Examples
+    --------
+    >>> model = ExponentialModel(rho=5, sigma=1.41)
+    >>> model(np.array([[0., 1.], [0., 0.]]))
+    array([1.9881    , 1.62771861])
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
     sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
+        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
     )
 
     def _compute(self, lags: np.ndarray):
@@ -401,10 +433,26 @@ class ExponentialModel(CovarianceModel):
 
 
 class SquaredExponentialModel(CovarianceModel):
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Range parameter")
-    sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.infty), doc="Amplitude parameter"
-    )
+    """
+    Implements the Squared Exponential covariance model, or Gaussian covariance model.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter
+
+    sigma: float
+        amplitude parameter
+
+    Examples
+    --------
+    >>> model = SquaredExponentialModel(rho=5, sigma=1.41)
+    >>> model(np.array([[0., 1.], [0., 0.]]))
+    array([1.9881    , 1.94873298])
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Amplitude parameter")
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
@@ -432,21 +480,130 @@ class SquaredExponentialModel(CovarianceModel):
         return dict(rho=d_rho, sigma=d_sigma)
 
 
+class Matern32Model(CovarianceModel):
+    """
+    Implements the Matern Covariance kernel with slope parameter 3/2.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = Matern32Model(rho=5, sigma=1)
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.ndarray):
+        d = np.sqrt(np.sum(lags**2, 0))
+        return (
+            self.sigma**2
+            * (1 + np.sqrt(3) * d / self.rho)
+            * np.exp(-np.sqrt(3) * d / self.rho)
+        )
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
+class Matern52Model(CovarianceModel):
+    """
+    Implements the Matern Covariance kernel with slope parameter 5/2.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = Matern52Model(rho=10)
+    >>> model = Matern52Model(rho=10, sigma=0.9)
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.ndarray):
+        d = np.sqrt(np.sum(lags**2, 0))
+        temp = np.sqrt(5) * d / self.rho
+        return self.sigma**2 * (1 + temp + temp**2 / 3) * np.exp(-temp)
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
+class RationalQuadraticModel(CovarianceModel):
+    """
+    Implements the Rational Quadratic Covariance Kernel.
+
+    Attributes
+    ----------
+    rho: float
+        length scale parameter of the kernel
+
+    alpha: float
+        alpha parameter of the kernel
+
+    sigma: float
+        amplitude parameter of the kernel
+
+    Examples
+    --------
+    >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
+    """
+
+    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
+    alpha = ModelParameter(default=1.0, bounds=(0, np.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _compute(self, lags: np.array):
+        d2 = np.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * np.power(1 + d2 / self.alpha, -self.alpha)
+
+    def _gradient(self, lags: np.ndarray):
+        raise NotImplementedError()
+
+
 class NuggetModel(CompoundModel):
     """
-    Class to define a covariance modle based on a latent covariance model, and amplitude parameter and a nugget
-    parameter.
+    Allows to add a nugget to a base covariance model. The nugget parameter is between 0 and 1 and characterises the
+    proportion of the variance due to the nugget. For instance, if the base model has variance 2, using a Nugget model
+    on top with nugget parameter 0.1 will result in a model whose variance is still 2, but with a nugget of 0.2.
 
     Properties
     ----------
-    sigma: ModelParameter
-        standard deviation
-
     nugget: ModelParameter
         Proportion of variance explained by the nugget
+
+    Examples
+    --------
+    >>> model = SquaredExponentialModel(rho=12, sigma=1)
+    >>> model(np.array([[0., 1., 2.]]))
+    array([1.        , 0.9965338 , 0.98620712])
+    >>> model = NuggetModel(model, nugget=0.1)
+    >>> model(np.array([[0., 1., 2.]]))
+    array([1.        , 0.89688042, 0.88758641])
     """
 
-    sigma = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude")
     nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
     def __init__(self, model, *args, **kwargs):
@@ -459,10 +616,69 @@ class NuggetModel(CompoundModel):
         )
 
     def _compute(self, lags: np.ndarray):
-        return (
-            np.all(lags == 0, 0) * self.nugget
-            + (1 - self.nugget) * self.children[0]._compute(lags)
-        ) * self.sigma**2
+        n_spatial_dim = lags.shape[0]
+        zero_lag = np.zeros((n_spatial_dim, lags.shape[-1]))
+        variance = self.children[0]._compute(zero_lag)
+        return np.all(lags == 0, 0) * self.nugget * variance + (
+            1 - self.nugget
+        ) * self.children[0]._compute(lags)
+
+
+class AnisotropicModel(CompoundModel):
+    """
+    Allows to define an anisotropic model based on a base isotropic model via a scaling + rotation transform.
+    Dimension 2.
+
+    Attributes
+    ----------
+    base_model
+        Covariance model
+
+    eta
+        Scaling factor
+
+    phi
+        Rotation angle
+
+    Examples
+    --------
+    >>> base_model = SquaredExponentialModel(rho=10)
+    >>> model = AnisotropicModel(base_model, eta=1.5, phi=np.pi / 3)
+    """
+
+    eta = ModelParameter(default=1, bounds=(0, np.inf))
+    phi = ModelParameter(default=0, bounds=(-np.pi / 2, np.pi / 2))
+
+    def __init__(self, base_model: CovarianceModel, *args, **kwargs):
+        super().__init__(
+            [
+                base_model,
+            ],
+            *args,
+            **kwargs,
+        )
+
+    @property
+    def scaling_matrix(self):
+        return np.array([[self.eta, 0], [0, 1 / self.eta]])
+
+    @property
+    def rotation_matrix(self):
+        return np.array(
+            [
+                [np.cos(self.phi), -np.sin(self.phi)],
+                [np.sin(self.phi), np.cos(self.phi)],
+            ]
+        )
+
+    def _compute(self, lags: np.ndarray):
+        lags = np.swapaxes(lags, 0, -1)
+        lags = np.expand_dims(lags, -1)
+        lags = np.matmul(self.rotation_matrix, lags)
+        lags = np.matmul(self.scaling_matrix, lags)
+        lags = np.squeeze(lags, -1)
+        lags = np.swapaxes(lags, 0, -1)
+        return self.children[0]._compute(lags)
 
 
 class BivariateUniformCorrelation(CompoundModel):
@@ -475,30 +691,28 @@ class BivariateUniformCorrelation(CompoundModel):
     base_model: CovarianceModel
         Base univariate covariance model
 
-    r_0: Parameter
+    r: Parameter
         Correlation parameter, float between -1 and 1
 
-    f_0: Parameter
+    f: Parameter
         Amplitude ratio, float, positive
 
     Examples
     --------
-    >>> base_model = ExponentialModel()
-    >>> base_model.rho = 12.
-    >>> base_model.sigma = 1.
-    >>> bivariate_model = BivariateUniformCorrelation(base_model)
-    >>> bivariate_model.r_0 = 0.75
-    >>> bivariate_model.f_0 = 2.3
+    >>> base_model = ExponentialModel(rho=12.)
+    >>> bivariate_model = BivariateUniformCorrelation(base_model, r=0.3, f=2.)
     """
 
-    r = ModelParameter(default=0.0, bounds=(-1, 1), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.infty), doc="Amplitude ratio")
+    r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
+    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
 
-    def __init__(self, base_model: CovarianceModel):
+    def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(
             [
                 base_model,
-            ]
+            ],
+            *args,
+            **kwargs,
         )
 
     @property
@@ -509,7 +723,7 @@ class BivariateUniformCorrelation(CompoundModel):
     def base_model(self, model):
         raise AttributeError("Base model cannot be set")
 
-    def __call__(self, lags: np.ndarray):
+    def _compute(self, lags: np.ndarray):
         """
         Evaluates the covariance model at the passed lags. Since the model is bivariate,
         the returned array has two extra dimensions compared to the array lags, both of size
@@ -525,7 +739,7 @@ class BivariateUniformCorrelation(CompoundModel):
             Covariance values with shape (m1, m2, ..., mk, 2, 2)
 
         """
-        acv11 = self.base_model(lags)
+        acv11 = self.base_model._compute(lags)
         out = np.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11

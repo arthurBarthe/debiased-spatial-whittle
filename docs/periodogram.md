@@ -71,3 +71,11 @@ where $\Theta$ is the parameter space, defined within the specified model.
 ::: debiased_spatial_whittle.likelihood.MultivariateDebiasedWhittle
 
 ::: debiased_spatial_whittle.likelihood.Estimator
+
+## least_squares.py
+
+This module provides a method for a least-squares fit of the expected periodogram
+to the periodogram. This can be used for instance to obtain an initial guess
+before using Debiased Whittle estimation.
+
+::: debiased_spatial_whittle.least_squares.LeastSquareEstimator

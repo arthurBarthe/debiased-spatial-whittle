@@ -174,6 +174,62 @@ class SamplerOnRectangularGrid:
         return result
 
 
+from numpy.linalg import eigh
+
+
+class MultivariateSamplerOnRectangularGrid:
+    """
+    Implements circulant embedding for multivariate random fields, as proposed by Chan & Wood (1999).
+    """
+
+    def __init__(self, model: CovarianceModel, grid: RectangularGrid, p: int):
+        self.model = model
+        self.grid = grid
+        self.p = p
+        self.sampling_grid = grid
+
+    @property
+    def spatial_axes(self):
+        return tuple(range(self.grid.ndim))
+
+    def compute_spectral_decomposition(self):
+        # cov shape (2 * n1 - 1, 2 * n2 - 1, p, p)
+        cov = self.sampling_grid.autocov(self.model)
+        f = prod_list(self.sampling_grid.n) * ifftn(cov, axes=self.spatial_axes)
+        return eigh(f)
+
+    def _sample(self):
+        # lambdas shape (p, ), r_matrix shape (p, p)
+        lambdas, r_matrix = self.compute_spectral_decomposition()
+        shape = self.sampling_grid.n + (1, self.p)
+        # e shape (n1, ..., nd, p, 1)
+        e = randn(*lambdas.shape) + 1j * randn(*lambdas.shape)
+        y = np.expand_dims(np.sqrt(lambdas) * e, -1)
+        y = np.matmul(r_matrix, y)
+        w = (
+            1
+            / np.sqrt(np.array(prod_list(self.sampling_grid.n)))
+            * np.real(fftn(y, axes=self.spatial_axes))
+        )
+        for i, n in enumerate(self.grid.n):
+            w = np.take(w, arange(n), i)
+        # remove extra dimensions
+        # TODO dirty, clean this somehow
+        w = np.squeeze(w, -1)
+        w = np.squeeze(w, -2)
+        return w * self.grid.mask
+
+    def __call__(self):
+        """
+        Generate a realization from the specified covariance model on the grid.
+
+        Returns
+        -------
+
+        """
+        return self._sample()
+
+
 class TSamplerOnRectangularGrid:
     """
     Class for the sampling of a t-multivariate random field
