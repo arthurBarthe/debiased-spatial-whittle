@@ -59,6 +59,8 @@ class LeastSquareEstimator:
             x = np.asarray(x)
             model.update_free_parameters(x)
             model_ep = self.expected_periodogram(model)
-            return np.to_cpu((data_periodogram - model_ep).flatten())
+            ratio = (data_periodogram / model_ep).flatten()
+            residuals = ratio - np.ones_like(ratio)
+            return np.to_cpu(residuals)
 
         return opt_func

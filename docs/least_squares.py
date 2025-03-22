@@ -12,8 +12,8 @@ from debiased_spatial_whittle.least_squares import LeastSquareEstimator
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 
 grid = RectangularGrid((512, 512))
-model = SquaredExponentialModel(rho=12.0, sigma=2.0)
-model = NuggetModel(model, nugget=1e-3)
+model = SquaredExponentialModel(rho=12.0, sigma=1.2)
+model = NuggetModel(model, nugget=1e-2)
 sampler = SamplerOnRectangularGrid(model, grid)
 data = sampler()
 
