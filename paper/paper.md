@@ -9,16 +9,16 @@ tags:
   - gaussian processes
 authors:
   - name: Arthur P. Guillaumin
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-1571-4228
     affiliation: 1
   - name: Adam M. Sykulski
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0002-5564-3674
     affiliation: 2
   - name: Sofia C. Olhede
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-0061-227X
     affiliation: 3
   - name: Frederik J. Simons
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-2021-6645
     affiliation: 4
 affiliations:
  - name: Queen Mary University of London, United Kingdom
@@ -29,7 +29,7 @@ affiliations:
    index: 3
  - name: Princeton University, United States of America
    index: 4
-date: 20 January 2025
+date: 24 March 2025
 bibliography: paper.bib
 ---
 
