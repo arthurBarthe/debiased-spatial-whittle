@@ -19,7 +19,6 @@ np = BackendManager.get_backend()
 # ##Model Specification
 
 model = SquaredExponentialModel(rho=100, sigma=0.9)
-model.param.rho.log_scale_optim = True
 
 # ##Grid specification
 
@@ -44,7 +43,7 @@ expected_periodogram = ExpectedPeriodogram(grid_circle, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle, use_gradients=False, method="trust-constr")
 
-model_est = SquaredExponentialModel(rho=10.0, sigma=0.9)
+model_est = SquaredExponentialModel(rho=10.0, sigma=1.0)
 model_est.fix_parameter("sigma")
 model_est.set_param_bounds(dict(rho=(5.0, 250)))
 

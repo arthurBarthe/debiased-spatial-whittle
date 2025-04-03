@@ -445,9 +445,14 @@ class ExponentialModel(CovarianceModel):
     array([1.9881    , 1.62771861])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
+    rho = ModelParameter(
+        default=1.0, bounds=(0, numpy.inf), log_scale_optim=True, doc="Range parameter"
+    )
     sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
+        default=1.0,
+        bounds=(0, numpy.inf),
+        log_scale_optim=True,
+        doc="Amplitude parameter",
     )
 
     def _compute(self, lags: np.ndarray):
@@ -480,8 +485,12 @@ class SquaredExponentialModel(CovarianceModel):
     array([1.9881    , 1.94873298])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Amplitude parameter")
+    rho = ModelParameter(
+        default=1.0, bounds=(0, np.inf), log_scale_optim=True, doc="Range parameter"
+    )
+    sigma = ModelParameter(
+        default=1.0, bounds=(0, np.inf), log_scale_optim=True, doc="Amplitude parameter"
+    )
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
@@ -526,8 +535,8 @@ class Matern32Model(CovarianceModel):
     >>> model = Matern32Model(rho=5, sigma=1)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -562,8 +571,8 @@ class Matern52Model(CovarianceModel):
     >>> model = Matern52Model(rho=10, sigma=0.9)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -597,9 +606,9 @@ class RationalQuadraticModel(CovarianceModel):
     >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
-    alpha = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf), log_scale_optim=True)
+    alpha = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -633,7 +642,9 @@ class NuggetModel(CompoundModel):
     array([1.        , 0.89688042, 0.88758641])
     """
 
-    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
+    nugget = ModelParameter(
+        default=0.0, bounds=(0, 1), log_scale_optim=True, doc="Nugget amplitude"
+    )
 
     def __init__(self, model, *args, **kwargs):
         super().__init__(
@@ -675,7 +686,7 @@ class AnisotropicModel(CompoundModel):
     >>> model = AnisotropicModel(base_model, eta=1.5, phi=np.pi / 3)
     """
 
-    eta = ModelParameter(default=1, bounds=(0, np.inf))
+    eta = ModelParameter(default=1, bounds=(0, np.inf), log_scale_optim=True)
     phi = ModelParameter(default=0, bounds=(-np.pi / 2, np.pi / 2))
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
@@ -733,7 +744,9 @@ class BivariateUniformCorrelation(CompoundModel):
     """
 
     r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
+    f = ModelParameter(
+        default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio", log_scale_optim=True
+    )
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(
