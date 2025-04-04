@@ -23,7 +23,7 @@ model = SquaredExponentialModel(rho=32, sigma=0.9)
 
 # ##Grid specification
 
-m = 1024
+m = 512
 shape = (m, m)
 x_0, y_0, diameter = m // 2, m // 2, m
 x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
@@ -47,7 +47,9 @@ expected_periodogram = ExpectedPeriodogram(grid_circle, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle, use_gradients=False)
 
-model_est = SquaredExponentialModel(sigma=0.9)
-model_est.fix_parameter("sigma")
+model_est = SquaredExponentialModel(rho=2.0, sigma=1)
+model_est.set_param_bounds(dict(rho=(1.0, 100), sigma=(0.1, 10)))
+
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
-print("Estimated range parameter:", model_est.rho)
+print(f"Estimated range parameter: {model_est.rho}")
+print(f"Estimated amplitude parameter: {model_est.sigma}")

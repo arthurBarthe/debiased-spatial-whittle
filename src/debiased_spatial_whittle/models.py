@@ -86,12 +86,11 @@ def _parameterized_repr_html(p, open):
 
 
 class ModelParameter(param.Parameter):
-    __slots__ = [
-        "bounds",
-    ]
+    __slots__ = ["bounds", "log_scale_optim"]
 
     def __init__(self, *args, **kwargs):
         self.bounds = kwargs.pop("bounds")
+        self.log_scale_optim = kwargs.pop("log_scale_optim", False)
         super().__init__(*args, allow_refs=True, per_instance=True, **kwargs)
 
     @property
@@ -265,6 +264,10 @@ class CovarianceModel(ModelInterface):
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
 
+    def requires_log_scale(self, param_name: str):
+        """True if the model parameter is to be optimized on a log-scale"""
+        return getattr(self.param, param_name).log_scale_optim
+
     def update_free_parameters(self, param_values: np.ndarray):
         """In the case of a simple model, we simply update the free parameters"""
         a, b = (
@@ -272,18 +275,29 @@ class CovarianceModel(ModelInterface):
             param_values[self.n_free_parameters :],
         )
         for p_name, value in zip(self.free_parameters, a):
-            setattr(self, p_name, value)
+            if self.requires_log_scale(p_name):
+                setattr(self, p_name, np.exp(value))
+            else:
+                setattr(self, p_name, value)
 
     def free_parameter_values_to_array_deep(self):
         list_values = []
         for p in self.free_parameters:
-            list_values.append(getattr(self, p))
+            if self.requires_log_scale(p):
+                list_values.append(np.log(getattr(self, p)))
+            else:
+                list_values.append(getattr(self, p))
         return np.array(list_values)
 
     def free_parameter_bounds_to_list_deep(self):
         list_bounds = []
         for p in self.free_parameters:
-            list_bounds.append(getattr(self.param, p).bounds)
+            if self.requires_log_scale(p):
+                bounds = getattr(self.param, p).bounds
+                log_bounds = np.log(bounds[0]), np.log(bounds[1])
+                list_bounds.append(log_bounds)
+            else:
+                list_bounds.append(getattr(self.param, p).bounds)
         return list_bounds
 
     def _repr_html_(self):
@@ -307,6 +321,10 @@ class CompoundModel(ModelInterface):
         super().__init__(*args, **kwargs)
         self.children = children
 
+    def requires_log_scale(self, param_name: str):
+        """True if the model parameter is to be optimized on a log-scale"""
+        return getattr(self.param, param_name).log_scale_optim
+
     @property
     def n_free_parameters_deep(self):
         out = self.n_free_parameters
@@ -320,7 +338,10 @@ class CompoundModel(ModelInterface):
             param_values[self.n_free_parameters :],
         )
         for p_name, value in zip(self.free_parameters, a):
-            setattr(self, p_name, value)
+            if self.requires_log_scale(p_name):
+                setattr(self, p_name, np.exp(value))
+            else:
+                setattr(self, p_name, value)
         # update parameters of children
         for child in self.children:
             child.update_free_parameters(b)
@@ -329,7 +350,10 @@ class CompoundModel(ModelInterface):
     def free_parameter_values_to_array_deep(self):
         list_values = []
         for p in self.free_parameters:
-            list_values.append(getattr(self, p))
+            if self.requires_log_scale(p):
+                list_values.append(np.log(getattr(self, p)))
+            else:
+                list_values.append(getattr(self, p))
         array_values = np.array(list_values)
         return np.concatenate(
             [
@@ -341,7 +365,12 @@ class CompoundModel(ModelInterface):
     def free_parameter_bounds_to_list_deep(self):
         list_bounds = []
         for p in self.free_parameters:
-            list_bounds.append(getattr(self.param, p).bounds)
+            if self.requires_log_scale(p):
+                bounds = getattr(self.param, p).bounds
+                log_bounds = np.log(bounds[0]), np.log(bounds[1])
+                list_bounds.append(log_bounds)
+            else:
+                list_bounds.append(getattr(self.param, p).bounds)
         for child in self.children:
             list_bounds.extend(child.free_parameter_bounds_to_list_deep())
         return list_bounds
@@ -416,9 +445,14 @@ class ExponentialModel(CovarianceModel):
     array([1.9881    , 1.62771861])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
+    rho = ModelParameter(
+        default=1.0, bounds=(0, numpy.inf), log_scale_optim=True, doc="Range parameter"
+    )
     sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
+        default=1.0,
+        bounds=(0, numpy.inf),
+        log_scale_optim=True,
+        doc="Amplitude parameter",
     )
 
     def _compute(self, lags: np.ndarray):
@@ -451,8 +485,12 @@ class SquaredExponentialModel(CovarianceModel):
     array([1.9881    , 1.94873298])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Amplitude parameter")
+    rho = ModelParameter(
+        default=1.0, bounds=(0, np.inf), log_scale_optim=True, doc="Range parameter"
+    )
+    sigma = ModelParameter(
+        default=1.0, bounds=(0, np.inf), log_scale_optim=True, doc="Amplitude parameter"
+    )
 
     def _compute(self, lags: np.ndarray):
         d = np.sum(lags**2, 0) / (2 * self.rho**2)
@@ -497,8 +535,8 @@ class Matern32Model(CovarianceModel):
     >>> model = Matern32Model(rho=5, sigma=1)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -533,8 +571,8 @@ class Matern52Model(CovarianceModel):
     >>> model = Matern52Model(rho=10, sigma=0.9)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -568,9 +606,9 @@ class RationalQuadraticModel(CovarianceModel):
     >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
-    alpha = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf), log_scale_optim=True)
+    alpha = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
+    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), log_scale_optim=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -604,7 +642,9 @@ class NuggetModel(CompoundModel):
     array([1.        , 0.89688042, 0.88758641])
     """
 
-    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
+    nugget = ModelParameter(
+        default=0.0, bounds=(0, 1), log_scale_optim=True, doc="Nugget amplitude"
+    )
 
     def __init__(self, model, *args, **kwargs):
         super().__init__(
@@ -646,7 +686,7 @@ class AnisotropicModel(CompoundModel):
     >>> model = AnisotropicModel(base_model, eta=1.5, phi=np.pi / 3)
     """
 
-    eta = ModelParameter(default=1, bounds=(0, np.inf))
+    eta = ModelParameter(default=1, bounds=(0, np.inf), log_scale_optim=True)
     phi = ModelParameter(default=0, bounds=(-np.pi / 2, np.pi / 2))
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
@@ -704,7 +744,9 @@ class BivariateUniformCorrelation(CompoundModel):
     """
 
     r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
+    f = ModelParameter(
+        default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio", log_scale_optim=True
+    )
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(
