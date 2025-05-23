@@ -323,7 +323,8 @@ class DebiasedWhittle:
     @property
     def frequency_mask(self):
         if self._frequency_mask is None:
-            return 1
+            grid = self.expected_periodogram.grid
+            return np.ones(grid.n)
         else:
             return self._frequency_mask
 
