@@ -66,32 +66,49 @@ Firstly, you need to install poetry. Then, git clone this repository, ad run the
 the directory corresponding to the package.
 
    ```bash
-   poetry install
+      poetry install
    ```
 
 If you run into some issue regarding the Python version, you can run
    ```bash
-   poetry env use <path_to_python>
+      poetry env use <path_to_python>
    ```
 where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
 
 ### Unit tests
 Unit tests are run with pytest. On Pull-requests, the unit tests will be
-run.
+run. They can be run locally via the command
 
-## Documentation
-The documentation is hosted on readthedocs. It is based on docstrings.
-Currently, it points to the joss_paper branch and is updated on any push to that branch.
+```bash
+   pytest
+```
+from the root of the directory, with your environment activated.
 
-## Versioning
-Currently, versioning is handled manuallyusing poetry, e.g.
+### Pre-commits
+We run ruff-format as a pre-commit hook. Specifically, this is set up via pre-commit in
+the `.pre-commit-config.yaml` file.
+
+When you first try to commit, ruff-format might
+makes formatting changes to the code. You need to check those and then you can add again
+those files and try to commit with those changes.
+
+### Building the documentation
+The documentation is built using mkdocs. You can build and serve the documentation
+locally via the following command:
+
+```bash
+   mkdocs serve
+```
+
+### Versioning
+Currently, versioning is handled manually using poetry, e.g.
 
    ```bash
-   poetry version patch
+      poetry version patch
    ```
 or
    ```bash
-   poetry version minor
+      poetry version minor
    ```
 
 When creating a release in Github, the version tag should be set to match
