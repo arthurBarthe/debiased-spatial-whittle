@@ -77,14 +77,31 @@ where <path_to_python> is the path to a Python version compatible with the requi
 
 ### Unit tests
 Unit tests are run with pytest. On Pull-requests, the unit tests will be
-run.
+run. They can be run locally via the command
 
-## Documentation
-The documentation is hosted on readthedocs. It is based on docstrings.
-Currently, it points to the joss_paper branch and is updated on any push to that branch.
+```bash
+   pytest
+```
+from the root of the directory, with your environment activated.
+
+### Pre-commits
+We run ruff-format as a pre-commit hook. Specifically, this is set up via pre-commit in
+the `.pre-commit-config.yaml` file.
+
+When you first try to commit, ruff-format might
+makes formatting changes to the code. You need to check those and then you can add again
+those files and try to commit with those changes.
+
+### Documentation
+The documentation is built using mkdocs. You can build and serve the documentation
+locally via the following command:
+
+```bash
+   mkdocs serve
+```
 
 ## Versioning
-Currently, versioning is handled manuallyusing poetry, e.g.
+Currently, versioning is handled manually using poetry, e.g.
 
    ```bash
    poetry version patch
