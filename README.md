@@ -20,9 +20,11 @@ The SDW extends ideas from the Whittle likelihood and Debiased Whittle Likelihoo
 
 ## Installation instructions
 
+### CPU-only
+
 The package can be installed via one of the following methods.
 
-1. Via the use of Poetry ([https://python-poetry.org/](https://python-poetry.org/)), by running the following command:
+1. Via the use of [Poetry](https://python-poetry.org/), by running the following command:
 
    ```bash
    poetry add debiased-spatial-whittle
@@ -34,38 +36,79 @@ The package can be installed via one of the following methods.
     pip install debiased-spatial-whittle
     ```
 
+### GPU
+The Debiased Spatial Whittle likelihood relies on the Fast Fourier Transform (FFT) for computational efficiency.
+GPU implementations of the FFT provide additional computational efficiency (order x100) at almost no additional cost thanks to GPU implementations of the FFT algorithm.
+
+If you want to install with GPU dependencies (Cupy and Pytorch):
+
+1. You need an NVIDIA GPU
+2. You need to install the CUDA Toolkit. See for instance Cupy's [installation page](https://docs.cupy.dev/en/stable/install.html).
+3. You can install Cupy or pytorch yourself in your environment. Or you can specify an extra to poetry, e.g.
+
+   ```bash
+   poetry add debiased-spatial-whittle -E gpu12
+   ```
+   if you version of the CUDA toolkit is 12.* (use gpu11 if your version is 11.*)
+
+You can then switch to using e.g. Cupy instead of numpy as the backend via:
+
+   ```python
+    from debiased_spatial_whittle.backend import BackendManager
+    BackendManager.set_backend("cupy")
+   ```
+
+This should be run before any other import from the debiased_spatial_whittle package.
+
 ## Development
 
 Firstly, you need to install poetry. Then, git clone this repository, ad run the following command from
 the directory corresponding to the package.
 
    ```bash
-   poetry install
+      poetry install
    ```
 
 If you run into some issue regarding the Python version, you can run
    ```bash
-   poetry env use <path_to_python>
+      poetry env use <path_to_python>
    ```
 where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
 
 ### Unit tests
 Unit tests are run with pytest. On Pull-requests, the unit tests will be
-run.
+run. They can be run locally via the command
 
-## Documentation
-The documentation is hosted on readthedocs. It is based on docstrings.
-Currently, it points to the joss_paper branch and is updated on any push to that branch.
+```bash
+   pytest
+```
+from the root of the directory, with your environment activated.
 
-## Versioning
-Currently, versioning is handled manuallyusing poetry, e.g.
+### Pre-commits
+We run ruff-format as a pre-commit hook. Specifically, this is set up via pre-commit in
+the `.pre-commit-config.yaml` file.
+
+When you first try to commit, ruff-format might
+makes formatting changes to the code. You need to check those and then you can add again
+those files and try to commit with those changes.
+
+### Building the documentation
+The documentation is built using mkdocs. You can build and serve the documentation
+locally via the following command:
+
+```bash
+   mkdocs serve
+```
+
+### Versioning
+Currently, versioning is handled manually using poetry, e.g.
 
    ```bash
-   poetry version patch
+      poetry version patch
    ```
 or
    ```bash
-   poetry version minor
+      poetry version minor
    ```
 
 When creating a release in Github, the version tag should be set to match

@@ -704,7 +704,7 @@ class BivariateUniformCorrelation(CompoundModel):
     """
 
     r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
+    f = ModelParameter(default=1.0, bounds=(1e-2, 1e2), doc="Amplitude ratio")
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(
