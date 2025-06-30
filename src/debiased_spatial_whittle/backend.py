@@ -1,5 +1,8 @@
+import cupyx.scipy.special
 import numpy
 import warnings
+
+import scipy.special
 
 TORCH_INSTALLED = True
 CUPY_INSTALLED = True
@@ -197,6 +200,16 @@ class BackendManager:
             fftshift = cls._changes_keyword(torch.fft.fftshift, "axes", "dim")
             ifftshift = cls._changes_keyword(torch.fft.ifftshift, "axes", "dim")
             return fftshift, ifftshift
+
+    @classmethod
+    def get_gamma(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return scipy.special.gamma
+        elif cls.backend_name == "cupy":
+            return cupyx.scipy.special.gamma
+        elif cls.backend_name == "torch":
+            lgamma = torch.lgamma
+            return lambda *args, **kwargs: torch.exp(lgamma(*args, **kwargs))
 
     @classmethod
     def _changes_keyword(cls, func, old_keyword, new_keyword):

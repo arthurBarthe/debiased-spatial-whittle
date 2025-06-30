@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import debiased_spatial_whittle.grids as grids
 from debiased_spatial_whittle.models import SquaredExponentialModel
+from debiased_spatial_whittle.sdf_models import SpectralMatern
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -26,7 +27,7 @@ z = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-estimator = Estimator(debiased_whittle, use_gradients=True)
+estimator = Estimator(debiased_whittle)
 
 model_est = SquaredExponentialModel()
 estimate = estimator(model_est, z)
