@@ -202,12 +202,10 @@ class MultivariateDebiasedWhittle:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
         d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
-        ep_inv = np.expand_dims(ep_inv, 2)
         # the derivative of the log determinant
         d_log_det = np.trace(np.matmul(ep_inv, d_ep), axis1=-2, axis2=-1)
         # the derivative the second term
         d_ep_inv = -np.matmul(ep_inv, np.matmul(d_ep, ep_inv))
-        p = np.expand_dims(p, axis=2)
         d_quad_term = np.trace(np.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
         # derivative
         d_whittle = np.mean(d_log_det + d_quad_term, axis=(0, 1))
@@ -215,12 +213,13 @@ class MultivariateDebiasedWhittle:
 
     def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
         """Provides the expectation of the hessian matrix"""
+        n_params = len(params_for_gradient)
         ep = self.expected_periodogram(model)
         ep_inv = inv(ep)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = zeros((len(params_for_gradient), len(params_for_gradient)))
-        for i1, p1_name in enumerate(params_for_gradient.names):
-            for i2, p2_name in enumerate(params_for_gradient.names):
+        h = zeros((n_params, n_params))
+        for i1 in range(n_params):
+            for i2 in range(n_params):
                 d_ep1 = d_ep[..., i1]
                 d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.mean(

@@ -400,9 +400,10 @@ class ExpectedPeriodogram:
         if p == 1:
             cg = np.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
         else:
-            cg = np.reshape(
-                cg, cg.shape[:n_dim] + (1,) * (acv.ndim - n_dim - 2) + (p, p)
-            )
+            if acv.shape[n_dim] == 1:
+                cg = np.expand_dims(cg, n_dim)
+            if acv.ndim > cg.ndim:
+                cg = np.expand_dims(cg, -1)
         cbar = acv
         if apply_cg:
             cbar = cg * acv

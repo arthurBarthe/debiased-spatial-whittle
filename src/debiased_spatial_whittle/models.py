@@ -762,24 +762,18 @@ class BivariateUniformCorrelation(CompoundModel):
             shape (m1, ..., mk, 2, 2, p + 2)
             where p is the number of parameters of the base model.
         """
-        acv11 = self.base_model(x)
+        acv_base_model = self.base_model(x)
         gradient_base_model = self.base_model._gradient(x)
-        # gradient 11
-        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
-        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
-        # gradient 12
-        temp = np.stack((acv11 * self.f, acv11 * self.r), axis=-1)
-        gradient_12 = np.concatenate(
-            (temp, gradient_base_model * self.r * self.f), axis=-1
-        )
-        # gradient 21
-        gradient_21 = gradient_12
-        # gradient 22
-        temp = np.stack((np.zeros_like(acv11), 2 * self.f * acv11), axis=-1)
-        gradient_22 = np.concatenate((temp, gradient_base_model * self.f**2), axis=-1)
-        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
-        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
-        return np.stack((row1, row2), axis=x.ndim - 1)
+        # derivative w.r.t. r
+        d_r = np.zeros(acv_base_model.shape + (2, 2))
+        d_r[..., 0, 1] = acv_base_model * self.f
+        d_r[..., 1, 0] = acv_base_model * self.f
+        # derivative w.r.t. f
+        d_f = np.zeros(acv_base_model.shape + (2, 2))
+        d_f[..., 1, 1] = 2 * self.f * acv_base_model
+        d_f[..., 0, 1] = acv_base_model * self.r
+        d_f[..., 1, 0] = acv_base_model * self.r
+        return dict(r=d_r, f=d_f)
 
 
 # TODO temporary fix

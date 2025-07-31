@@ -87,16 +87,17 @@ def test_gradient_bivariate():
     bvm.r = 0.2
     bvm.f = 1.5
     lags = g.lags_unique
-    gradient = bvm.gradient(lags, [bvm.param.r, bvm.param.f])
+    params_for_gradient = [bvm.param.r, bvm.param.f]
+    gradient = bvm.gradient(lags, params_for_gradient)
     epsilon = 1e-5
     cov = bvm(lags)
-    for i, p in enumerate(bvm.params):
-        print(p)
-        p.value = p.value + epsilon
+    for i, p in enumerate(params_for_gradient):
+        print(p.name)
+        setattr(bvm, p.name, getattr(bvm, p.name) + epsilon)
         cov2 = bvm(lags)
         gradient_num = (cov2 - cov) / epsilon
-        assert_allclose(gradient[p.name], gradient_num, rtol=0.01)
-        p.value = p.value - epsilon
+        assert_allclose(gradient[..., i], gradient_num[:, :, 0, ...], rtol=0.01)
+        setattr(bvm, p.name, getattr(bvm, p.name) - epsilon)
 
 
 """

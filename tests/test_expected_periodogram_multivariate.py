@@ -25,6 +25,6 @@ class TestEpFullGrid:
             periodograms.append(p_value)
         avg_per = np.mean(periodograms, axis=0)
         ep_computer = ExpectedPeriodogram(self.grid, p_computer)
-        ep = ep_computer(self.bvm)
+        ep = ep_computer(self.bvm)[:, :, 0, ...]
         # for this model and grid (full grid), the expected periodogram is real-valued
         assert_allclose(np.real(avg_per), np.real(ep), rtol=0.2)
