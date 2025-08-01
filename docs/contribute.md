@@ -1,7 +1,28 @@
+Contributions are most welcome, thank you for your interest! A good starting point is to take a look at
+the list of [issues](https://github.com/arthurBarthe/debiased-spatial-whittle/issues).
+
 ## Development
 
-Firstly, you need to install poetry. Then, git clone this repository, ad run the following command from
-the directory corresponding to the package.
+The general steps to follow to make a contribution are:
+1. **Fork the Repository**: You create your own copy of the repository by forking it. This allows you to make changes without affecting the original repository.
+
+2. **Clone the Fork**: You then clone your fork to your local machine to work on the changes.
+
+3. **Create a Branch**: This keeps your changes organized and makes it easier to manage multiple contributions.
+
+4. **Make Changes**: You make your changes in your local branch.
+
+5. **Commit Changes**: You commit your changes with descriptive commit messages.
+
+6. **Push Changes**: You push your changes to your fork on the remote repository.
+
+7. **Create a Pull Request**: Finally, you create a pull request from your fork to the original repository. This allows the maintainers to review your changes and merge them if they are acceptable.
+
+Note that once you have cloned the repository, you will need to also install [poetry](https://python-poetry.org/),
+which we use for packaging and dependency managment.
+
+Having done so, you can create a virtual environment and install the package by running the following command from
+the directory corresponding to the package:
 
    ```bash
       poetry install
