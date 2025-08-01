@@ -10,7 +10,7 @@ theme:
 plugins:
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py']
+    'anisotropic.py', 'france_interpolation.py']
     execute: true
 - mkdocstrings:
     handlers:
@@ -60,6 +60,7 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
+      - Interpolation: france_interpolation.py
   - Reference:
       - Grids: grids.md
       - Models: models.md
