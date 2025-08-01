@@ -53,6 +53,12 @@ If you want to install with GPU dependencies (Cupy and Pytorch):
    ```
    if you version of the CUDA toolkit is 12.* (use gpu11 if your version is 11.*)
 
+One way to check your CUDA version is to run the following command in a terminal:
+
+```bash
+   nvidia-smi
+```
+
 You can then switch to using e.g. Cupy instead of numpy as the backend via:
 
    ```python
@@ -63,7 +69,7 @@ You can then switch to using e.g. Cupy instead of numpy as the backend via:
 This should be run before any other import from the debiased_spatial_whittle package.
 
 
-## PyPi
+## PyPI
 The package is updated on PyPi automatically on creation of a new
 release in Github. Note that currently the version in pyproject.toml
 needs to be manually updated. This should be fixed by adding
