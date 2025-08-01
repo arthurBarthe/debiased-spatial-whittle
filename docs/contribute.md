@@ -59,6 +59,18 @@ locally via the following command:
    mkdocs serve
 ```
 
+The Reference section is built from docstrings, however only referenced classes are displayed.
+For instance, we refer to the RectangularGrid class in the Grids section by adding the line
+
+```markdown
+::: debiased_spatial_whittle.grids.RectangularGrid
+```
+
+in docs/grids.md.
+
+The structure of the documentation website is defined in mkdocs.yml, where files that are pointed to
+are expected to be found in the docs/ directory.
+
 ### Versioning
 Currently, versioning is handled manually using poetry, e.g.
 
