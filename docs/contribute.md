@@ -1,3 +1,58 @@
+## Development
+
+Firstly, you need to install poetry. Then, git clone this repository, ad run the following command from
+the directory corresponding to the package.
+
+   ```bash
+      poetry install
+   ```
+
+If you run into some issue regarding the Python version, you can run
+   ```bash
+      poetry env use <path_to_python>
+   ```
+where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
+
+### Unit tests
+Unit tests are run with pytest. On Pull-requests, the unit tests will be
+run. They can be run locally via the command
+
+```bash
+   pytest
+```
+from the root of the directory, with your environment activated.
+
+### Pre-commits
+We run ruff-format as a pre-commit hook. Specifically, this is set up via pre-commit in
+the `.pre-commit-config.yaml` file.
+
+When you first try to commit, ruff-format might
+make formatting changes to the code. You need to check those and then you can git-add again
+those files and try to commit with those changes.
+
+### Building the documentation
+The documentation is built using mkdocs. You can build and serve the documentation
+locally via the following command:
+
+```bash
+   mkdocs serve
+```
+
+### Versioning
+Currently, versioning is handled manually using poetry, e.g.
+
+   ```bash
+      poetry version patch
+   ```
+or
+   ```bash
+      poetry version minor
+   ```
+
+When creating a release in Github, the version tag should be set to match
+the version in th pyproject.toml. Creating a release in Github will trigger
+a Github workflow that will publish to Pypi (see Pypi section).
+
 ## Bug reports
 
 If you encounter a bug, we would be thankful if you could report it by raising an issue.
