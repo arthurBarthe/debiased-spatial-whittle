@@ -362,13 +362,21 @@ class ExpectedPeriodogram:
             Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd), the first d dimensions
             of acv should have sizes (2 * n1 - 1, ..., 2 * nd - 1).
             The standard way to obtain acv is through the call of the autocov method of a rectangular grid.
-            acv may have extra dimensions. The following cases are standard:
-            1. Univariate data, multiple model parameter vectors. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, m)
+            acv may have extra dimensions. The following other cases are standard:
+            1. Univariate data, vectorized models. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, m)
             where m is the number of model parameter vectors.
-            2. Multivariate data, unique model parameter vector. acv will have shape
+            2. Univariate data, gradient. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, k) where k is the number of
+            parameters with respect to which we request the gradient.
+            3. Multivariate data, unique model parameter vector. acv will have shape
             (2 * n1 - 1, ..., 2 * nd - 1, p, p) where p is the number of variates
-            3. Multivariate data, multiple model parameter vectors. acv will have shape
+            4. Multivariate data, vectorized models. acv will have shape
             (2 * n1 - 1, ..., 2 * nd - 1, m, p, p)
+            5. Multivariate data, gradient. acv will have shape
+            (2 * n1 - 1, ..., 2 * nd - 1, k, p, p) where k is the number of parameters with respect to which we
+            take the gradient.
+
+            The case of gradient computation combined with vectorized models (not shown above) might work,
+            but has not been tested as of now.
         fold
             Whether to apply folding of the expected periodogram
         d
@@ -398,12 +406,12 @@ class ExpectedPeriodogram:
         else:
             cg = spatial_kernel(self.grid.mask, d)
         if p == 1:
+            # scalar field. We might have acv.ndim - n_dim > 0 for vectorized models or for gradients
             cg = np.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
         else:
-            if acv.shape[n_dim] == 1:
+            # multivariate field.
+            for i in range(acv.ndim - n_dim - 2):
                 cg = np.expand_dims(cg, n_dim)
-            if acv.ndim > cg.ndim:
-                cg = np.expand_dims(cg, -1)
         cbar = acv
         if apply_cg:
             cbar = cg * acv

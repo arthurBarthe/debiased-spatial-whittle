@@ -288,8 +288,7 @@ def test_gradient_expected_periodogram_bivariate():
         setattr(bvm, p.name, new_value)
         ep2 = ep_op(bvm)
         grad_num = (ep2 - ep) / epsilon
-        grad_num = grad_num[..., 0, :, :]
-        assert_allclose(ep_grad[..., i], grad_num, rtol=0.001)
+        assert_allclose(ep_grad[..., i, :, :], grad_num, rtol=0.001)
         setattr(bvm, p.name, old_value)
 
 

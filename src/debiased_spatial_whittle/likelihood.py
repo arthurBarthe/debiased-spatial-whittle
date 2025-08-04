@@ -201,7 +201,8 @@ class MultivariateDebiasedWhittle:
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
+        ep_inv = np.expand_dims(ep_inv, -3)
+        p = np.expand_dims(p, -3)
         # the derivative of the log determinant
         d_log_det = np.trace(np.matmul(ep_inv, d_ep), axis1=-2, axis2=-1)
         # the derivative the second term

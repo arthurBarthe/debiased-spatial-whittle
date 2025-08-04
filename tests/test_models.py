@@ -93,7 +93,7 @@ def test_gradient_bivariate():
         setattr(bvm, p.name, getattr(bvm, p.name) + epsilon)
         cov2 = bvm(lags)
         gradient_num = (cov2 - cov) / epsilon
-        assert_allclose(gradient[..., i], gradient_num[:, :, 0, ...], rtol=0.01)
+        assert_allclose(gradient[..., i, :, :], gradient_num, rtol=0.01)
         setattr(bvm, p.name, getattr(bvm, p.name) - epsilon)
 
 

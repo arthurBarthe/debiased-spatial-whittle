@@ -218,7 +218,8 @@ class ModelInterface(param.Parameterized):
         out = []
         for p in params:
             out.append(grad[p.name])
-        return np.stack(out, -1)
+        n_spatial_dims = lags.shape[0]
+        return np.stack(out, n_spatial_dims)
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()
@@ -293,9 +294,10 @@ class CovarianceModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
+        ndim = lags.ndim
         out = self._compute(np.expand_dims(lags, -1))
-        if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+        if out.shape[ndim - 1] == 1:
+            out = np.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -358,9 +360,10 @@ class CompoundModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
+        ndim = lags.ndim
         out = self._compute(np.expand_dims(lags, -1))
-        if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+        if out.shape[ndim - 1] == 1:
+            out = np.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -740,13 +743,10 @@ class BivariateUniformCorrelation(CompoundModel):
 
         """
         acv11 = self.base_model._compute(lags)
-        out = np.zeros(acv11.shape + (2, 2))
-        out = BackendManager.convert(out)
-        out[..., 0, 0] = acv11
-        out[..., 1, 1] = acv11 * self.f**2
-        out[..., 0, 1] = acv11 * self.r * self.f
-        out[..., 1, 0] = acv11 * self.r * self.f
-        return out
+        fill_in = np.ones_like(self.r * self.f)
+        column1 = np.stack((acv11 * fill_in, acv11 * self.r * self.f), -1)
+        column2 = np.stack((acv11 * self.r * self.f, acv11 * fill_in * self.f**2), -1)
+        return np.stack((column1, column2), -1)
 
     def _gradient(self, x: np.ndarray):
         """
