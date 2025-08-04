@@ -79,15 +79,12 @@ def test_gradient_bivariate():
 
     """
     g = RectangularGrid((32, 32), nvars=2)
-    model = SquaredExponentialModel()
-    model.rho = 3
-    model.sigma = 2
-    model.nugget = 0.2
-    bvm = BivariateUniformCorrelation(model)
-    bvm.r = 0.2
-    bvm.f = 1.5
+    model = SquaredExponentialModel(rho=3.0, sigma=1.2)
+    bvm = BivariateUniformCorrelation(model, r=0.2, f=0.1)
     lags = g.lags_unique
-    params_for_gradient = [bvm.param.r, bvm.param.f]
+    params_for_gradient = [
+        bvm.param.r,
+    ]
     gradient = bvm.gradient(lags, params_for_gradient)
     epsilon = 1e-5
     cov = bvm(lags)
