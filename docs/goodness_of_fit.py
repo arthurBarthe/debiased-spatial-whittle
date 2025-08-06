@@ -1,65 +1,67 @@
+# imports
+
 import numpy as np
+from numpy.fft import fftshift
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    SquaredExponentialModel,
+    Matern32Model,
+    Matern52Model,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 from debiased_spatial_whittle.diagnostics import GoodnessOfFit
+from debiased_spatial_whittle.utils import plot_fourier_values
 
-model = ExponentialModel()
-model.nugget = 0.1
-model.rho = 10
-model.sigma = 1.0
+# ## True model and sampler
+
+model = Matern32Model(rho=8, sigma=0.9)
 
 m = 256
-shape = (m * 1, m * 1)
+shape = (m, m)
 
-grid_circle = RectangularGrid(shape)
-sampler = SamplerOnRectangularGrid(model, grid_circle)
+grid = RectangularGrid(shape)
+sampler = SamplerOnRectangularGrid(model, grid)
 
-p_values = []
+z = sampler()
 
-fig = plt.figure()
-ax = fig.add_subplot()
+# ## Model inference from sample
 
-for i_sample in range(1):
-    print(f"---------Sample {i_sample}------------")
-    z = sampler()
+periodogram = Periodogram()
+expected_periodogram = ExpectedPeriodogram(grid, periodogram)
+debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
+estimator = Estimator(debiased_whittle)
 
-    periodogram = Periodogram()
-    expected_periodogram = ExpectedPeriodogram(grid_circle, periodogram)
-    debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
-    estimator = Estimator(debiased_whittle, use_gradients=False)
 
-    def get_model_est():
-        model_est = SquaredExponentialModel()
-        model_est.nugget = None
-        return model_est
+def get_model_est():
+    model_est = Matern32Model()
+    model_est.set_param_bounds(dict(rho=(1.0, m), sigma=(0.1, 10)))
+    return model_est
 
-    model_est = get_model_est()
-    estimate = estimator(model_est, z)
-    print(estimate)
 
-    # we carry out some goodness-of-fit analysis
-    gof = GoodnessOfFit(model_est, grid_circle, z, n_bins=500)
+model_est = get_model_est()
+estimate = estimator(model_est, z)
+print("Rho estimate: ", estimate.rho)
 
-    residuals = gof.compute_residuals(z, model)
-    plt.figure()
-    plt.hist(residuals.flatten())
+# ## Goodness-of-fit analysis using uniform residuals
 
-    gof.bootstrap = False
-    gof.get_model_est = get_model_est
-    chi, p_value = gof.compute_diagnostic_statistic()
-    print(chi, p_value)
-    p_value = gof.p_value(chi)
-    print(p_value)
-    p_values.append(p_value)
+gof = GoodnessOfFit(model_est, grid, z, n_bins=500)
+gof.plot()
 
-    # update plot
-    ax.clear()
-    ax.hist(p_values, bins=np.linspace(0, 1, 20))
-    plt.pause(0.1)
-    plt.show(block=False)
-plt.show(block=True)
+gof.bootstrap = False
+gof.get_model_est = get_model_est
+chi, p_value = gof.compute_diagnostic_statistic()
+p_value = gof.p_value(chi)
+print("p-value: ", p_value)
+
+# ## Goodness-of-fit using ratio residuals
+
+from debiased_spatial_whittle.diagnostics import GoodnessOfFitSimonsOlhede
+
+gof = GoodnessOfFitSimonsOlhede(model_est, grid, z)
+print(gof.compute_diagnostic_statistic())
+gof.plot()

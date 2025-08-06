@@ -1,17 +1,115 @@
 from functools import cached_property
 import numpy as np
-from scipy.stats import chisquare
+from numpy.fft import fftshift
+from scipy.stats import chi2, chisquare, uniform, norm
 from matplotlib import pyplot as plt
+
 from debiased_spatial_whittle.models import CovarianceModel
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.utils import plot_fourier_values
+
+
+class GoodnessOfFitSimonsOlhede:
+    """
+    Class to carry out a goodness-of-fit analysis that relies on spectral residuals as defined in
+    Simons & Olhede 2013.
+    """
+
+    def __init__(
+        self, model: CovarianceModel, grid: RectangularGrid, sample: np.ndarray
+    ):
+        self.model = model
+        self.grid = grid
+        self.sample = sample
+        self.periodogram_computer = Periodogram()
+
+    def compute_residuals(self):
+        r"""
+        Compute spectral residuals.
+
+        Notes
+        -----
+        The residuals are defined according to,
+
+        $$
+            X(k) = \frac{I(\mathbf{k})}{\overline{I}(\mathbf{k}; \widehat{\boldsymbol{\theta}})},
+        $$
+
+        where $\widehat{\boldsymbol{\theta}}$ is the model's parameter estimates. Under the correct model,
+        these residuals are expected to (approximately) follow a chi-square distribution with two degrees of freedom
+        multiplied by a factor one half.
+
+        Returns
+        -------
+        residuals
+            Array of spectral residuals.
+        """
+        periodogram = self.periodogram_computer(self.sample)
+        ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(self.model)
+        residuals = periodogram / ep
+        return residuals
+
+    def plot(self):
+        """
+        Generates two plots regarding the distribution of the spectral-domain residuals. A Fourier-space
+        plot of the residual values, and a qq-plot against the approximate theoretical distribution.
+
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+        >>> model = ExponentialModel(rho=8)
+        >>> grid = RectangularGrid((128, 128))
+        >>> sample = SamplerOnRectangularGrid(model, grid)()
+        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof.plot()
+        >>> model = SquaredExponentialModel(rho=8)
+        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof.plot()
+        """
+        residuals = self.compute_residuals()
+        # spatial plot
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 2, 1)
+        plot_fourier_values(self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=6)
+        ax.set_title("Fourier residuals")
+        # qq plot
+        dist = chi2(df=2)
+        ps = np.linspace(0, 1, 500)
+        th_quantiles = dist.ppf(ps) / 2
+        emp_quantiles = np.quantile(residuals, ps)
+        ax = fig.add_subplot(1, 2, 2)
+        ax.plot(th_quantiles, emp_quantiles, "-*")
+        ax.plot(th_quantiles, th_quantiles)
+        ax.set_aspect("equal")
+        ax.set_title("QQ-plot of Fourier residuals")
+        plt.show()
+
+    def compute_diagnostic_statistic(self):
+        residuals = self.compute_residuals()
+        statistic = np.mean((residuals - 1) ** 2)
+        th_variance = 8 / self.grid.n_points
+        statistic = -np.abs(statistic - 1) * np.sqrt(1 / th_variance)
+        p_value = norm.cdf(statistic) * 2
+        return statistic, p_value
 
 
 class GoodnessOfFit:
+    """
+    Class to carry out a goodness-of-fit analysis that relies on spectral residuals expected to be U(0, 1)
+    distributed.
+    """
+
     def __init__(
-        self, model: CovarianceModel, grid: RectangularGrid, sample, n_bins: int = 10
+        self,
+        model: CovarianceModel,
+        grid: RectangularGrid,
+        sample: np.ndarray,
+        n_bins: int = 10,
     ):
         self.model = model
         self.grid = grid
@@ -25,12 +123,50 @@ class GoodnessOfFit:
         return SamplerOnRectangularGrid(self.model, self.grid)
 
     def compute_residuals(self, sample, model):
+        r"""
+        Compute spectral residuals.
+
+        Notes
+        -----
+        The residuals are defined according to,
+
+        $$
+            X(k) = 1 - \exp\left(-\frac{I(\mathbf{k})}{\overline{I}(\mathbf{k}; \widehat{\boldsymbol{\theta}})}\right),
+        $$
+
+        where $\widehat{\boldsymbol{\theta}}$ is the model's parameter estimates. Under the correct model, the
+        residuals defined above are expected to (approximately) follow a Uniform distribution over the unit interval.
+
+        Returns
+        -------
+        residuals
+            Array of spectral residuals.
+        """
         periodogram = self.periodogram_computer(sample)
         ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
         residuals = 1 - np.exp(-periodogram / ep)
         return residuals
 
-    def compute_diagnostic_statistic(self, sample=None, model=None):
+    def compute_diagnostic_statistic(
+        self, sample: np.ndarray = None, model: CovarianceModel = None
+    ) -> tuple[float, float]:
+        """
+        Compute a diagnostic statistic from the residuals. The provided p-value is derived under the assumption that Fourier residuals are
+        not correlated. This might be a poor approximation in practice, leading to incorrectly small p-values.
+        To address this issue, one can use the method p_value instead.
+
+        Parameters
+        ----------
+        sample
+            random field data
+        model
+            fitted covariance model
+
+        Returns
+        -------
+        statistic, p-value
+            value of the statistic and the corresponding theoretical p-value
+        """
         if sample is None:
             sample = self.sample
             model = self.model
@@ -39,7 +175,23 @@ class GoodnessOfFit:
         statistic, pvalue = chisquare(bin_counts)
         return statistic, pvalue
 
-    def p_value(self, statistic: float, n_sim: int = 20):
+    def p_value(self, statistic: float, n_sim: int = 20) -> float:
+        """
+        Compute a p-value for the diagnostic statistic. The p-value is empirical as it relies on simulations
+        from the model.
+
+        Parameters
+        ----------
+        statistic
+            Value of the statistic obtained from the data
+        n_sim
+            Number of simulated random fields used to compute the empirical p-value.
+
+        Returns
+        -------
+        p-value
+            p-value for the model
+        """
         statistic_values = []
         dbw = DebiasedWhittle(
             self.periodogram_computer,
@@ -60,6 +212,43 @@ class GoodnessOfFit:
                 )
             statistic_values.append(statistic_value)
         return np.mean(statistic <= statistic_values)
+
+    def plot(self):
+        """
+        Generates two plots regarding the distribution of the spectral-domain residuals. A Fourier-space
+        plot of the residual values, and a qq-plot against the approximate theoretical distribution.
+
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
+        >>> from debiased_spatial_whittle.grids import RectangularGrid
+        >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+        >>> model = ExponentialModel(rho=8)
+        >>> grid = RectangularGrid((128, 128))
+        >>> sample = SamplerOnRectangularGrid(model, grid)()
+        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof.plot()
+        >>> model = SquaredExponentialModel(rho=8)
+        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof.plot()
+        """
+        residuals = self.compute_residuals(self.sample, self.model)
+        # spatial plot
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 2, 1)
+        plot_fourier_values(self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=1)
+        ax.set_title("Fourier residuals")
+        # qq plot
+        dist = uniform()
+        ps = np.linspace(0, 1, 500)
+        th_quantiles = dist.ppf(ps)
+        emp_quantiles = np.quantile(residuals, ps)
+        ax = fig.add_subplot(1, 2, 2)
+        ax.plot(th_quantiles, emp_quantiles, "-*")
+        ax.plot(th_quantiles, th_quantiles)
+        ax.set_aspect("equal")
+        ax.set_title("QQ-plot of Fourier residuals")
+        plt.show()
 
 
 class ModelDiagnostic:
