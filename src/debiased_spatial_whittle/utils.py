@@ -1,6 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
+from numpy.fft import fftshift
+
+from debiased_spatial_whittle.grids import RectangularGrid
 
 
 def prod_list(l):
@@ -8,6 +11,49 @@ def prod_list(l):
         return 1
     else:
         return l[0] * prod_list(l[1:])
+
+
+def plot_fourier_values(
+    grid: RectangularGrid,
+    values: np.ndarray,
+    plot_func: str = "imshow",
+    ax=None,
+    *args,
+    **kwargs,
+):
+    """
+    Helper function to plot spectral-domain values (e.g. a periodogram, or spectral residuals) with
+    the correct axes.
+
+    Parameters
+    ----------
+    grid
+        Spatial grid of the data
+    values
+        Spectral domain values used for the plot
+    plot_func
+        matplotlib function used for the plot. Can be either imshow, pcolor, contour or contourf
+
+    Returns
+    -------
+    axis
+        pyplot axis
+    """
+    frequencies = grid.fourier_frequencies
+    frequencies = fftshift(frequencies, (0, 1))
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot()
+    if plot_func == "imshow":
+        extent = (
+            frequencies[0, 0, 0],
+            frequencies[-1, 0, 0],
+            frequencies[0, 0, 1],
+            frequencies[0, -1, 1],
+        )
+        im = ax.imshow(values, extent=extent, *args, **kwargs)
+        plt.colorbar(im, ax=ax)
+    return ax
 
 
 def video_plot_3d(

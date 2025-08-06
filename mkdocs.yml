@@ -10,7 +10,7 @@ theme:
 plugins:
 - mkdocs-jupyter:
     include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py']
+    'anisotropic.py', 'goodness_of_fit.py']
     execute: true
 - mkdocstrings:
     handlers:
@@ -60,8 +60,10 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
+      - Goodness-of-fit analysis: goodness_of_fit.py
   - Reference:
       - Grids: grids.md
       - Models: models.md
       - Estimation: periodogram.md
+      - Goodness-of-fit: gof.md
   - Contributing: contribute.md
