@@ -73,20 +73,25 @@ class GoodnessOfFitSimonsOlhede:
         """
         residuals = self.compute_residuals()
         # spatial plot
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 3))
         ax = fig.add_subplot(1, 2, 1)
-        plot_fourier_values(self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=6)
+        plot_fourier_values(
+            self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=6, cmap="bone"
+        )
         ax.set_title("Fourier residuals")
         # qq plot
         dist = chi2(df=2)
-        ps = np.linspace(0, 1, 500)
+        ps = np.linspace(0, 1, 500)[1:-1]
         th_quantiles = dist.ppf(ps) / 2
         emp_quantiles = np.quantile(residuals, ps)
         ax = fig.add_subplot(1, 2, 2)
         ax.plot(th_quantiles, emp_quantiles, "-*")
         ax.plot(th_quantiles, th_quantiles)
+        ax.set_ylim(0, th_quantiles[-1])
+        ax.set_xlim(0, th_quantiles[-1])
         ax.set_aspect("equal")
         ax.set_title("QQ-plot of Fourier residuals")
+        plt.tight_layout()
         plt.show()
 
     def compute_diagnostic_statistic(self):
@@ -226,18 +231,21 @@ class GoodnessOfFit:
         >>> model = ExponentialModel(rho=8)
         >>> grid = RectangularGrid((128, 128))
         >>> sample = SamplerOnRectangularGrid(model, grid)()
-        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof = GoodnessOfFit(model, grid, sample)
         >>> gof.plot()
         >>> model = SquaredExponentialModel(rho=8)
-        >>> gof = GoodnessOfFitSimonsOlhede(model, grid, sample)
+        >>> gof = GoodnessOfFit(model, grid, sample)
         >>> gof.plot()
         """
         residuals = self.compute_residuals(self.sample, self.model)
         # spatial plot
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 3))
         ax = fig.add_subplot(1, 2, 1)
-        plot_fourier_values(self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=1)
+        plot_fourier_values(
+            self.grid, fftshift(residuals), ax=ax, vmin=0, vmax=1, cmap="RdBu"
+        )
         ax.set_title("Fourier residuals")
+        ax.set_aspect("equal")
         # qq plot
         dist = uniform()
         ps = np.linspace(0, 1, 500)
@@ -246,6 +254,8 @@ class GoodnessOfFit:
         ax = fig.add_subplot(1, 2, 2)
         ax.plot(th_quantiles, emp_quantiles, "-*")
         ax.plot(th_quantiles, th_quantiles)
+        ax.set_ylim(0, th_quantiles[-1])
+        ax.set_xlim(0, th_quantiles[-1])
         ax.set_aspect("equal")
         ax.set_title("QQ-plot of Fourier residuals")
         plt.show()

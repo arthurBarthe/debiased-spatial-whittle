@@ -52,7 +52,7 @@ def plot_fourier_values(
             frequencies[0, -1, 1],
         )
         im = ax.imshow(values, extent=extent, *args, **kwargs)
-        plt.colorbar(im)
+        plt.colorbar(im, ax=ax)
     return ax
 
 
