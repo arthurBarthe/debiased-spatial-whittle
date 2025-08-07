@@ -11,7 +11,7 @@ plugins:
 - mkdocs-jupyter:
     include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py']
-    execute: false
+    execute: true
 - mkdocstrings:
     handlers:
       python:
