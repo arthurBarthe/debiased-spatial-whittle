@@ -317,32 +317,19 @@ class ExpectedPeriodogram:
         Returns
         -------
         ep: ndarray
-            Shape  (n1, n2, ..., nk).
-            The expected periodogram on the grid of Fourier frequencies.
+            The shape depends n univariate versus multivariate ($p$) and on unique versus vectorized model ($m$),
+            as per the table below.
+
+            Shape of ep | $p=1$ | $p>1$
+            :----------- |:-------------:| -----------:
+            Unique model         | (n1, ..., nd)        | (n1, ..., nd, p, p)
+            Vectorized model         | (n1, ..., nd, m)        | (n1, ..., nd, m, p, p)
 
             If the fold attribute of the periodogram is False, the shape of the returned array is instead
-            (2 * n1 + 1, ..., 2 * nk + 1).
+            (2 * n1 + 1, ..., 2 * nd + 1).
         """
         acv = self.grid.autocov(model)
         return self.compute_ep(acv, self.periodogram.fold)
-
-    def _reshape_acv(self, acv):
-        """
-        TODO: NOT USED. TO BE DELETED
-        Method for internal call that ensures acv has the right number of dimensions before applying the algorithm
-        that computes the expected periodogram. Specifically, if d is the number of spatial dimensions, p the number
-        of variates (including p=1, in which case acv might typically have (n1, ..., nd) or (n1, ..., nd, m)
-        for m model parameters), then the returned shape should be (n1, ..., nd, m, p, p). In the multivariate case
-        acv will have shape (n1, ..., nd, p, p) or (n1, ..., nd, m, p, p). Again the returned shape should be
-        (n1, ..., nd, m, p, p)
-        """
-        ndim = self.grid.ndim
-        p = self.grid.nvars
-        acv_shape, acv_ndim = acv.shape, acv.ndim
-        if acv.ndim == ndim:
-            return np.reshape(acv, acv_shape + (1, 1, 1))
-        if acv.ndim == ndim + 1:
-            return np.reshape(acv, acv_shape + (1, 1))
 
     def compute_ep(
         self,
@@ -362,15 +349,21 @@ class ExpectedPeriodogram:
             Autocovariance evaluated on the grid's lags. For a grid with shape (n1, ..., nd), the first d dimensions
             of acv should have sizes (2 * n1 - 1, ..., 2 * nd - 1).
             The standard way to obtain acv is through the call of the autocov method of a rectangular grid.
-            acv may have extra dimensions. The following other cases are standard:
+            acv may have extra dimensions. The following other cases are standard (see the documentation of
+            the __call__ and gradient methods of models.ModelInterface):
+
             1. Univariate data, vectorized models. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, m)
             where m is the number of model parameter vectors.
+
             2. Univariate data, gradient. acv will have shape (2 * n1 - 1, ..., 2 * nd - 1, k) where k is the number of
             parameters with respect to which we request the gradient.
+
             3. Multivariate data, unique model parameter vector. acv will have shape
             (2 * n1 - 1, ..., 2 * nd - 1, p, p) where p is the number of variates
+
             4. Multivariate data, vectorized models. acv will have shape
             (2 * n1 - 1, ..., 2 * nd - 1, m, p, p)
+
             5. Multivariate data, gradient. acv will have shape
             (2 * n1 - 1, ..., 2 * nd - 1, k, p, p) where k is the number of parameters with respect to which we
             take the gradient.
@@ -385,11 +378,7 @@ class ExpectedPeriodogram:
         Returns
         -------
         ep: np.ndarray
-            Expectation of the periodogram.
-
-            - shape (2 * n1 - 1, ..., 2 * nd - 1) is the fold attribute of self.periodogram is False
-
-            - shape (n1, ..., nd) if fold is True
+            Expectation of the periodogram. Same shape as acv when fold is True.
 
         Notes
         -----

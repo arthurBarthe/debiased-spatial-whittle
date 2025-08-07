@@ -124,7 +124,15 @@ class ModelInterface(param.Parameterized):
         Returns
         -------
         cov
-            covariances. Shape (n1, ..., nk)
+            covariances at the passed lags. The shape of cov will depend on scalar vs multivariate model whether
+            vectorized models are used. This is summarized by the table below, where $p$ denotes the
+            number of variates of the random field ($p=1$ for a scalar random field), and $m$ denotes
+            the number of models in the case of vectorized models.
+
+            cov shape | p=1 | p > 1
+            :----------- |:-------------:| -----------:
+            single model         | (n1, ..., nk)        | (n1, ..., nk, p, p)
+            vectorized model         | (n1, ... nk, m)        | (n1, ..., nk, m, p, p)
         """
         pass
 
@@ -204,7 +212,7 @@ class ModelInterface(param.Parameterized):
         Parameters
         ----------
         lags
-
+            array of lags. Shape (d, n1, ..., nk)
 
         params
             parameters for which we require the derivative
@@ -212,7 +220,18 @@ class ModelInterface(param.Parameterized):
         Returns
         -------
         gradient
-            last dimension indexes the parameters passed in params
+            array of gradient w.r.t. parameters in params. The shape depends on scalar versus multivariate
+            random field model and on unique versus vectorized model. This is summarized by the table below,
+            where $p$ denotes the number of variates of the random field ($p=1$ for a scalar random field),
+            and $m$ denotes the number of models in the case of vectorized models. $g$ denotes the number of parameters
+            in params, those for which we request the gradient.
+
+            cov shape | p=1 | p > 1
+            :----------- |:-------------:| -----------:
+            single model         | (n1, ..., nk, g)        | (n1, ..., nk, g, p, p)
+            vectorized model         | Not tested      | Not tested
+
+
         """
         grad = self._gradient(lags)
         out = []

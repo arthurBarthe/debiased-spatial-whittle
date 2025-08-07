@@ -144,7 +144,7 @@ inv = BackendManager.get_inv()
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
-    if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
+    if e_per.ndim != e_per_prime.ndim:
         out = []
         for i in range(e_per_prime.shape[-1]):
             out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
@@ -648,7 +648,7 @@ class Estimator:
         Debiased Whittle likelihood used for fitting.
 
     use_gradients: bool
-        Whether to use gradients in the optimization procedure
+        Whether to use gradients in the optimization procedure. Not working at the moment.
 
     max_iter: int
         Maximum number of iterations of the optimization procedure
@@ -694,6 +694,19 @@ class Estimator:
         self.method = method
         self.f_opt = None
         self.f_info = None
+
+    @property
+    def use_gradients(self):
+        return self._use_gradients
+
+    @use_gradients.setter
+    def use_gradients(self, value: bool):
+        if value:
+            raise NotImplementedError(
+                "The use of gradients for optimization is currently not implemented."
+            )
+        else:
+            self._use_gradients = value
 
     def __call__(
         self,
