@@ -43,7 +43,10 @@ def plot_fourier_values(
     --------
     >>> import numpy as np
     >>> from numpy.fft import fftshift
-    >>> from debiased_spatial_whittle import *
+    >>> from debiased_spatial_whittle.grids import RectangularGrid
+    >>> from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+    >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+    >>> from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
     >>> from debiased_spatial_whittle.models import Matern32Model
     >>> grid = RectangularGrid((128, 128))
     >>> model = Matern32Model(rho=12)
