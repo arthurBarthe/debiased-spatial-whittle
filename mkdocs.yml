@@ -6,8 +6,13 @@ theme:
   name: "material"
   features:
     - content.code.copy
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.instant
+    - navigation.instant.progress
 
 plugins:
+- search
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py', 'france_interpolation.py']
@@ -17,7 +22,8 @@ plugins:
       python:
         options:
           show_properties: true
-          show_signature_annotations: false
+          show_bases: true
+          show_signature_annotations: true
           docstring_style: numpy
           merge_init_into_class: true
           show_root_heading: true
@@ -25,7 +31,7 @@ plugins:
           show_symbol_type_heading: true
           show_symbol_type_toc: true
           members_order: source
-          separate_signature: true
+          separate_signature: false
           show_source: false
 
 markdown_extensions:

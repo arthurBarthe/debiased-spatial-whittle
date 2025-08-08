@@ -87,7 +87,7 @@ def test_gradient_bivariate():
     bvm.r = 0.2
     bvm.f = 1.5
     lags = g.lags_unique
-    gradient = bvm.gradient(lags, [bvm.param.r, bvm.param.f])
+    gradient = bvm.gradient(lags, [bvm.param.r, bvm.param.spectral_amplitudes])
     epsilon = 1e-5
     cov = bvm(lags)
     for i, p in enumerate(bvm.params):

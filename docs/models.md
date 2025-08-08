@@ -1,5 +1,8 @@
 
-## models.py
+## ::: debiased_spatial_whittle.models
+    options:
+      members: false
+
 This module provides tools to define covariance models. A few pre-defined covariance
 models are made available. To define your own covariance model, you need
 to inherit from CovarianceModel or CompoundCovarianceModel.
@@ -23,29 +26,29 @@ shape (n1, ..., nk).
 For a bivariate model, we expect the covariance model to return an array with
 shape (n1, ..., nk, 2, 2).
 
-::: debiased_spatial_whittle.models.ModelInterface
+### ::: debiased_spatial_whittle.models.ModelInterface
 
-::: debiased_spatial_whittle.models.CovarianceModel
+### ::: debiased_spatial_whittle.models.CovarianceModel
 
-::: debiased_spatial_whittle.models.SumModel
+### ::: debiased_spatial_whittle.models.SumModel
 
-::: debiased_spatial_whittle.models.NuggetModel
+### ::: debiased_spatial_whittle.models.NuggetModel
 
-::: debiased_spatial_whittle.models.ExponentialModel
+### ::: debiased_spatial_whittle.models.ExponentialModel
     options:
       show_inheritance_diagram: True
       members:
         - __call__
         - _gradient
 
-::: debiased_spatial_whittle.models.SquaredExponentialModel
+### ::: debiased_spatial_whittle.models.SquaredExponentialModel
 
-::: debiased_spatial_whittle.models.Matern32Model
+### ::: debiased_spatial_whittle.models.Matern32Model
 
-::: debiased_spatial_whittle.models.Matern52Model
+### ::: debiased_spatial_whittle.models.Matern52Model
 
-::: debiased_spatial_whittle.models.RationalQuadraticModel
+### ::: debiased_spatial_whittle.models.RationalQuadraticModel
 
-::: debiased_spatial_whittle.models.AnisotropicModel
+### ::: debiased_spatial_whittle.models.AnisotropicModel
 
-::: debiased_spatial_whittle.models.BivariateUniformCorrelation
+### ::: debiased_spatial_whittle.models.BivariateUniformCorrelation

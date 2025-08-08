@@ -116,7 +116,7 @@ def test_whittle_grad_multi():
     z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     epsilon = 1e-8
-    params_for_grad = [bvm.param.r, bvm.param.f]
+    params_for_grad = [bvm.param.r, bvm.param.spectral_amplitudes]
     lkh, grad = dbw(z, bvm, params_for_grad)
     for i, p in enumerate(params_for_grad):
         print(p.name)
@@ -169,7 +169,7 @@ def test_fisher_multivariate():
     bvm.f = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.f])
+    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.spectral_amplitudes])
     assert np.all(np.diag(h) > 0)
 
 
@@ -244,6 +244,6 @@ def test_jmatrix_sample_multivariate():
     bvm.r = 0.3
     bvm.f = 1.5
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    jmat = dbw.jmatrix_sample(bvm, [bvm.param.r, bvm.param.f])
+    jmat = dbw.jmatrix_sample(bvm, [bvm.param.r, bvm.param.spectral_amplitudes])
     assert jmat.shape == (5, 5)
     assert np.all(np.diag(jmat) > 0)

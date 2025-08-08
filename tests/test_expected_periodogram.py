@@ -275,7 +275,7 @@ def test_gradient_expected_periodogram_bivariate():
     bvm = BivariateUniformCorrelation(model)
     bvm.r = 0.1
     bvm.f = 1.2
-    params_for_grad = [bvm.param.r, bvm.param.f]
+    params_for_grad = [bvm.param.r, bvm.param.spectral_amplitudes]
     ep_grad = ep_op.gradient(bvm, params_for_grad)
     ep = ep_op(bvm)
     epsilon = 1e-6
