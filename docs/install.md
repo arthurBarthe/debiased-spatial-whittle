@@ -1,40 +1,47 @@
 The package can be installed via one of the following methods.
 
-## pip
+### CPU-only
 
+The package can be installed via one of the following methods.
+
+1. Via the use of [Poetry](https://python-poetry.org/), by running the following command:
+
+   ```bash
+   poetry add debiased-spatial-whittle
+   ```
+
+2. Otherwise, you can directly install via pip:
+
+    ```bash
     pip install debiased-spatial-whittle
+    ```
 
-If you want to install the optional Cupy and Pytorch dependencies for GPU computations,
-you need to add the optional gpu dependency:
+### GPU
+The Debiased Spatial Whittle likelihood relies on the Fast Fourier Transform (FFT) for computational efficiency.
+GPU implementations of the FFT provide additional computational efficiency (order x100) at almost no additional cost thanks to GPU implementations of the FFT algorithm.
 
-    pip install debiased-spatial-whittle[gpu]
+If you want to install with GPU dependencies (Cupy and Pytorch):
 
-Otherwise, you should be able to directly install this repository:
+1. You need an NVIDIA GPU
+2. You need to install the CUDA Toolkit. See for instance Cupy's [installation page](https://docs.cupy.dev/en/stable/install.html).
+3. You can install Cupy or pytorch yourself in your environment. Or you can specify an extra to poetry, e.g.
 
-    pip install git@github.com:arthurBarthe/debiased-spatial-whittle
+   ```bash
+   poetry add debiased-spatial-whittle -E gpu12
+   ```
+   if you version of the CUDA toolkit is 12.* (use gpu11 if your version is 11.*)
 
-## Poetry
-Via the use of Poetry (https://python-poetry.org/) by running
+One way to check your CUDA version is to run the following command in a terminal:
 
-    poetry add debiased-spatial-whittle
-
-Or, to add optional gpu dependencies,
-
-    poetry add debiased-spatial-whittle -E gpu
-
-You can also use the latest github version by adding the following dependency in your pyproject.toml:
-
-    debiased-spatial-whittle = {git = "git@github.com:arthurBarthe/debiased-spatial-whittle", branch="master"}
-
-## Development
-
-Install for development - in this case you need to clone the github repository and (assuming you already have poetry installed) run
+```bash
+   nvidia-smi
 ```
-poetry install
-```
-which will install an environment based on the dependencies listed in the lock
-file.
 
-To install with gpu dependencies,
+You can then switch to using e.g. Cupy instead of numpy as the backend via:
 
-    poetry install -E gpu
+```python
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend("cupy")
+  ```
+
+This should be run before any other import from the debiased_spatial_whittle package.
