@@ -1,5 +1,7 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
 from debiased_spatial_whittle.grids import Grid, RectangularGrid
+
+xp = BackendManager.get_backend()
 
 
 class Sample:
@@ -8,7 +10,7 @@ class Sample:
     periodograms etc.
     """
 
-    def __init__(self, grid: Grid, values: np.ndarray):
+    def __init__(self, grid: Grid, values: xp.ndarray):
         self.grid = grid
         self.values = values
         self.periodograms = dict()
@@ -18,7 +20,7 @@ class Sample:
 
     def __eq__(self, other):
         eq_grid = self.grid == other.grid
-        eq_values = np.all(self.values == other.values)
+        eq_values = xp.all(self.values == other.values)
         return eq_grid and eq_values
 
 
@@ -28,7 +30,7 @@ class SampleOnRectangularGrid(Sample):
     missing locations are not used.
     """
 
-    def __init__(self, grid: RectangularGrid, values: np.ndarray):
+    def __init__(self, grid: RectangularGrid, values: xp.ndarray):
         assert isinstance(
             grid, RectangularGrid
         ), "The grid should be an instance of RectangularGrid"
