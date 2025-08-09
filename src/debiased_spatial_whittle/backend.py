@@ -1,4 +1,3 @@
-import cupyx.scipy.special
 import numpy
 import warnings
 
@@ -14,6 +13,7 @@ except ModuleNotFoundError:
 
 try:
     import cupy
+    import cupyx.scipy.special
 except ModuleNotFoundError:
     CUPY_INSTALLED = False
 

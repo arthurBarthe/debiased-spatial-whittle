@@ -2,7 +2,7 @@ from debiased_spatial_whittle.backend import BackendManager
 from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
 from abc import ABCMeta, abstractmethod
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
 arange = BackendManager.get_arange()
 gamma = BackendManager.get_gamma()
@@ -10,7 +10,7 @@ gamma = BackendManager.get_gamma()
 
 class SpectralModel(CovarianceModel):
     @abstractmethod
-    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+    def spectral_density(self, frequencies: xp.ndarray) -> xp.ndarray:
         """
         Abstract method that must provide the spectral density function evaluated at the passed frequencies
 
@@ -26,7 +26,7 @@ class SpectralModel(CovarianceModel):
         """
         raise NotImplementedError()
 
-    def __call__(self, lags: np.ndarray):
+    def __call__(self, lags: xp.ndarray):
         """
         Compute an approximation to the covariance function evaluated at the passed lags based on the spectral
         density function.
@@ -47,22 +47,22 @@ class SpectralModel(CovarianceModel):
         raise NotImplementedError()
 
     def call_on_rectangular_grid(self, grid):
-        fftfreq = np.fft.fftfreq
+        fftfreq = xp.fft.fftfreq
         ndim = len(grid.n)
         n = grid.n
         delta = grid.delta
-        mesh = np.meshgrid(
+        mesh = xp.meshgrid(
             *[fftfreq(3 * n_i + 1, d_i / 2) for n_i, d_i in zip(n, delta)],
             indexing="ij",
         )
-        freqs = np.stack(mesh, axis=-1)  # / (2 * np.pi)
+        freqs = xp.stack(mesh, axis=-1)  # / (2 * np.pi)
         sdf = self.spectral_density(freqs)
-        out = np.real(fftn(sdf)) / np.prod(np.array([(3 * n_i + 1) / 2 for n_i in n]))
+        out = xp.real(fftn(sdf)) / xp.prod(xp.array([(3 * n_i + 1) / 2 for n_i in n]))
         for i_dim in range(ndim):
             n_i = n[i_dim]
-            out = np.take(
+            out = xp.take(
                 out,
-                np.concatenate(
+                xp.concatenate(
                     (
                         arange(0, 2 * n_i, 2),
                         arange(out.shape[i_dim] - 2 * (n_i - 1), out.shape[i_dim], 2),
@@ -79,13 +79,13 @@ class SpectralMatern(SpectralModel):
     spatial domain version for non half integer values of the slope parameter.
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="range parameter")
-    nu = ModelParameter(default=0.5, bounds=(0.5, np.inf), doc="slope parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="range parameter")
+    nu = ModelParameter(default=0.5, bounds=(0.5, xp.inf), doc="slope parameter")
 
     def __init__(self, *args, **kwargs):
         super(SpectralMatern, self).__init__(*args, **kwargs)
 
-    def spectral_density(self, frequencies: np.ndarray) -> np.ndarray:
+    def spectral_density(self, frequencies: xp.ndarray) -> xp.ndarray:
         """
         Implements the spectral density of the Matern.
 
@@ -99,17 +99,17 @@ class SpectralMatern(SpectralModel):
 
         """
         ndim = frequencies.shape[-1]
-        f2 = np.sum(frequencies**2, -1)
+        f2 = xp.sum(frequencies**2, -1)
         rho, nu = self.rho, self.nu
         term1 = (
             2**ndim
-            * np.pi ** (ndim / 2)
+            * xp.pi ** (ndim / 2)
             * gamma(nu + ndim / 2)
             * (2 * nu) ** nu
             / (gamma(nu) * rho ** (2 * nu))
         )
-        term2 = (2 * nu / rho**2 + 4 * np.pi**2 * f2) ** (-nu - ndim / 2)
+        term2 = (2 * nu / rho**2 + 4 * xp.pi**2 * f2) ** (-nu - ndim / 2)
         return term1 * term2
 
-    def _gradient(self, x: np.ndarray):
+    def _gradient(self, x: xp.ndarray):
         raise NotImplementedError()
