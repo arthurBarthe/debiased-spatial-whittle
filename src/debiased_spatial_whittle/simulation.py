@@ -1,13 +1,11 @@
 import sys
-
-from debiased_spatial_whittle.backend import BackendManager
-
-np = BackendManager.get_backend()
-
 import warnings
-from debiased_spatial_whittle.periodogram import autocov
 from typing import List
+from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.periodogram import autocov
 
+
+xp = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
 randn = BackendManager.get_randn()
 arange = BackendManager.get_arange()
@@ -25,15 +23,15 @@ def prod_list(l: List[int]):
 def sim_circ_embedding(cov_func, shape):
     cov = autocov(cov_func, shape)
     f = prod_list(shape) * ifftn(cov)
-    min_ = np.min(f)
+    min_ = xp.min(f)
     if min_ < 0:
         sys.exit(0)
         warnings.warn(f"Embedding is not positive definite, min value {min_}.")
-    e = np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape)
-    z = np.sqrt(np.maximum(f, 0)) * e
-    z_inv = 1 / np.sqrt(prod_list(shape)) * np.real(fftn(z))
+    e = xp.random.randn(*f.shape) + 1j * xp.random.randn(*f.shape)
+    z = xp.sqrt(xp.maximum(f, 0)) * e
+    z_inv = 1 / xp.sqrt(prod_list(shape)) * xp.real(fftn(z))
     for i, n in enumerate(shape):
-        z_inv = np.take(z_inv, np.arange(n), i)
+        z_inv = xp.take(z_inv, xp.arange(n), i)
     return z_inv, min_
 
 
@@ -129,14 +127,14 @@ class SamplerOnRectangularGrid:
             if not self.exact:
                 cov *= self.sampling_grid.spatial_kernel()
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
-            f = np.real(f)
-            min_, max_ = np.min(f), np.max(f)
+            f = xp.real(f)
+            min_, max_ = xp.min(f), xp.max(f)
             if min_ <= -1e-2:
                 print(min_, max_)
                 raise ValueError(
                     f"Embedding is not positive definite, min value {min_}."
                 )
-            self._f = np.maximum(f, np.zeros_like(f))
+            self._f = xp.maximum(f, xp.zeros_like(f))
         return self._f
 
     def __call__(self):
@@ -159,16 +157,16 @@ class SamplerOnRectangularGrid:
             f = self.f
             shape = f.shape + (self.n_sims,)
             e = randn(*shape) + 1j * randn(*shape)
-            f = np.expand_dims(f, -1)
-            z = np.sqrt(np.maximum(f, np.zeros_like(f))) * e
+            f = xp.expand_dims(f, -1)
+            z = xp.sqrt(xp.maximum(f, xp.zeros_like(f))) * e
             z_inv = (
                 1
-                / np.sqrt(np.array(prod_list(self.sampling_grid.n)))
-                * np.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
+                / xp.sqrt(xp.array(prod_list(self.sampling_grid.n)))
+                * xp.real(fftn(z, axes=tuple(range(self.sampling_grid.ndim))))
             )
             for i, n in enumerate(self.grid.n):
-                z_inv = np.take(z_inv, arange(n), i)
-            self._z = z_inv * np.expand_dims(self.grid.mask, -1)
+                z_inv = xp.take(z_inv, arange(n), i)
+            self._z = z_inv * xp.expand_dims(self.grid.mask, -1)
         result = self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
         return result
@@ -204,19 +202,19 @@ class MultivariateSamplerOnRectangularGrid:
         shape = self.sampling_grid.n + (1, self.p)
         # e shape (n1, ..., nd, p, 1)
         e = randn(*lambdas.shape) + 1j * randn(*lambdas.shape)
-        y = np.expand_dims(np.sqrt(lambdas) * e, -1)
-        y = np.matmul(r_matrix, y)
+        y = xp.expand_dims(xp.sqrt(lambdas) * e, -1)
+        y = xp.matmul(r_matrix, y)
         w = (
             1
-            / np.sqrt(np.array(prod_list(self.sampling_grid.n)))
-            * np.real(fftn(y, axes=self.spatial_axes))
+            / xp.sqrt(xp.array(prod_list(self.sampling_grid.n)))
+            * xp.real(fftn(y, axes=self.spatial_axes))
         )
         for i, n in enumerate(self.grid.n):
-            w = np.take(w, arange(n), i)
+            w = xp.take(w, arange(n), i)
         # remove extra dimensions
         # TODO dirty, clean this somehow
-        w = np.squeeze(w, -1)
-        w = np.squeeze(w, -2)
+        w = xp.squeeze(w, -1)
+        w = xp.squeeze(w, -2)
         return w * self.grid.mask
 
     def __call__(self):
@@ -242,10 +240,10 @@ class TSamplerOnRectangularGrid:
 
     def __call__(self):
         nu = self.model.nu_1.value
-        chi = np.random.chisquare(nu) / nu
+        chi = xp.random.chisquare(nu) / nu
         # chi = np.random.chisquare(nu, self.grid.n) / nu  # this is a different model
         z = self.gaussian_sampler()
-        return z / np.sqrt(chi)
+        return z / xp.sqrt(chi)
 
 
 class SquaredSamplerOnRectangularGrid:
@@ -277,8 +275,8 @@ class ChiSquaredSamplerOnRectangularGrid:
         zs = []
         for i in range(self.model.dof_1.value):
             zs.append(self.latent_sampler())
-        zs = np.stack(zs, axis=0)
-        return np.sum(zs**2, axis=0)
+        zs = xp.stack(zs, axis=0)
+        return xp.sum(zs**2, axis=0)
 
 
 class SamplerSeparable:
@@ -304,14 +302,14 @@ class SamplerSeparable:
         zs = []
         for sampler in self.samplers:
             zs.append(sampler())
-        return np.prod(zs)
+        return xp.prod(zs)
 
     def __call__(self):
-        z = np.zeros(self.grid.n)
+        z = xp.zeros(self.grid.n)
         for i in range(self.n_sim):
             z_i = self._unit_sample()
             z = i / (i + 1) * z + 1 / (i + 1) * z_i
-        return z * np.sqrt(self.n_sim)
+        return z * xp.sqrt(self.n_sim)
 
 
 class SamplerBUCOnRectangularGrid:
@@ -342,17 +340,17 @@ class SamplerBUCOnRectangularGrid:
         if self._f is None:
             cov = self.grid.autocov(self.model.base_model)
             f = prod_list(self.grid.n) * ifftn(cov)
-            f = np.real(f)
-            min_ = np.min(f)
+            f = xp.real(f)
+            min_ = xp.min(f)
             if min_ <= -1e-5:
                 sys.exit(0)
                 warnings.warn(f"Embedding is not positive definite, min value {min_}.")
-            self._f = np.maximum(f, np.zeros_like(f))
+            self._f = xp.maximum(f, xp.zeros_like(f))
         return self._f
 
     def __call__(
         self, periodic: bool = False, return_spectral: bool = False
-    ) -> np.ndarray:
+    ) -> xp.ndarray:
         """
         Sample a realization.
 
@@ -374,24 +372,24 @@ class SamplerBUCOnRectangularGrid:
         e = BackendManager.convert(e)
         e[..., -1] *= self.model.f
         e = e[..., 0, :] + 1j * e[..., 1, :]
-        f = np.expand_dims(self.f, -1)
-        z = np.sqrt(f) * e
+        f = xp.expand_dims(self.f, -1)
+        z = xp.sqrt(f) * e
         if return_spectral:
             return z
         z_inv = (
             1
-            / np.sqrt(
-                np.array(
+            / xp.sqrt(
+                xp.array(
                     [
                         self.grid.n_points,
                     ]
                 )
             )
-            * np.real(fftn(z, None, list(range(z.ndim - 1))))
+            * xp.real(fftn(z, None, list(range(z.ndim - 1))))
         )
         if periodic:
             return z_inv
         for i, n in enumerate(self.grid.n):
-            z_inv = np.take(z_inv, np.arange(n), i)
-        z_inv = np.reshape(z_inv, self.grid.n + (2,))
+            z_inv = xp.take(z_inv, xp.arange(n), i)
+        z_inv = xp.reshape(z_inv, self.grid.n + (2,))
         return z_inv * self.grid.mask

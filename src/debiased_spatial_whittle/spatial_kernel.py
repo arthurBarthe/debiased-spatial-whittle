@@ -1,15 +1,15 @@
+from typing import Tuple
 from debiased_spatial_whittle.backend import BackendManager
 
-np = BackendManager.get_backend()
-from typing import Tuple
 
-fftn = np.fft.fftn
-ifftn = np.fft.ifftn
+xp = BackendManager.get_backend()
+fftn = xp.fft.fftn
+ifftn = xp.fft.ifftn
 
 
 def spatial_kernel(
-    g: np.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None
-) -> np.ndarray:
+    g: xp.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None
+) -> xp.ndarray:
     r"""
     Compute the spatial kernel, cg in the paper, via FFT for computational efficiency.
 
@@ -39,7 +39,7 @@ def spatial_kernel(
 
     Examples
     --------
-    >>> g = np.arange(10)
+    >>> g = xp.arange(10)
     >>> spatial_kernel(g)
     array([2.85000000e+01, 2.40000000e+01, 1.96000000e+01, 1.54000000e+01,
            1.15000000e+01, 8.00000000e+00, 5.00000000e+00, 2.60000000e+00,
@@ -58,31 +58,31 @@ def spatial_kernel(
     if n_spatial_dim is None:
         n_spatial_dim = g.ndim
     n = g.shape[:n_spatial_dim]
-    normalization_factor = np.prod(np.array(n))
+    normalization_factor = xp.prod(xp.array(n))
     two_n = tuple([s * 2 - 1 for s in n])
     if m == (0, 0):
         if n_spatial_dim == g.ndim:
             # univariate case
-            f = np.abs(fftn(g, two_n)) ** 2
+            f = xp.abs(fftn(g, two_n)) ** 2
             cg = ifftn(f)
             cg /= normalization_factor
-            return np.real(cg)
+            return xp.real(cg)
         else:
             # multivariate case
-            g = np.expand_dims(g, -1)
+            g = xp.expand_dims(g, -1)
             f1 = fftn(g, two_n, axes=tuple(range(n_spatial_dim)))
-            f2 = np.transpose(f1, tuple(range(n_spatial_dim)) + (-1, -2))
-            cg = ifftn(np.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
+            f2 = xp.transpose(f1, tuple(range(n_spatial_dim)) + (-1, -2))
+            cg = ifftn(xp.matmul(f1, f2.conj()), axes=tuple(range(n_spatial_dim)))
             cg /= normalization_factor
-            return np.real(cg)
+            return xp.real(cg)
     # TODO this specific case only works in 2d right now
     m1, m2 = m
     n1, n2 = n
-    a = np.exp(2j * np.pi * m1 / n1 * np.arange(n1)).reshape((-1, 1))
-    a = a * np.exp(2j * np.pi * m2 / n2 * np.arange(n2)).reshape((1, -1))
+    a = xp.exp(2j * xp.pi * m1 / n1 * xp.arange(n1)).reshape((-1, 1))
+    a = a * xp.exp(2j * xp.pi * m2 / n2 * xp.arange(n2)).reshape((1, -1))
     g2 = g * a
-    f = fftn(g, two_n) * np.conj(fftn(g2, two_n))
+    f = fftn(g, two_n) * xp.conj(fftn(g2, two_n))
     cg = ifftn(f)
     # TODO check normalization is consistent
-    cg /= np.sum(g**2)
+    cg /= xp.sum(g**2)
     return cg

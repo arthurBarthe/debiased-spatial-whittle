@@ -2,10 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 import pickle
 from debiased_spatial_whittle.backend import BackendManager
 
-try:
-    np = BackendManager.get_backend()
-except:
-    import numpy as np
+xp = BackendManager.get_backend()
 
 import numpy
 import param
@@ -112,7 +109,7 @@ class ModelInterface(param.Parameterized):
     free_only = param.Boolean(per_instance=True, default=True)
 
     @abstractmethod
-    def __call__(self, lags: np.ndarray):
+    def __call__(self, lags: xp.ndarray):
         """
         Evaluate the covariance model at the passed lags.
 
@@ -148,7 +145,7 @@ class ModelInterface(param.Parameterized):
         pass
 
     @abstractmethod
-    def update_free_parameters(self, param_values: np.ndarray):
+    def update_free_parameters(self, param_values: xp.ndarray):
         """Update free parameters of the model recursively from array values.
         Useful for numerical optimization."""
         pass
@@ -197,7 +194,7 @@ class ModelInterface(param.Parameterized):
         with open(file, "wb") as f:
             pickle.dump(self, f)
 
-    def gradient(self, lags: np.ndarray, params: list[ModelParameter]) -> np.ndarray:
+    def gradient(self, lags: xp.ndarray, params: list[ModelParameter]) -> xp.ndarray:
         """
         Compute the gradient of the model with respect to the passed parameters
 
@@ -218,16 +215,16 @@ class ModelInterface(param.Parameterized):
         out = []
         for p in params:
             out.append(grad[p.name])
-        return np.stack(out, -1)
+        return xp.stack(out, -1)
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         raise NotImplementedError()
 
     @abstractmethod
     def _repr_html_(self):
         pass
 
-    def cov_mat_x1_x2(self, x1: np.ndarray, x2: np.ndarray = None) -> np.ndarray:
+    def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None) -> xp.ndarray:
         """
         Compute the covariance matrix between between points in x1 and points in x2.
 
@@ -245,10 +242,10 @@ class ModelInterface(param.Parameterized):
         """
         if x2 is None:
             x2 = x1
-        x1 = np.expand_dims(x1, axis=1)
-        x2 = np.expand_dims(x2, axis=0)
+        x1 = xp.expand_dims(x1, axis=1)
+        x2 = xp.expand_dims(x2, axis=0)
         lags = x1 - x2
-        lags = np.transpose(lags, (2, 0, 1))
+        lags = xp.transpose(lags, (2, 0, 1))
         return self(lags)
 
 
@@ -265,7 +262,7 @@ class CovarianceModel(ModelInterface):
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
 
-    def update_free_parameters(self, param_values: np.ndarray):
+    def update_free_parameters(self, param_values: xp.ndarray):
         """In the case of a simple model, we simply update the free parameters"""
         a, b = (
             param_values[: self.n_free_parameters],
@@ -278,7 +275,7 @@ class CovarianceModel(ModelInterface):
         list_values = []
         for p in self.free_parameters:
             list_values.append(getattr(self, p))
-        return np.array(list_values)
+        return xp.array(list_values)
 
     def free_parameter_bounds_to_list_deep(self):
         list_bounds = []
@@ -289,13 +286,13 @@ class CovarianceModel(ModelInterface):
     def _repr_html_(self):
         return _parameterized_repr_html(self, True)
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         raise NotImplementedError()
 
-    def __call__(self, lags: np.ndarray):
-        out = self._compute(np.expand_dims(lags, -1))
+    def __call__(self, lags: xp.ndarray):
+        out = self._compute(xp.expand_dims(lags, -1))
         if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+            out = xp.squeeze(out, -1)
         return out
 
     def __add__(self, other):
@@ -330,8 +327,8 @@ class CompoundModel(ModelInterface):
         list_values = []
         for p in self.free_parameters:
             list_values.append(getattr(self, p))
-        array_values = np.array(list_values)
-        return np.concatenate(
+        array_values = xp.array(list_values)
+        return xp.concatenate(
             [
                 array_values,
             ]
@@ -354,13 +351,13 @@ class CompoundModel(ModelInterface):
             + "</div>"
         )
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         raise NotImplementedError()
 
-    def __call__(self, lags: np.ndarray):
-        out = self._compute(np.expand_dims(lags, -1))
+    def __call__(self, lags: xp.ndarray):
+        out = self._compute(xp.expand_dims(lags, -1))
         if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+            out = xp.squeeze(out, -1)
         return out
 
     def __add__(self, other):
@@ -391,7 +388,7 @@ class SumModel(CompoundModel):
         children = args
         super().__init__(children, **kwargs)
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         values = (child._compute(lags) for child in self.children)
         out = sum(values)
         return out
@@ -412,7 +409,7 @@ class ExponentialModel(CovarianceModel):
     Examples
     --------
     >>> model = ExponentialModel(rho=5, sigma=1.41)
-    >>> model(np.array([[0., 1.], [0., 0.]]))
+    >>> model(xp.array([[0., 1.], [0., 0.]]))
     array([1.9881    , 1.62771861])
     """
 
@@ -421,14 +418,14 @@ class ExponentialModel(CovarianceModel):
         default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
     )
 
-    def _compute(self, lags: np.ndarray):
-        d = np.sqrt(np.sum(lags**2, 0)) / self.rho
-        return self.sigma**2 * np.exp(-d)
+    def _compute(self, lags: xp.ndarray):
+        d = xp.sqrt(xp.sum(lags**2, 0)) / self.rho
+        return self.sigma**2 * xp.exp(-d)
 
-    def _gradient(self, lags: np.ndarray):
-        d = np.sqrt(sum((lag**2 for lag in lags)))
-        d_rho = (self.sigma / self.rho) ** 2 * d * np.exp(-d / self.rho)
-        d_sigma = 2 * self.sigma * np.exp(-d / self.rho)
+    def _gradient(self, lags: xp.ndarray):
+        d = xp.sqrt(sum((lag**2 for lag in lags)))
+        d_rho = (self.sigma / self.rho) ** 2 * d * xp.exp(-d / self.rho)
+        d_sigma = 2 * self.sigma * xp.exp(-d / self.rho)
         return dict(rho=d_rho, sigma=d_sigma)
 
 
@@ -447,18 +444,18 @@ class SquaredExponentialModel(CovarianceModel):
     Examples
     --------
     >>> model = SquaredExponentialModel(rho=5, sigma=1.41)
-    >>> model(np.array([[0., 1.], [0., 0.]]))
+    >>> model(xp.array([[0., 1.], [0., 0.]]))
     array([1.9881    , 1.94873298])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf), doc="Amplitude parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter")
 
-    def _compute(self, lags: np.ndarray):
-        d = np.sum(lags**2, 0) / (2 * self.rho**2)
-        return self.sigma**2 * np.exp(-d)
+    def _compute(self, lags: xp.ndarray):
+        d = xp.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * xp.exp(-d)
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         """
         Provides the derivatives of the covariance model evaluated at the passed lags with respect to
         the model's parameters.
@@ -466,7 +463,7 @@ class SquaredExponentialModel(CovarianceModel):
         Examples
         --------
         >>> model = SquaredExponentialModel(rho=2, sigma=1.41)
-        >>> model.gradient(np.array([[0, 0, 1, 1], [0, 1, 0, 1]]), [model.param.rho, model.param.sigma])
+        >>> model.gradient(xp.array([[0, 0, 1, 1], [0, 1, 0, 1]]), [model.param.rho, model.param.sigma])
         array([[0.        , 2.82      ],
                [0.21931151, 2.48864127],
                [0.21931151, 2.48864127],
@@ -474,9 +471,9 @@ class SquaredExponentialModel(CovarianceModel):
         """
         d2 = sum((lag**2 for lag in lags))
         d_rho = (
-            self.rho ** (-3) * d2 * self.sigma**2 * np.exp(-1 / 2 * d2 / self.rho**2)
+            self.rho ** (-3) * d2 * self.sigma**2 * xp.exp(-1 / 2 * d2 / self.rho**2)
         )
-        d_sigma = 2 * self.sigma * np.exp(-1 / 2 * d2 / self.rho**2)
+        d_sigma = 2 * self.sigma * xp.exp(-1 / 2 * d2 / self.rho**2)
         return dict(rho=d_rho, sigma=d_sigma)
 
 
@@ -497,21 +494,21 @@ class Matern32Model(CovarianceModel):
     >>> model = Matern32Model(rho=5, sigma=1)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _compute(self, lags: np.ndarray):
-        d = np.sqrt(np.sum(lags**2, 0))
+    def _compute(self, lags: xp.ndarray):
+        d = xp.sqrt(xp.sum(lags**2, 0))
         return (
             self.sigma**2
-            * (1 + np.sqrt(3) * d / self.rho)
-            * np.exp(-np.sqrt(3) * d / self.rho)
+            * (1 + xp.sqrt(3) * d / self.rho)
+            * xp.exp(-xp.sqrt(3) * d / self.rho)
         )
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         raise NotImplementedError()
 
 
@@ -533,18 +530,18 @@ class Matern52Model(CovarianceModel):
     >>> model = Matern52Model(rho=10, sigma=0.9)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _compute(self, lags: np.ndarray):
-        d = np.sqrt(np.sum(lags**2, 0))
-        temp = np.sqrt(5) * d / self.rho
-        return self.sigma**2 * (1 + temp + temp**2 / 3) * np.exp(-temp)
+    def _compute(self, lags: xp.ndarray):
+        d = xp.sqrt(xp.sum(lags**2, 0))
+        temp = xp.sqrt(5) * d / self.rho
+        return self.sigma**2 * (1 + temp + temp**2 / 3) * xp.exp(-temp)
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         raise NotImplementedError()
 
 
@@ -568,18 +565,18 @@ class RationalQuadraticModel(CovarianceModel):
     >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0.0, np.inf))
-    alpha = ModelParameter(default=1.0, bounds=(0, np.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, np.inf))
+    rho = ModelParameter(default=1.0, bounds=(0.0, xp.inf))
+    alpha = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _compute(self, lags: np.array):
-        d2 = np.sum(lags**2, 0) / (2 * self.rho**2)
-        return self.sigma**2 * np.power(1 + d2 / self.alpha, -self.alpha)
+    def _compute(self, lags: xp.array):
+        d2 = xp.sum(lags**2, 0) / (2 * self.rho**2)
+        return self.sigma**2 * xp.power(1 + d2 / self.alpha, -self.alpha)
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         raise NotImplementedError()
 
 
@@ -597,10 +594,10 @@ class NuggetModel(CompoundModel):
     Examples
     --------
     >>> model = SquaredExponentialModel(rho=12, sigma=1)
-    >>> model(np.array([[0., 1., 2.]]))
+    >>> model(xp.array([[0., 1., 2.]]))
     array([1.        , 0.9965338 , 0.98620712])
     >>> model = NuggetModel(model, nugget=0.1)
-    >>> model(np.array([[0., 1., 2.]]))
+    >>> model(xp.array([[0., 1., 2.]]))
     array([1.        , 0.89688042, 0.88758641])
     """
 
@@ -615,11 +612,11 @@ class NuggetModel(CompoundModel):
             **kwargs,
         )
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         n_spatial_dim = lags.shape[0]
-        zero_lag = np.zeros((n_spatial_dim, lags.shape[-1]))
+        zero_lag = xp.zeros((n_spatial_dim, lags.shape[-1]))
         variance = self.children[0]._compute(zero_lag)
-        return np.all(lags == 0, 0) * self.nugget * variance + (
+        return xp.all(lags == 0, 0) * self.nugget * variance + (
             1 - self.nugget
         ) * self.children[0]._compute(lags)
 
@@ -643,11 +640,11 @@ class AnisotropicModel(CompoundModel):
     Examples
     --------
     >>> base_model = SquaredExponentialModel(rho=10)
-    >>> model = AnisotropicModel(base_model, eta=1.5, phi=np.pi / 3)
+    >>> model = AnisotropicModel(base_model, eta=1.5, phi=xp.pi / 3)
     """
 
-    eta = ModelParameter(default=1, bounds=(0, np.inf))
-    phi = ModelParameter(default=0, bounds=(-np.pi / 2, np.pi / 2))
+    eta = ModelParameter(default=1, bounds=(0, xp.inf))
+    phi = ModelParameter(default=0, bounds=(-xp.pi / 2, xp.pi / 2))
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super().__init__(
@@ -660,24 +657,24 @@ class AnisotropicModel(CompoundModel):
 
     @property
     def scaling_matrix(self):
-        return np.array([[self.eta, 0], [0, 1 / self.eta]])
+        return xp.array([[self.eta, 0], [0, 1 / self.eta]])
 
     @property
     def rotation_matrix(self):
-        return np.array(
+        return xp.array(
             [
-                [np.cos(self.phi), -np.sin(self.phi)],
-                [np.sin(self.phi), np.cos(self.phi)],
+                [xp.cos(self.phi), -xp.sin(self.phi)],
+                [xp.sin(self.phi), xp.cos(self.phi)],
             ]
         )
 
-    def _compute(self, lags: np.ndarray):
-        lags = np.swapaxes(lags, 0, -1)
-        lags = np.expand_dims(lags, -1)
-        lags = np.matmul(self.rotation_matrix, lags)
-        lags = np.matmul(self.scaling_matrix, lags)
-        lags = np.squeeze(lags, -1)
-        lags = np.swapaxes(lags, 0, -1)
+    def _compute(self, lags: xp.ndarray):
+        lags = xp.swapaxes(lags, 0, -1)
+        lags = xp.expand_dims(lags, -1)
+        lags = xp.matmul(self.rotation_matrix, lags)
+        lags = xp.matmul(self.scaling_matrix, lags)
+        lags = xp.squeeze(lags, -1)
+        lags = xp.swapaxes(lags, 0, -1)
         return self.children[0]._compute(lags)
 
 
@@ -723,7 +720,7 @@ class BivariateUniformCorrelation(CompoundModel):
     def base_model(self, model):
         raise AttributeError("Base model cannot be set")
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         """
         Evaluates the covariance model at the passed lags. Since the model is bivariate,
         the returned array has two extra dimensions compared to the array lags, both of size
@@ -740,7 +737,7 @@ class BivariateUniformCorrelation(CompoundModel):
 
         """
         acv11 = self.base_model._compute(lags)
-        out = np.zeros(acv11.shape + (2, 2))
+        out = xp.zeros(acv11.shape + (2, 2))
         out = BackendManager.convert(out)
         out[..., 0, 0] = acv11
         out[..., 1, 1] = acv11 * self.f**2
@@ -748,7 +745,7 @@ class BivariateUniformCorrelation(CompoundModel):
         out[..., 1, 0] = acv11 * self.r * self.f
         return out
 
-    def _gradient(self, x: np.ndarray):
+    def _gradient(self, x: xp.ndarray):
         """
 
         Parameters
@@ -765,21 +762,21 @@ class BivariateUniformCorrelation(CompoundModel):
         acv11 = self.base_model(x)
         gradient_base_model = self.base_model._gradient(x)
         # gradient 11
-        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
-        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
+        temp = xp.stack((xp.zeros_like(acv11), xp.zeros_like(acv11)), axis=-1)
+        gradient_11 = xp.concatenate((temp, gradient_base_model), axis=-1)
         # gradient 12
-        temp = np.stack((acv11 * self.f, acv11 * self.r), axis=-1)
-        gradient_12 = np.concatenate(
+        temp = xp.stack((acv11 * self.f, acv11 * self.r), axis=-1)
+        gradient_12 = xp.concatenate(
             (temp, gradient_base_model * self.r * self.f), axis=-1
         )
         # gradient 21
         gradient_21 = gradient_12
         # gradient 22
-        temp = np.stack((np.zeros_like(acv11), 2 * self.f * acv11), axis=-1)
-        gradient_22 = np.concatenate((temp, gradient_base_model * self.f**2), axis=-1)
-        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
-        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
-        return np.stack((row1, row2), axis=x.ndim - 1)
+        temp = xp.stack((xp.zeros_like(acv11), 2 * self.f * acv11), axis=-1)
+        gradient_22 = xp.concatenate((temp, gradient_base_model * self.f**2), axis=-1)
+        row1 = xp.stack((gradient_11, gradient_12), axis=x.ndim - 1)
+        row2 = xp.stack((gradient_21, gradient_22), axis=x.ndim - 1)
+        return xp.stack((row1, row2), axis=x.ndim - 1)
 
 
 # TODO temporary fix

@@ -1,16 +1,16 @@
 from .backend import BackendManager
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from typing import Tuple
 
 from debiased_spatial_whittle.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.utils import prod_list
 
-fft = np.fft.fft
-fftn = np.fft.fftn
-ifftshift = np.fft.ifftshift
-ndarray = np.ndarray
+fft = xp.fft.fft
+fftn = xp.fft.fftn
+ifftshift = xp.fft.ifftshift
+ndarray = xp.ndarray
 
 
 def autocov(cov_func, shape):
@@ -18,7 +18,7 @@ def autocov(cov_func, shape):
     In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
     0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
     when computing the expecting periodogram"""
-    xs = np.meshgrid(*(np.arange(-n + 1, n) for n in shape), indexing="ij")
+    xs = xp.meshgrid(*(xp.arange(-n + 1, n) for n in shape), indexing="ij")
     if BackendManager.backend_name == "torch":
         # TODO this is a temporary solution, not ideal though
         xs = xs.to(device=BackendManager.device)
@@ -44,12 +44,12 @@ def compute_ep(
     # now we need to "fold"
     if fold:
         # TODO: make this autograd compatible for any d with any n's
-        result = np.zeros(shape, dtype=np.complex128)
+        result = xp.zeros(shape, dtype=xp.complex128)
 
         if n_dim == 1:
             for i in range(2):
                 res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                result += np.pad(res, (i, 0), mode="constant")
+                result += xp.pad(res, (i, 0), mode="constant")
 
         elif n_dim == 2:
             for i in range(2):
@@ -58,7 +58,7 @@ def compute_ep(
                         i * shape[0] : (i + 1) * shape[0],
                         j * shape[1] : (j + 1) * shape[1],
                     ]
-                    result += np.pad(
+                    result += xp.pad(
                         res, ((i, 0), (j, 0)), mode="constant"
                     )  # autograd solution
 
@@ -71,17 +71,17 @@ def compute_ep(
                             j * shape[1] : (j + 1) * shape[1],
                             k * shape[2] : (k + 1) * shape[2],
                         ]
-                        result += np.pad(res, ((i, 0), (j, 0), (k, 0)), mode="constant")
+                        result += xp.pad(res, ((i, 0), (j, 0), (k, 0)), mode="constant")
 
     else:
         m, n = shape
-        result = np.zeros((2 * m, 2 * n))
+        result = xp.zeros((2 * m, 2 * n))
         result[:m, :n] = cbar[:m, :n]
         result[m + 1 :, :n] = cbar[m:, :n]
         result[m + 1 :, n + 1 :] = cbar[m:, n:]
         result[:m, n + 1 :] = cbar[:m, n:]
     # We take the real part of the fft only due to numerical precision, in theory this should be real
-    result = np.real(fftn(result))
+    result = xp.real(fftn(result))
     return result
 
 
@@ -101,8 +101,8 @@ def compute_ep_old(cov_func, grid, fold=True):
     cbar = cg * acv
     # now we need to "fold"
     if fold:
-        result = np.zeros_like(grid)
-        result = np.zeros_like(grid, dtype=np.complex128)
+        result = xp.zeros_like(grid)
+        result = xp.zeros_like(grid, dtype=xp.complex128)
         if n_dim == 1:
             for i in range(2):
                 result[i:] += cbar[i * shape[0] : (i + 1) * shape[0]]
@@ -124,13 +124,13 @@ def compute_ep_old(cov_func, grid, fold=True):
                         ]
     else:
         m, n = shape
-        result = np.zeros((2 * m, 2 * n))
+        result = xp.zeros((2 * m, 2 * n))
         result[:m, :n] = cbar[:m, :n]
         result[m + 1 :, :n] = cbar[m:, :n]
         result[m + 1 :, n + 1 :] = cbar[m:, n:]
         result[:m, n + 1 :] = cbar[:m, n:]
     # We take the real part of the fft only due to numerical precision, in theory this should be real-valued
-    result = np.real(fftn(result))
+    result = xp.real(fftn(result))
     return result
 
 
@@ -174,7 +174,7 @@ class Periodogram:
     def fold(self, value: bool):
         self._fold = value
 
-    def __call__(self, sample: Union[np.ndarray, SampleOnRectangularGrid]):
+    def __call__(self, sample: Union[xp.ndarray, SampleOnRectangularGrid]):
         """
         Computes the periodogram of the data.
 
@@ -199,7 +199,7 @@ class Periodogram:
                 z_values = sample.values * self.taper(sample.grid.n)
         else:
             z_values = sample * self.taper(sample.shape)
-        f = 1 / prod_list(z_values.shape) * np.abs(fftn(z_values)) ** 2
+        f = 1 / prod_list(z_values.shape) * xp.abs(fftn(z_values)) ** 2
         if isinstance(sample, SampleOnRectangularGrid):
             sample.periodograms[self] = f
         return f
@@ -222,7 +222,7 @@ class Periodogram:
 
 
 class HashableArray:
-    def __init__(self, values: np.array):
+    def __init__(self, values: xp.array):
         self.values = values
 
     def __hash__(self):
@@ -305,7 +305,7 @@ class ExpectedPeriodogram:
     def taper(self):
         return self._taper
 
-    def __call__(self, model: CovarianceModel) -> np.ndarray:
+    def __call__(self, model: CovarianceModel) -> xp.ndarray:
         """
         Compute the expected periodogram for this covariance model.
 
@@ -340,13 +340,13 @@ class ExpectedPeriodogram:
         p = self.grid.nvars
         acv_shape, acv_ndim = acv.shape, acv.ndim
         if acv.ndim == ndim:
-            return np.reshape(acv, acv_shape + (1, 1, 1))
+            return xp.reshape(acv, acv_shape + (1, 1, 1))
         if acv.ndim == ndim + 1:
-            return np.reshape(acv, acv_shape + (1, 1))
+            return xp.reshape(acv, acv_shape + (1, 1))
 
     def compute_ep(
         self,
-        acv: np.ndarray,
+        acv: xp.ndarray,
         fold: bool = True,
         d: Tuple[int, int] = (0, 0),
         apply_cg: bool = True,
@@ -398,9 +398,9 @@ class ExpectedPeriodogram:
         else:
             cg = spatial_kernel(self.grid.mask, d)
         if p == 1:
-            cg = np.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
+            cg = xp.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
         else:
-            cg = np.reshape(
+            cg = xp.reshape(
                 cg, cg.shape[:n_dim] + (1,) * (acv.ndim - n_dim - 2) + (p, p)
             )
         cbar = acv
@@ -410,17 +410,17 @@ class ExpectedPeriodogram:
         zeros_ = ((0, 0),) * (acv.ndim - n_dim)
         if fold:
             if BackendManager.backend_name == "torch":
-                result = np.zeros(
+                result = xp.zeros(
                     shape + acv.shape[n_dim:],
-                    dtype=np.complex128,
+                    dtype=xp.complex128,
                     device=BackendManager.device,
                 )
             else:
-                result = np.zeros(shape + acv.shape[n_dim:], dtype=np.complex128)
+                result = xp.zeros(shape + acv.shape[n_dim:], dtype=xp.complex128)
             if n_dim == 1:
                 for i in range(2):
                     res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                    result += np.pad(res, ((i, 0),) + zeros_, mode="constant")
+                    result += xp.pad(res, ((i, 0),) + zeros_, mode="constant")
 
             elif n_dim == 2:
                 for i in range(2):
@@ -429,7 +429,7 @@ class ExpectedPeriodogram:
                             i * shape[0] : (i + 1) * shape[0],
                             j * shape[1] : (j + 1) * shape[1],
                         ]
-                        result += np.pad(
+                        result += xp.pad(
                             res,
                             (
                                 (i, 0),
@@ -448,7 +448,7 @@ class ExpectedPeriodogram:
                                 j * shape[1] : (j + 1) * shape[1],
                                 k * shape[2] : (k + 1) * shape[2],
                             ]
-                            result += np.pad(
+                            result += xp.pad(
                                 res,
                                 (
                                     (i, 0),
@@ -466,7 +466,7 @@ class ExpectedPeriodogram:
             #             cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
         else:
             m, n = shape
-            result = np.zeros((2 * m, 2 * n))
+            result = xp.zeros((2 * m, 2 * n))
             result[:m, :n] = cbar[:m, :n]
             result[m + 1 :, :n] = cbar[m:, :n]
             result[m + 1 :, n + 1 :] = cbar[m:, n:]
@@ -475,11 +475,11 @@ class ExpectedPeriodogram:
         if d == (0, 0):
             out = fftn(result, None, list(range(n_dim)))
             if grid.nvars == 1:
-                out = np.real(out)
+                out = xp.real(out)
             return out
         out = fftn(result)
         if grid.nvars == 1:
-            out = np.reshape(out, grid.n)
+            out = xp.reshape(out, grid.n)
         return out
 
     def gradient(self, model: CovarianceModel, params: list[ModelParameter]) -> ndarray:
@@ -540,7 +540,7 @@ class ExpectedPeriodogram:
         n = self.grid.n
 
         def transpose(mat):
-            mat = np.reshape(mat, (n[0] * n[1], -1))
+            mat = xp.reshape(mat, (n[0] * n[1], -1))
             mat_t = mat.T
             mat_t = mat_t.reshape((-1, n[0], n[1]))
             return mat_t
@@ -572,7 +572,7 @@ class ExpectedPeriodogram:
         n = self.grid.n
 
         def transpose(mat):
-            mat = np.reshape(mat, (n[0] * n[1], -1))
+            mat = xp.reshape(mat, (n[0] * n[1], -1))
             mat_t = mat.T
             mat_t = mat_t.reshape((-1, n[0], n[1]))
             return mat_t
@@ -630,7 +630,7 @@ class ExpectedPeriodogram:
         cov: ndarray
             Covariance of the periodogram between frequencies offset by m
         """
-        return np.abs(self.cov_dft_diagonals(model, m)) ** 2
+        return xp.abs(self.cov_dft_diagonals(model, m)) ** 2
 
     def cov_dft_antidiagonals(self, model: CovarianceModel, m: Tuple[int, int]):
         """Returns the covariance of the DFT over a given diagonal. More precisely, m = (m1, m2) is the offset
@@ -650,7 +650,7 @@ class ExpectedPeriodogram:
         model
         m
         """
-        return np.abs(self.cov_dft_antidiagonals(model, m)) ** 2
+        return xp.abs(self.cov_dft_antidiagonals(model, m)) ** 2
 
 
 class SeparableExpectedPeriodogram(ExpectedPeriodogram):
@@ -666,7 +666,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
     def __call__(self, model):
         model1, model2 = model.models
         n1, n2 = self.grid.n
-        tau1, tau2 = np.arange(n1), np.arange(n2)
+        tau1, tau2 = xp.arange(n1), xp.arange(n2)
         cov_seq1 = model1(
             [
                 tau1,
@@ -677,8 +677,8 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
                 tau2,
             ]
         ) * (1 - tau2 / n2)
-        ep1 = 2 * np.real(fft(cov_seq1)).reshape((-1, 1)) - cov_seq1[0]
-        ep2 = 2 * np.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]
+        ep1 = 2 * xp.real(fft(cov_seq1)).reshape((-1, 1)) - cov_seq1[0]
+        ep2 = 2 * xp.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]
         return ep1 * ep2
 
     def gradient(self, model):
@@ -686,7 +686,7 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
         at all frequencies of the Fourier grid. The last dimension is used for different parameters."""
         model1, model2 = model.models
         n1, n2 = self.grid.n
-        tau1, tau2 = np.arange(n1), np.arange(n2)
+        tau1, tau2 = xp.arange(n1), xp.arange(n2)
         gradient_seq1 = model1.gradient(
             [
                 tau1,
@@ -698,18 +698,18 @@ class SeparableExpectedPeriodogram(ExpectedPeriodogram):
             ]
         ) * (1 - tau2 / n2)
         d_ep1 = (
-            2 * np.real(fft(gradient_seq1, axis=0)).reshape((-1, 1))
+            2 * xp.real(fft(gradient_seq1, axis=0)).reshape((-1, 1))
             - gradient_seq1[0, :]
         )
         d_ep2 = (
-            2 * np.real(fft(gradient_seq2, axis=0)).reshape((1, -1))
+            2 * xp.real(fft(gradient_seq2, axis=0)).reshape((1, -1))
             - gradient_seq2[0, :]
         )
         return d_ep1 * d_ep2
 
     def compute_ep(
-        self, acv: np.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)
-    ) -> np.ndarray:
+        self, acv: xp.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)
+    ) -> xp.ndarray:
         """
         Computes the expected periodogram for the passed finite autocovariance function, in the case where...
 
