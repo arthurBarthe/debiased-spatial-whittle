@@ -209,7 +209,18 @@ class BackendManager:
             return cupyx.scipy.special.gamma
         elif cls.backend_name == "torch":
             lgamma = torch.lgamma
-            return lambda *args, **kwargs: torch.exp(lgamma(*args, **kwargs))
+
+            def torch_gamma(*args, **kwargs):
+                x, *args = args
+                if not isinstance(x, torch.Tensor):
+                    x = torch.tensor(
+                        [
+                            x,
+                        ]
+                    ).to(device=cls.device)
+                return torch.exp(lgamma(x, *args, **kwargs))
+
+            return torch_gamma
 
     @classmethod
     def _changes_keyword(cls, func, old_keyword, new_keyword):
