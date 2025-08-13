@@ -11,6 +11,12 @@ authors:
   - name: Arthur P. Guillaumin
     orcid: 0000-0000-0000-0000
     affiliation: 1
+  - name: Thomas Goodwin
+    orcid: 0000-0003-1394-808X
+    affiliation: 5
+  - name: Olivia Walbert
+    orcid: 0000-0002-6026-5014
+    affiliation: 4
   - name: Adam M. Sykulski
     orcid: 0000-0000-0000-0000
     affiliation: 2
@@ -29,6 +35,8 @@ affiliations:
    index: 3
  - name: Princeton University, United States of America
    index: 4
+ - name: School of Economics, University of New South Wales, Australia
+   index: 5
 date: 20 January 2025
 bibliography: paper.bib
 ---
