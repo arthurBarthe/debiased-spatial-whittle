@@ -3,6 +3,7 @@ import warnings
 
 TORCH_INSTALLED = True
 CUPY_INSTALLED = True
+JNP_INSTALLED = True
 
 try:
     import torch
@@ -13,6 +14,12 @@ try:
     import cupy
 except ModuleNotFoundError:
     CUPY_INSTALLED = False
+
+try:
+    import jax.numpy as jnp
+    import jax.random as jrdm
+except ModuleNotFoundError:
+    JNP_INSTALLED = False
 
 
 def func(x):
@@ -64,6 +71,10 @@ class BackendManager:
             numpy.to_cpu = lambda x: x
             numpy.item = lambda x: x
             return numpy
+        elif cls.backend_name == "jax":
+            jnp.to_cpu = lambda x: x
+            jnp.item = lambda x: x
+            return jnp
         elif cls.backend_name == "cupy":
             cupy.to_cpu = lambda x: x.get()
             cupy.item = lambda x: x.item()
@@ -99,6 +110,8 @@ class BackendManager:
             return a
         elif BackendManager.backend_name == "cupy":
             return cupy.asarray(a)
+        elif BackendManager.backend_name == "jax":
+            return a
 
     @classmethod
     def get_zeros(cls):
@@ -110,6 +123,8 @@ class BackendManager:
             return lambda *args, **kargs: torch.zeros(
                 *args, **kargs, device=BackendManager.device
             )
+        elif BackendManager.backend_name == "jax":
+            return jnp.zeros
 
     @classmethod
     def get_ones(cls):
@@ -121,6 +136,8 @@ class BackendManager:
             return lambda *args, **kargs: torch.ones(
                 *args, **kargs, device=BackendManager.device
             )
+        elif BackendManager.backend_name == "jax":
+            return jnp.ones
 
     @classmethod
     def get_randn(cls):
@@ -132,6 +149,8 @@ class BackendManager:
             return lambda *args, **kargs: torch.randn(
                 *args, **kargs, dtype=torch.float64, device=cls.device
             )
+        elif BackendManager.backend_name == "jax":
+            return lambda *args, **kwargs: jrdm.normal(key, args)
         else:
             raise Exception("No backend set")
 
@@ -145,6 +164,8 @@ class BackendManager:
             return lambda *args, **kargs: torch.arange(
                 *args, **kargs, device=cls.device
             )
+        elif cls.backend_name == "jax":
+            return jnp.arange
         else:
             raise Exception("No backend set")
 
@@ -156,6 +177,8 @@ class BackendManager:
             return cupy.linalg.slogdet
         elif cls.backend_name == "torch":
             return torch.linalg.slogdet
+        elif cls.backend_name == "jax":
+            return jnp.linalg.slogdet
         else:
             raise Exception("No backend set")
 
@@ -167,6 +190,8 @@ class BackendManager:
             return cupy.linalg.inv
         elif cls.backend_name == "torch":
             return torch.linalg.inv
+        elif cls.backend_name == "jax":
+            return jnp.linalg.inv
         else:
             raise Exception("No backend set")
 
@@ -176,6 +201,8 @@ class BackendManager:
             return numpy.fft.fftn, numpy.fft.ifftn
         elif cls.backend_name == "cupy":
             return cupy.fft.fftn, cupy.fft.ifftn
+        elif cls.backend_name == "jax":
+            return jnp.fft.fftn, jnp.fft.ifftn
         elif cls.backend_name == "torch":
 
             def new_fftn(a, *args, **kargs):
@@ -193,6 +220,8 @@ class BackendManager:
             return numpy.fft.fftshift, numpy.fft.ifftshift
         elif cls.backend_name == "cupy":
             return cupy.fft.fftshift, cupy.fft.ifftshift
+        elif cls.backend_name == "jax":
+            return jnp.fft.fftshift, jnp.fft.ifftshift
         elif cls.backend_name == "torch":
             fftshift = cls._changes_keyword(torch.fft.fftshift, "axes", "dim")
             ifftshift = cls._changes_keyword(torch.fft.ifftshift, "axes", "dim")
@@ -219,9 +248,9 @@ class BackendManager:
 
     @classmethod
     def to_cpu(cls, a):
-        if cls.backend_name == "numpy":
-            return a
         if cls.backend_name == "cupy":
             return a.get()
         if cls.backend_name == "numpy":
             return a.cpu()
+        else:
+            return a

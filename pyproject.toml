@@ -9,8 +9,7 @@ homepage = "http://arthurpgb.pythonanywhere.com/sdw"
 keywords = ["random fields", "statistics", "whittle", "spatial", "matern", "kriging", "interpolation"]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <4.0"
-numpy = "^1.21.5"
+python = ">=3.11, <4.0"
 matplotlib = "^3.7.0"
 scipy = "^1.7.3"
 progressbar2 = "^4.2.0"
@@ -22,6 +21,7 @@ seaborn = "^0.12.2"
 cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
+jax = "^0.7.0"
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]
