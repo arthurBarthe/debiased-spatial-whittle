@@ -700,7 +700,6 @@ class Estimator:
         model: CovarianceModel,
         sample: Union[np.ndarray, SampleOnRectangularGrid],
         opt_callback: Callable = None,
-        x0: Optional[np.ndarray] = None,
     ):
         """
         Fits the passed covariance model to the passed data.
@@ -716,9 +715,6 @@ class Estimator:
 
         opt_callback: function handle
             Callback function called by the optimizer
-
-        x0: ndarray
-            Inital parameter guess
 
         Returns
         -------
@@ -754,9 +750,20 @@ class Estimator:
         ):
             import scipy
 
-            opt_result = getattr(scipy.optimize, self.method)(
-                opt_func, bounds=bounds, callback=opt_callback, **self.optim_options
-            )
+            try:
+                opt_result = getattr(scipy.optimize, self.method)(
+                    opt_func,
+                    bounds=bounds,
+                    callback=opt_callback,
+                    x0=x0,
+                    **self.optim_options,
+                )
+            except TypeError as e:
+                print(e)
+                print("Trying again without passing x0...")
+                opt_result = getattr(scipy.optimize, self.method)(
+                    opt_func, bounds=bounds, callback=opt_callback, **self.optim_options
+                )
         else:
             if self.use_gradients:
                 opt_result = minimize(
