@@ -18,9 +18,9 @@ print(s.shape)
 
 plt.figure()
 plt.subplot(1, 2, 1)
-plt.imshow(s[..., 0])
+plt.imshow(s[..., 0], cmap="seismic")
 plt.subplot(1, 2, 2)
-plt.imshow(s[..., 1])
+plt.imshow(s[..., 1], cmap="seismic")
 plt.show()
 
 # inference
@@ -42,5 +42,5 @@ ys = model.predict(
 )
 ys = ys.reshape((64, 64))
 plt.figure()
-plt.imshow(ys)
+plt.imshow(ys, cmap="seismic")
 plt.show()
