@@ -1,5 +1,11 @@
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel
+from debiased_spatial_whittle.simulation import (
+    SamplerOnRectangularGrid,
+    MultivariateSamplerOnRectangularGrid,
+)
+from debiased_spatial_whittle.models import (
+    ExponentialModel,
+    BivariateUniformCorrelation,
+)
 from debiased_spatial_whittle.grids import RectangularGrid
 
 
@@ -48,3 +54,13 @@ class TestMultipleSimulations:
     def test_independent(self):
         # TODO add this test to check that realizations are i.i.d.
         pass
+
+
+class TestMultivariateSimulations:
+    base_model = ExponentialModel(rho=12)
+    bvm = BivariateUniformCorrelation(base_model, r=0.2, f=1.0)
+
+    def test_simulation(self):
+        grid = RectangularGrid((64, 64), nvars=2)
+        sampler = MultivariateSamplerOnRectangularGrid(self.bvm, grid, p=2)
+        assert sampler().shape == (64, 64, 2)

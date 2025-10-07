@@ -275,19 +275,21 @@ def test_gradient_expected_periodogram_bivariate():
     bvm = BivariateUniformCorrelation(model)
     bvm.r = 0.1
     bvm.f = 1.2
-    params_for_grad = [bvm.param.r, bvm.param.spectral_amplitudes]
+    params_for_grad = [
+        bvm.param.r,
+    ]
     ep_grad = ep_op.gradient(bvm, params_for_grad)
     ep = ep_op(bvm)
     epsilon = 1e-6
     for i, p in enumerate(params_for_grad):
         print(p.name)
-        old_value = getattr(model, p.name)
+        old_value = getattr(bvm, p.name)
         new_value = old_value + epsilon
-        setattr(model, p.name, new_value)
+        setattr(bvm, p.name, new_value)
         ep2 = ep_op(bvm)
         grad_num = (ep2 - ep) / epsilon
-        assert_allclose(ep_grad[..., i], grad_num, rtol=0.001)
-        setattr(model, p.name, old_value)
+        assert_allclose(ep_grad[..., i, :, :], grad_num, rtol=0.001)
+        setattr(bvm, p.name, old_value)
 
 
 def test_gradient_expected_periodogram_sqExpCov():

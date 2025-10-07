@@ -267,7 +267,6 @@ class MultivariateSamplerOnRectangularGrid:
         # remove extra dimensions
         # TODO dirty, clean this somehow
         w = np.squeeze(w, -1)
-        w = np.squeeze(w, -2)
         return w * self.grid.mask
 
     def __call__(self) -> np.ndarray:
