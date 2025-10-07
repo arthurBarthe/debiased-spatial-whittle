@@ -30,11 +30,35 @@ class LeastSquareEstimator:
         expected_periodogram: ExpectedPeriodogram,
         verbose: int = 0,
     ):
+        """
+        Parameters
+        ----------
+        periodogram
+            Periodogram object that will be applied to the data
+        expected_periodogram
+            Expected periodogram object
+        verbose
+            Verbosity level passed on to the least_squares function of scipy.optimize
+        """
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
         self.verbose = verbose
 
-    def __call__(self, data: np.array, model: CovarianceModel):
+    def __call__(self, data: np.array, model: CovarianceModel) -> CovarianceModel:
+        """
+        Carries out the Least-Square estimation.
+
+        Parameters
+        ----------
+        data
+            Sampled random field
+        model
+            Covariance model
+        Returns
+        -------
+        model
+            Fitted covariance model
+        """
         x0 = model.free_parameter_values_to_array_deep()
         bounds = np.array(list(zip(*model.free_parameter_bounds_to_list_deep())))
 

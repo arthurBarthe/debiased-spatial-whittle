@@ -27,7 +27,6 @@ from debiased_spatial_whittle.simulation import (
 # ##Grid specification
 
 # Note that we use the argument nvars=2 to specify that we observe a bivariate random field
-
 g = RectangularGrid((128, 128), nvars=2)
 
 
@@ -75,7 +74,7 @@ plt.show()
 # ##Inference
 
 e = Estimator(db)
-m = ExponentialModel(rho=1, sigma=1)
+m = Matern32Model(rho=1, sigma=1)
+m.set_param_bounds(dict(rho=(0.1, 100), sigma=(0.1, 10)))
 bvm = BivariateUniformCorrelation(m, r=0.0, f=1.0)
 e(bvm, data)
-print(bvm.r)
