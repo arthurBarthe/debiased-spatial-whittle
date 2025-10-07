@@ -171,7 +171,7 @@ def test_fisher_multivariate():
     bvm.f = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.spectral_amplitudes])
+    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.f])
     assert np.all(np.diag(h) > 0)
 
 
