@@ -98,7 +98,9 @@ The code base also includes tapering, the use of which can further
 Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
 In practice, we observe computational GPU-versus-CPU speed-ups of order $\times 10$ up
-to order $\times 100$ as reported in \autoref{fig:times} (Nvidia Tesla V100 16GiB,
+to order $\times 100$ as reported in \autoref{fig:times}
+(CPU: Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz, 
+GPU: NVIDIA A100-PCIE 40GB,
 numpy 1.26.4, cupy 13.4.0).
 
 ![A simulated sample from an exponential covariance kernel observed on a domain
