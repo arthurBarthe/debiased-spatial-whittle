@@ -23,6 +23,8 @@ shape (n1, ..., nk).
 For a bivariate model, we expect the covariance model to return an array with
 shape (n1, ..., nk, 2, 2).
 
+::: debiased_spatial_whittle.models.ModelInterface
+
 ::: debiased_spatial_whittle.models.CovarianceModel
 
 ::: debiased_spatial_whittle.models.SumModel

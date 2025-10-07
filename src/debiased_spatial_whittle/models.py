@@ -124,7 +124,15 @@ class ModelInterface(param.Parameterized):
         Returns
         -------
         cov
-            covariances. Shape (n1, ..., nk)
+            covariances at the passed lags. The shape of cov will depend on scalar vs multivariate model whether
+            vectorized models are used. This is summarized by the table below, where $p$ denotes the
+            number of variates of the random field ($p=1$ for a scalar random field), and $m$ denotes
+            the number of models in the case of vectorized models.
+
+            cov shape | p=1 | p > 1
+            :----------- |:-------------:| -----------:
+            single model         | (n1, ..., nk)        | (n1, ..., nk, p, p)
+            vectorized model         | (n1, ... nk, m)        | (n1, ..., nk, m, p, p)
         """
         pass
 
@@ -204,7 +212,7 @@ class ModelInterface(param.Parameterized):
         Parameters
         ----------
         lags
-
+            array of lags. Shape (d, n1, ..., nk)
 
         params
             parameters for which we require the derivative
@@ -212,13 +220,25 @@ class ModelInterface(param.Parameterized):
         Returns
         -------
         gradient
-            last dimension indexes the parameters passed in params
+            array of gradient w.r.t. parameters in params. The shape depends on scalar versus multivariate
+            random field model and on unique versus vectorized model. This is summarized by the table below,
+            where $p$ denotes the number of variates of the random field ($p=1$ for a scalar random field),
+            and $m$ denotes the number of models in the case of vectorized models. $g$ denotes the number of parameters
+            in params, those for which we request the gradient.
+
+            cov shape | p=1 | p > 1
+            :----------- |:-------------:| -----------:
+            single model         | (n1, ..., nk, g)        | (n1, ..., nk, g, p, p)
+            vectorized model         | Not tested      | Not tested
+
+
         """
         grad = self._gradient(lags)
         out = []
         for p in params:
             out.append(grad[p.name])
-        return np.stack(out, -1)
+        n_spatial_dims = lags.shape[0]
+        return np.stack(out, n_spatial_dims)
 
     def _gradient(self, lags: np.ndarray):
         raise NotImplementedError()
@@ -293,9 +313,10 @@ class CovarianceModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
+        ndim = lags.ndim
         out = self._compute(np.expand_dims(lags, -1))
-        if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+        if out.shape[ndim - 1] == 1:
+            out = np.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -358,9 +379,10 @@ class CompoundModel(ModelInterface):
         raise NotImplementedError()
 
     def __call__(self, lags: np.ndarray):
+        ndim = lags.ndim
         out = self._compute(np.expand_dims(lags, -1))
-        if out.shape[-1] == 1:
-            out = np.squeeze(out, -1)
+        if out.shape[ndim - 1] == 1:
+            out = np.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -740,13 +762,10 @@ class BivariateUniformCorrelation(CompoundModel):
 
         """
         acv11 = self.base_model._compute(lags)
-        out = np.zeros(acv11.shape + (2, 2))
-        out = BackendManager.convert(out)
-        out[..., 0, 0] = acv11
-        out[..., 1, 1] = acv11 * self.f**2
-        out[..., 0, 1] = acv11 * self.r * self.f
-        out[..., 1, 0] = acv11 * self.r * self.f
-        return out
+        fill_in = np.ones_like(self.r * self.f)
+        column1 = np.stack((acv11 * fill_in, acv11 * self.r * self.f), -1)
+        column2 = np.stack((acv11 * self.r * self.f, acv11 * fill_in * self.f**2), -1)
+        return np.stack((column1, column2), -1)
 
     def _gradient(self, x: np.ndarray):
         """
@@ -762,24 +781,18 @@ class BivariateUniformCorrelation(CompoundModel):
             shape (m1, ..., mk, 2, 2, p + 2)
             where p is the number of parameters of the base model.
         """
-        acv11 = self.base_model(x)
+        acv_base_model = self.base_model(x)
         gradient_base_model = self.base_model._gradient(x)
-        # gradient 11
-        temp = np.stack((np.zeros_like(acv11), np.zeros_like(acv11)), axis=-1)
-        gradient_11 = np.concatenate((temp, gradient_base_model), axis=-1)
-        # gradient 12
-        temp = np.stack((acv11 * self.f, acv11 * self.r), axis=-1)
-        gradient_12 = np.concatenate(
-            (temp, gradient_base_model * self.r * self.f), axis=-1
-        )
-        # gradient 21
-        gradient_21 = gradient_12
-        # gradient 22
-        temp = np.stack((np.zeros_like(acv11), 2 * self.f * acv11), axis=-1)
-        gradient_22 = np.concatenate((temp, gradient_base_model * self.f**2), axis=-1)
-        row1 = np.stack((gradient_11, gradient_12), axis=x.ndim - 1)
-        row2 = np.stack((gradient_21, gradient_22), axis=x.ndim - 1)
-        return np.stack((row1, row2), axis=x.ndim - 1)
+        # derivative w.r.t. r
+        d_r = np.zeros(acv_base_model.shape + (2, 2))
+        d_r[..., 0, 1] = acv_base_model * self.f
+        d_r[..., 1, 0] = acv_base_model * self.f
+        # derivative w.r.t. f
+        d_f = np.zeros(acv_base_model.shape + (2, 2))
+        d_f[..., 1, 1] = 2 * self.f * acv_base_model
+        d_f[..., 0, 1] = acv_base_model * self.r
+        d_f[..., 1, 0] = acv_base_model * self.r
+        return dict(r=d_r, f=d_f)
 
 
 # TODO temporary fix
