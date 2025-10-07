@@ -144,7 +144,7 @@ inv = BackendManager.get_inv()
 
 def whittle_prime(per, e_per, e_per_prime):
     n = prod_list(per.shape)
-    if e_per.ndim != e_per_prime.ndim and e_per_prime.shape[-1] > 1:
+    if e_per.ndim != e_per_prime.ndim:
         out = []
         for i in range(e_per_prime.shape[-1]):
             out.append(whittle_prime(per, e_per, e_per_prime[..., i]))
@@ -201,13 +201,12 @@ class MultivariateDebiasedWhittle:
         if not params_for_gradient:
             return whittle
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        d_ep = np.transpose(d_ep, (0, 1, 4, 2, 3))
-        ep_inv = np.expand_dims(ep_inv, 2)
+        ep_inv = np.expand_dims(ep_inv, -3)
+        p = np.expand_dims(p, -3)
         # the derivative of the log determinant
         d_log_det = np.trace(np.matmul(ep_inv, d_ep), axis1=-2, axis2=-1)
         # the derivative the second term
         d_ep_inv = -np.matmul(ep_inv, np.matmul(d_ep, ep_inv))
-        p = np.expand_dims(p, axis=2)
         d_quad_term = np.trace(np.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
         # derivative
         d_whittle = np.mean(d_log_det + d_quad_term, axis=(0, 1))
@@ -215,12 +214,13 @@ class MultivariateDebiasedWhittle:
 
     def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
         """Provides the expectation of the hessian matrix"""
+        n_params = len(params_for_gradient)
         ep = self.expected_periodogram(model)
         ep_inv = inv(ep)
         d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        h = zeros((len(params_for_gradient), len(params_for_gradient)))
-        for i1, p1_name in enumerate(params_for_gradient.names):
-            for i2, p2_name in enumerate(params_for_gradient.names):
+        h = zeros((n_params, n_params))
+        for i1 in range(n_params):
+            for i2 in range(n_params):
                 d_ep1 = d_ep[..., i1]
                 d_ep2 = d_ep[..., i2]
                 h[i1, i2] = np.mean(
@@ -648,7 +648,7 @@ class Estimator:
         Debiased Whittle likelihood used for fitting.
 
     use_gradients: bool
-        Whether to use gradients in the optimization procedure
+        Whether to use gradients in the optimization procedure. Not working at the moment.
 
     max_iter: int
         Maximum number of iterations of the optimization procedure
@@ -695,12 +695,24 @@ class Estimator:
         self.f_opt = None
         self.f_info = None
 
+    @property
+    def use_gradients(self):
+        return self._use_gradients
+
+    @use_gradients.setter
+    def use_gradients(self, value: bool):
+        if value:
+            raise NotImplementedError(
+                "The use of gradients for optimization is currently not implemented."
+            )
+        else:
+            self._use_gradients = value
+
     def __call__(
         self,
         model: CovarianceModel,
         sample: Union[np.ndarray, SampleOnRectangularGrid],
         opt_callback: Callable = None,
-        x0: Optional[np.ndarray] = None,
     ):
         """
         Fits the passed covariance model to the passed data.
@@ -716,9 +728,6 @@ class Estimator:
 
         opt_callback: function handle
             Callback function called by the optimizer
-
-        x0: ndarray
-            Inital parameter guess
 
         Returns
         -------
@@ -754,9 +763,20 @@ class Estimator:
         ):
             import scipy
 
-            opt_result = getattr(scipy.optimize, self.method)(
-                opt_func, bounds=bounds, callback=opt_callback, **self.optim_options
-            )
+            try:
+                opt_result = getattr(scipy.optimize, self.method)(
+                    opt_func,
+                    bounds=bounds,
+                    callback=opt_callback,
+                    x0=x0,
+                    **self.optim_options,
+                )
+            except TypeError as e:
+                print(e)
+                print("Trying again without passing x0...")
+                opt_result = getattr(scipy.optimize, self.method)(
+                    opt_func, bounds=bounds, callback=opt_callback, **self.optim_options
+                )
         else:
             if self.use_gradients:
                 opt_result = minimize(

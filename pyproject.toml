@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "debiased-spatial-whittle"
-version = "1.0.1"
+version = "1.1.1"
 description = "Spatial Debiased Whittle likelihood for fast inference of spatio-temporal covariance models from gridded data"
 readme = "README.md"
 authors = ["arthur <ahw795@qmul.ac.uk>"]
@@ -22,6 +22,7 @@ seaborn = "^0.12.2"
 cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
+pytest-cov = "^6.2.1"
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]
