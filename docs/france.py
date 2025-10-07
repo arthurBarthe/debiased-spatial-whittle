@@ -5,7 +5,7 @@
 
 from debiased_spatial_whittle.backend import BackendManager
 
-BackendManager.set_backend("torch")
+
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
 from debiased_spatial_whittle.models import ExponentialModel
