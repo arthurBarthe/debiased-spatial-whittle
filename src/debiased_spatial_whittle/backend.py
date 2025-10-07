@@ -1,6 +1,6 @@
 import numpy
 import warnings
-from cupy_backends.cuda.api.runtime import CUDARuntimeError
+
 
 TORCH_INSTALLED = True
 CUPY_INSTALLED = True
@@ -12,6 +12,7 @@ except ModuleNotFoundError:
 
 try:
     import cupy
+    from cupy_backends.cuda.api.runtime import CUDARuntimeError
 except ModuleNotFoundError:
     CUPY_INSTALLED = False
 
