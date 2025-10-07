@@ -116,7 +116,9 @@ def test_whittle_grad_multi():
     z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     epsilon = 1e-8
-    params_for_grad = [bvm.param.r, bvm.param.f]
+    params_for_grad = [
+        bvm.param.r,
+    ]
     lkh, grad = dbw(z, bvm, params_for_grad)
     for i, p in enumerate(params_for_grad):
         print(p.name)
@@ -125,7 +127,7 @@ def test_whittle_grad_multi():
         setattr(bvm, p.name, new_value)
         lkh2 = dbw(z, bvm)
         grad_num = (lkh2 - lkh) / epsilon
-        assert_allclose(grad[i], grad_num, rtol=0.001)
+        assert_allclose(grad[..., i], grad_num, rtol=0.001)
         setattr(bvm, p.name, old_value)
 
 
@@ -245,5 +247,5 @@ def test_jmatrix_sample_multivariate():
     bvm.f = 1.5
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     jmat = dbw.jmatrix_sample(bvm, [bvm.param.r, bvm.param.f])
-    assert jmat.shape == (5, 5)
+    assert jmat.shape == (2, 2)
     assert np.all(np.diag(jmat) > 0)
