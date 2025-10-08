@@ -105,8 +105,11 @@ The code base also includes tapering, the use of which can further
  alleviate boundary effects [@dahlhaus_edge_1987]. Finally, the user can switch between several
 computing backends, Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
-This is shown in \autoref{fig:times} where we observed a $\times 100$
-speed-up with a GPU versus a CPU.
+In practice, we observe computational GPU-versus-CPU speed-ups of order $\times 10$ up
+to order $\times 100$ as reported in \autoref{fig:times}
+(CPU: Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz, 
+GPU: NVIDIA A100-PCIE 40GB,
+numpy 1.26.4, cupy 13.4.0).
 
 ![A simulated sample from an exponential covariance kernel observed on a domain
 with the shape of metropolitan France (sans Corsica) (a),
@@ -161,7 +164,7 @@ including example notebooks is available, and issues can be raised on
 via [mybinder.org](https://mybinder.org/v2/gh/arthurBarthe/debiased-spatial-whittle/master).
 
 # Acknowledgements
-This research utilised Queen Mary's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
+This research utilised Queen Mary University of London's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
 In particular, this research made use of the OnDemand portal [@Hudak2018].
 
 
