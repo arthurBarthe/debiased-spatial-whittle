@@ -24,11 +24,11 @@ torch = {version="2.2.2", optional=true}
 jax = "^0.7.0"
 
 [tool.poetry.extras]
-gpu12 = ["cupy-cuda12x", "torch", "jax[cuda12]"]
+gpu12 = ["cupy-cuda12x", "torch"]
 gpu11 = ["cupy-cuda11x", "torch"]
 
 [tool.poetry.group.gpu13.dependencies]
-jax = { extras = ["cuda13"], version = "^0.4.20", platform = "linux" }
+jax = { extras = ["cuda13"], version = "^0.7.0", platform = "linux" }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.3.1"
