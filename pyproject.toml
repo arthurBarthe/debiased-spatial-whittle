@@ -24,7 +24,8 @@ torch = {version="2.2.2", optional=true}
 jax = "^0.7.0"
 
 [tool.poetry.extras]
-gpu12 = ["cupy-cuda12x", "torch"]
+gpu13 = ["cupy-cuda13x", "torch", "jax[cuda13]"]
+gpu12 = ["cupy-cuda12x", "torch", "jax[cuda12]"]
 gpu11 = ["cupy-cuda11x", "torch"]
 
 [tool.poetry.dev-dependencies]
