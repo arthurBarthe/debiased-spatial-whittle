@@ -21,7 +21,7 @@ seaborn = "^0.12.2"
 cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
-jax = "^0.7.0"
+jax = {extras = ["cuda13"], version = "^0.7.2"}
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]

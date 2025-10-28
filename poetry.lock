@@ -1044,8 +1044,7 @@ version = "0.7.2"
 description = "JAX XLA PJRT Plugin for NVIDIA GPUs"
 optional = false
 python-versions = "*"
-groups = ["gpu13"]
-markers = "sys_platform == \"linux\""
+groups = ["main", "gpu13"]
 files = [
     {file = "jax_cuda13_pjrt-0.7.2-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:644527e195e6da913e2e2aee80d2f6143d843263c62246458c95c18f3a19ee48"},
     {file = "jax_cuda13_pjrt-0.7.2-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:bbac8c63629e9308f1a7daf00b3841e5a28a61740d7a1eda78fac0685a25c01d"},
@@ -1057,8 +1056,7 @@ version = "0.7.2"
 description = "JAX Plugin for NVIDIA GPUs"
 optional = false
 python-versions = ">=3.11"
-groups = ["gpu13"]
-markers = "sys_platform == \"linux\""
+groups = ["main", "gpu13"]
 files = [
     {file = "jax_cuda13_plugin-0.7.2-cp311-cp311-manylinux_2_27_aarch64.whl", hash = "sha256:ac3c47ecd93533355854a77d20eaf947e6dec11717d28d3027bf55d6ea4e84e2"},
     {file = "jax_cuda13_plugin-0.7.2-cp311-cp311-manylinux_2_27_x86_64.whl", hash = "sha256:75879b5dcddb02c298a923cf695e9d5d574853dbb9cc09c2544c85624ea85fb2"},
@@ -1881,9 +1879,9 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
     {version = ">=2.1.0", markers = "python_version >= \"3.13\""},
     {version = ">=1.26.0", markers = "python_version == \"3.12\""},
-    {version = ">=1.23.3", markers = "python_version == \"3.11\""},
 ]
 
 [package.extras]
@@ -2105,7 +2103,7 @@ version = "13.1.0.3"
 description = "CUBLAS native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cublas-13.1.0.3-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c86fc7f7ae36d7528288c5d88098edcb7b02c633d262e7ddbb86b0ad91be5df2"},
@@ -2132,7 +2130,7 @@ version = "13.0.88"
 description = "CUDA C Runtime"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cuda_crt-13.0.88-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ee2ea2a97073e02ee62bb27841f437332be2c248e3eac013df07997ada39c003"},
@@ -2146,7 +2144,7 @@ version = "13.0.85"
 description = "CUDA profiling tools runtime libs."
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_aarch64.whl", hash = "sha256:796bd679890ee55fb14a94629b698b6db54bcfd833d391d5e94017dd9d7d3151"},
@@ -2173,7 +2171,7 @@ version = "13.0.88"
 description = "CUDA nvcc"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cuda_nvcc-13.0.88-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:c7ff28f86a24effdc6c034fa15230c549a273e4771b10a7fec14996f8cf3307f"},
@@ -2192,7 +2190,7 @@ version = "13.0.88"
 description = "NVRTC native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:ad9b6d2ead2435f11cbb6868809d2adeeee302e9bb94bcf0539c7a40d80e8575"},
@@ -2219,7 +2217,7 @@ version = "13.0.96"
 description = "CUDA Runtime native Libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ef9bcbe90493a2b9d810e43d249adb3d02e98dd30200d86607d8d02687c43f55"},
@@ -2261,7 +2259,7 @@ version = "9.14.0.64"
 description = "cuDNN runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cudnn_cu13-9.14.0.64-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:2ca0fb0f8e8c42f9d05ce5ba2bb1a1455b60f2478739363b6d899cc25f897602"},
@@ -2278,7 +2276,7 @@ version = "12.0.0.61"
 description = "CUFFT native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cufft-12.0.0.61-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:2708c852ef8cd89d1d2068bdbece0aa188813a0c934db3779b9b1faa8442e5f5"},
@@ -2321,7 +2319,7 @@ version = "12.0.4.66"
 description = "CUDA solver native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:02c2457eaa9e39de20f880f4bd8820e6a1cfb9f9a34f820eb12a155aa5bc92d2"},
@@ -2358,7 +2356,7 @@ version = "12.6.3.3"
 description = "CUSPARSE native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:80bcc4662f23f1054ee334a15c72b8940402975e0eab63178fc7e670aa59472c"},
@@ -2403,7 +2401,7 @@ version = "2.28.3"
 description = "NVIDIA Collective Communication Library (NCCL) Runtime"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_nccl_cu13-2.28.3-py3-none-manylinux_2_18_aarch64.whl", hash = "sha256:cf9166b74777788a86071bbc20ea07982f7fa3a7cc3ac9ed6268b09a33aef6ca"},
@@ -2416,7 +2414,7 @@ version = "13.0.88"
 description = "Nvidia JIT LTO Library"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_nvjitlink-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:13a74f429e23b921c1109976abefacc69835f2f433ebd323d3946e11d804e47b"},
@@ -2444,7 +2442,7 @@ version = "3.4.5"
 description = "NVSHMEM creates a global address space that provides efficient and scalable communication for NVIDIA GPU clusters."
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
+groups = ["main", "gpu13"]
 markers = "sys_platform == \"linux\""
 files = [
     {file = "nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:6dc2a197f38e5d0376ad52cd1a2a3617d3cdc150fd5966f4aee9bcebb1d68fe9"},
@@ -2470,8 +2468,7 @@ version = "13.0.88"
 description = "NVVM Libraries"
 optional = false
 python-versions = ">=3"
-groups = ["gpu13"]
-markers = "sys_platform == \"linux\""
+groups = ["main", "gpu13"]
 files = [
     {file = "nvidia_nvvm-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:c5f41ffeb6466944a026dfa5317d7d85355c119bbec279205d22f1869d1054e0"},
     {file = "nvidia_nvvm-13.0.88-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:c4376a291d72d22a315d9d2f69bdae8f8cd83a627f75bad395cee49a0fe65dc1"},
@@ -2572,8 +2569,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
     {version = ">=1.23.2", markers = "python_version == \"3.11\""},
+    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -3956,4 +3953,4 @@ gpu12 = ["cupy-cuda12x", "torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11, <4.0"
-content-hash = "1c95a63c50e63ed65f6280c99491000cd82d33061da155b5fe9ee2f54d74335d"
+content-hash = "a263e2ccfb42eba3c7e6312d69c8e3a14b9426467dbf622bd0b115a9569d2582"
