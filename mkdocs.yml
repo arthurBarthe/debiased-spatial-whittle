@@ -16,7 +16,7 @@ plugins:
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py', 'france_interpolation.py']
-    execute: false
+    execute: true
 - mkdocstrings:
     handlers:
       python:
