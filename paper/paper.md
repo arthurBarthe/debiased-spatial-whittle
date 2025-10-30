@@ -11,6 +11,12 @@ authors:
   - name: Arthur P. Guillaumin
     orcid: 0000-0003-1571-4228
     affiliation: 1
+  - name: Thomas Goodwin
+    orcid: 0000-0003-1394-808X
+    affiliation: 5
+  - name: Olivia Walbert
+    orcid: 0000-0002-6026-5014
+    affiliation: 4
   - name: Adam M. Sykulski
     orcid: 0000-0002-5564-3674
     affiliation: 2
@@ -29,7 +35,9 @@ affiliations:
    index: 3
  - name: Princeton University, United States of America
    index: 4
-date: 24 March 2025
+ - name: School of Economics, University of New South Wales, Australia
+   index: 5
+date: 20 January 2025
 bibliography: paper.bib
 ---
 
@@ -64,12 +72,12 @@ which typically require a high number of likelihood evaluations during the optim
 when running an MCMC sampler.
 
 A common means to circumvent this computational burden is to use approximations to the Gaussian likelihood.
-Among these,
+Among these methods,
 the Whittle likelihood is a standard spectral domain method for gridded data.
 Along its computational benefits, the Whittle likelihood provides robustness to departures
 from Gaussianity and allows to restrict the second-order model to a specific range
 of spatio-temporal frequencies.
-However, for spatial and spatio-temporal data where $d\geq 2$, the standard Whittle likelihood
+However, for spatial and spatio-temporal data where the dimension $d$ is greater than 2, the standard Whittle likelihood
 suffers from a large bias
 and typically does not allow for missing observations.
 
@@ -87,18 +95,21 @@ obtained from 1000 independent samples generated from the same model and the
 predicted distribution of estimates, which can be used to build confidence
 intervals.
 
-The package allows to address multivariate data, including those cases where the
+The package allows the user to treat multivariate data, including those cases where the
 missingness patterns might differ between the variates. For instance,
 in \autoref{fig:bivariate} we show a realization of a bivariate random field
 with distinct patterns of missing observations between the two variates, from which
 we can still infer the parameters of the model, such as the correlation between
 the two fields.
 The code base also includes tapering, the use of which can further
- alleviate boundary effects [@dahlhaus_edge_1987]. Finally, the user can switch between several backends,
-Numpy, Cupy and PyTorch. This allows to further benefit from computational
+ alleviate boundary effects [@dahlhaus_edge_1987]. Finally, the user can switch between several
+computing backends, Numpy, Cupy and PyTorch. This allows to further benefit from computational
 gains via GPU implementations of the Fast Fourier Transform.
-This is shown in \autoref{fig:times} where we observed a $\times 100$
-speed-up with a GPU versus a CPU.
+In practice, we observe computational GPU-versus-CPU speed-ups of order $\times 10$ up
+to order $\times 100$ as reported in \autoref{fig:times}
+(CPU: Intel(R) Xeon(R) Platinum 8268 CPU @ 2.90GHz, 
+GPU: NVIDIA A100-PCIE 40GB,
+numpy 1.26.4, cupy 13.4.0).
 
 ![A simulated sample from an exponential covariance kernel observed on a domain
 with the shape of metropolitan France (sans Corsica) (a),
@@ -141,7 +152,7 @@ categories:
     be combined (e.g. via summation) to form more complex covariance models.
 - estimation:
   - `periodogram.py`: this module allows to compute the periodogram of the data, and to obtain
-    the expected periodogram for a given model, grid, and periodogram combination.
+    the expected periodogram for a given model and grid combination.
   - `multivariate_periodogram.py`: this module allows to compute the periodogram for multivariate data.
   - `likelihood.py`: this module allows to define the Debiased Whittle Likelihood and the corresponding
     estimator. The optimizer can be selected among those offered by the optimize
@@ -153,7 +164,7 @@ including example notebooks is available, and issues can be raised on
 via [mybinder.org](https://mybinder.org/v2/gh/arthurBarthe/debiased-spatial-whittle/master).
 
 # Acknowledgements
-This research utilised Queen Mary's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
+This research utilised Queen Mary University of London's Apocrita HPC facility, supported by QMUL Research-IT. doi:10.5281/zenodo.438045.
 In particular, this research made use of the OnDemand portal [@Hudak2018].
 
 

@@ -5,10 +5,11 @@
 
 from debiased_spatial_whittle.backend import BackendManager
 
-BackendManager.set_backend("numpy")
+
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.models import SquaredExponentialModel
+from debiased_spatial_whittle.models import ExponentialModel
+from debiased_spatial_whittle.sdf_models import SpectralMatern
 from debiased_spatial_whittle.grids import RectangularGrid
 from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
@@ -17,7 +18,7 @@ from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
 
 # ##Model specification
 
-model = SquaredExponentialModel(rho=15, sigma=0.9)
+model = SpectralMatern(rho=15, nu=2.0)
 
 # ##Grid specification
 
@@ -41,8 +42,7 @@ expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
-model_est = SquaredExponentialModel()
-model_est.sigma = 0.9
-model_est.fix_parameter("sigma")
-estimate = estimator(model_est, z)
+model_est = SpectralMatern()
+model_est.set_param_bounds(dict(rho=(3, 50), nu=(0.5, 5)))
+estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
 print(estimate.rho)

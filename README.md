@@ -18,11 +18,15 @@ This package implements the Spatial Debiased Whittle Likelihood (SDW) as present
 
 The SDW extends ideas from the Whittle likelihood and Debiased Whittle Likelihood to random fields and spatio-temporal data. In particular, it directly addresses the bias issue of the Whittle likelihood for observation domains with dimension greater than 2. It also allows us to work with rectangular domains (i.e., rather than square), missing observations, and complex shapes of data.
 
+The documentation is available [here](https://debiased-spatial-whittle.readthedocs.io/en/latest/?badge=latest).
+
 ## Installation instructions
+
+### CPU-only
 
 The package can be installed via one of the following methods.
 
-1. Via the use of Poetry ([https://python-poetry.org/](https://python-poetry.org/)), by running the following command:
+1. Via the use of [Poetry](https://python-poetry.org/), by running the following command:
 
    ```bash
    poetry add debiased-spatial-whittle
@@ -34,45 +38,38 @@ The package can be installed via one of the following methods.
     pip install debiased-spatial-whittle
     ```
 
-## Development
+### GPU
+The Debiased Spatial Whittle likelihood relies on the Fast Fourier Transform (FFT) for computational efficiency.
+GPU implementations of the FFT provide additional computational efficiency (order x100) at almost no additional cost thanks to GPU implementations of the FFT algorithm.
 
-Firstly, you need to install poetry. Then, git clone this repository, ad run the following command from
-the directory corresponding to the package.
+If you want to install with GPU dependencies (Cupy and Pytorch):
 
-   ```bash
-   poetry install
-   ```
-
-If you run into some issue regarding the Python version, you can run
-   ```bash
-   poetry env use <path_to_python>
-   ```
-where <path_to_python> is the path to a Python version compatible with the requirements in pyproject.toml.
-
-### Unit tests
-Unit tests are run with pytest. On Pull-requests, the unit tests will be
-run.
-
-## Documentation
-The documentation is hosted on readthedocs. It is based on docstrings.
-Currently, it points to the joss_paper branch and is updated on any push to that branch.
-
-## Versioning
-Currently, versioning is handled manuallyusing poetry, e.g.
+1. You need an NVIDIA GPU
+2. You need to install the CUDA Toolkit. See for instance Cupy's [installation page](https://docs.cupy.dev/en/stable/install.html).
+3. You can install Cupy or pytorch yourself in your environment. Or you can specify an extra to poetry, e.g.
 
    ```bash
-   poetry version patch
+   poetry add debiased-spatial-whittle -E gpu12
    ```
-or
-   ```bash
-   poetry version minor
+   if you version of the CUDA toolkit is 12.* (use gpu11 if your version is 11.*)
+
+One way to check your CUDA version is to run the following command in a terminal:
+
+```bash
+   nvidia-smi
+```
+
+You can then switch to using e.g. Cupy instead of numpy as the backend via:
+
+   ```python
+    from debiased_spatial_whittle.backend import BackendManager
+    BackendManager.set_backend("cupy")
    ```
 
-When creating a release in Github, the version tag should be set to match
-the version in th pyproject.toml. Creating a release in Github will trigger
-a Github workflow that will publish to Pypi (see Pypi section).
+This should be run before any other import from the debiased_spatial_whittle package.
 
-## PyPi
+
+## PyPI
 The package is updated on PyPi automatically on creation of a new
 release in Github. Note that currently the version in pyproject.toml
 needs to be manually updated. This should be fixed by adding

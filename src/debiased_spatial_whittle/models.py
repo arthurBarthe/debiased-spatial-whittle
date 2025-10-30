@@ -13,6 +13,7 @@ from param import Parameterized
 from param.parameterized import _get_param_repr
 
 zeros = BackendManager.get_zeros()
+inv = BackendManager.get_inv()
 
 
 def _parameterized_repr_html(p, open):
@@ -270,6 +271,53 @@ class ModelInterface(param.Parameterized):
         lags = x1 - x2
         lags = np.transpose(lags, (2, 0, 1))
         return self(lags)
+
+    def predict(
+        self,
+        x_obs: np.ndarray,
+        y_obs: np.ndarray,
+        x_pred: np.ndarray,
+        return_variance: bool = False,
+    ):
+        """
+        Compute conditional mean at a set of locations x_pred given values y_obs observed at x_obs.
+
+        Parameters
+        ----------
+        x_obs
+            shape (n_obs, d), array of locations where observations are made
+        y_obs
+            shape (n_obs, 1), observed values
+        x_pred
+            shape (n_pred, d), array of locations where predicted values are requested
+
+        Returns
+        -------
+        y_pred
+            shape (n_pred, 1), array of predicted values
+        """
+        x_obs = np.expand_dims(x_obs, 1)
+        # x_obs (n_obs, 1, d)
+        lags_xx = x_obs - np.transpose(x_obs, (1, 0, 2))
+        # lags_xx (n_obs, n_obs, d)
+
+        cov_mat_xx = self(np.transpose(lags_xx, (2, 0, 1)))
+        # cov_mat_xx (n_obs, n_obs)
+        cov_mat_xx_inv = inv(cov_mat_xx)
+
+        x_pred = np.expand_dims(x_pred, 1)
+        # x_pred (n_pred, 1, d)
+
+        lags_yx = x_pred - np.transpose(x_obs, (1, 0, 2))
+        # lags_yx (n_pred, n_obs, d)
+
+        sigma_yx = self(np.transpose(lags_yx, (2, 0, 1)))
+        # sigma_yx (n_pred, n_obs)
+
+        weights = np.dot(sigma_yx, cov_mat_xx_inv)
+        # weights (n_pred, n_obs)
+        y_pred = np.matmul(weights, y_obs)
+        return y_pred
 
 
 class CovarianceModel(ModelInterface):
@@ -726,7 +774,7 @@ class BivariateUniformCorrelation(CompoundModel):
     """
 
     r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Amplitude ratio")
+    f = ModelParameter(default=1.0, bounds=(1e-2, 1e2), doc="Amplitude ratio")
 
     def __init__(self, base_model: CovarianceModel, *args, **kwargs):
         super(BivariateUniformCorrelation, self).__init__(

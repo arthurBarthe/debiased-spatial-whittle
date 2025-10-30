@@ -2,7 +2,9 @@ The Debiased Whittle Likelihood estimator is based on the periodogram
 of the data and the expected periodogram corresponding to the combination
 of a sampling grid and covariance model.
 
-## periodogram.py
+## ::: debiased_spatial_whittle.periodogram
+    options:
+      members: false
 This module provides tools to define a periodogram and to obtain
 its expectation, the expected periodogram.
 
@@ -23,19 +25,24 @@ where the summation is over grid points, and where $g_{\mathbf{s}}$
 is obtained from both the grid mask and the periodogram taper function.
 In practice, this is implemented using the Fast Fourier Transform.
 
-::: debiased_spatial_whittle.periodogram.Periodogram
+### ::: debiased_spatial_whittle.periodogram.Periodogram
 
-::: debiased_spatial_whittle.periodogram.ExpectedPeriodogram
+### ::: debiased_spatial_whittle.periodogram.ExpectedPeriodogram
 
 
-## multivariate_periodogram.py
+## ::: debiased_spatial_whittle.multivariate_periodogram
+    options:
+      members: false
 
 This module provides a class for the definition of a multi-variate periodogram.
 
-::: debiased_spatial_whittle.multivariate_periodogram.Periodogram
+### ::: debiased_spatial_whittle.multivariate_periodogram.Periodogram
 
 
-## likelihood.py
+## ::: debiased_spatial_whittle.likelihood
+    options:
+      members: false
+
 This module provides tools to define the Debiased Whittle Likelihood
 and the associated estimator. More specifically, the Debiased Whittle Likelihood
 is defined by,
@@ -66,16 +73,18 @@ $$
 $$
 where $\Theta$ is the parameter space, defined within the specified model.
 
-::: debiased_spatial_whittle.likelihood.DebiasedWhittle
+### ::: debiased_spatial_whittle.likelihood.DebiasedWhittle
 
-::: debiased_spatial_whittle.likelihood.MultivariateDebiasedWhittle
+### ::: debiased_spatial_whittle.likelihood.MultivariateDebiasedWhittle
 
-::: debiased_spatial_whittle.likelihood.Estimator
+### ::: debiased_spatial_whittle.likelihood.Estimator
 
-## least_squares.py
+## ::: debiased_spatial_whittle.least_squares
+    options:
+      members: false
 
 This module provides a method for a least-squares fit of the expected periodogram
 to the periodogram. This can be used for instance to obtain an initial guess
 before using Debiased Whittle estimation.
 
-::: debiased_spatial_whittle.least_squares.LeastSquareEstimator
+### ::: debiased_spatial_whittle.least_squares.LeastSquareEstimator

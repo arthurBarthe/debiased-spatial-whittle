@@ -106,15 +106,38 @@ class SamplerOnRectangularGrid:
         self._z = None
         self.exact = exact
         try:
-            self.f
+            self.spectral_amplitudes
         except:
             print("up-sampling")
             n = tuple(2 * n for n in self.grid.n)
             self.sampling_grid = RectangularGrid(n, grid.delta)
 
     @property
+    def model(self) -> CovarianceModel:
+        """Model from which we sample"""
+        return self._model
+
+    @model.setter
+    def model(self, value: CovarianceModel):
+        self._model = value
+        self._f = None
+        self._i_sim = 0
+
+    @property
+    def grid(self) -> RectangularGrid:
+        """Sampling grid"""
+        return self._grid
+
+    @grid.setter
+    def grid(self, value: RectangularGrid):
+        self._grid = value
+        self._f = None
+        self._i_sim = 0
+
+    @property
     def n_sims(self):
-        """number of simulations in each block computation."""
+        """number of simulations in each block computation. By increasing this value, one allows parallel simulation,
+        at the expense of increased memory usage."""
         return self._n_sims
 
     @n_sims.setter
@@ -122,7 +145,7 @@ class SamplerOnRectangularGrid:
         self._n_sims = value
 
     @property
-    def f(self):
+    def spectral_amplitudes(self):
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
@@ -156,7 +179,7 @@ class SamplerOnRectangularGrid:
             is to increase the grid size.
         """
         if self._i_sim % self.n_sims == 0:
-            f = self.f
+            f = self.spectral_amplitudes
             shape = f.shape + (self.n_sims,)
             e = randn(*shape) + 1j * randn(*shape)
             f = np.expand_dims(f, -1)
@@ -183,10 +206,38 @@ class MultivariateSamplerOnRectangularGrid:
     """
 
     def __init__(self, model: CovarianceModel, grid: RectangularGrid, p: int):
+        """
+        Parameters
+        ----------
+        model
+            Model from which we sample
+        grid
+            Sampling grid
+        p
+            Number of variates of the model
+        """
         self.model = model
         self.grid = grid
         self.p = p
         self.sampling_grid = grid
+
+    @property
+    def model(self) -> CovarianceModel:
+        """Model from which we sample"""
+        return self._model
+
+    @model.setter
+    def model(self, value: CovarianceModel):
+        self._model = value
+
+    @property
+    def grid(self) -> RectangularGrid:
+        """Sampling grid"""
+        return self._grid
+
+    @grid.setter
+    def grid(self, value: RectangularGrid):
+        self._grid = value
 
     @property
     def spatial_axes(self):
@@ -218,13 +269,14 @@ class MultivariateSamplerOnRectangularGrid:
         w = np.squeeze(w, -1)
         return w * self.grid.mask
 
-    def __call__(self):
+    def __call__(self) -> np.ndarray:
         """
         Generate a realization from the specified covariance model on the grid.
 
         Returns
         -------
-
+        sample
+            Simulated sample.
         """
         return self._sample()
 
