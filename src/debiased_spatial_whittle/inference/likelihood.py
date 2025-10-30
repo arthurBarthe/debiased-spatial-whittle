@@ -3,16 +3,15 @@ import warnings
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
-import numpy
 
-from debiased_spatial_whittle.samples import SampleOnRectangularGrid
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 
 
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from scipy.signal.windows import hann as hanning
-from debiased_spatial_whittle.periodogram import compute_ep_old
-from debiased_spatial_whittle.confidence import CovarianceFFT
+from debiased_spatial_whittle.inference.periodogram import compute_ep_old
+from debiased_spatial_whittle.inference.confidence import CovarianceFFT
 
 
 fftn = np.fft.fftn
@@ -129,12 +128,12 @@ def fit(
 
 
 #########NEW OOP version
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
-from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
-from typing import Callable, Union, Optional
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
+from typing import Callable, Union
 
-from debiased_spatial_whittle.multivariate_periodogram import (
+from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as MultPeriodogram,
 )
 
@@ -293,10 +292,10 @@ class DebiasedWhittle:
     --------
     >>> import numpy as np
     >>> np.random.seed(1712)
-    >>> from debiased_spatial_whittle.grids import RectangularGrid
-    >>> from debiased_spatial_whittle.models import SquaredExponentialModel
-    >>> from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-    >>> from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+    >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+    >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+    >>> from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+    >>> from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
     >>> grid = RectangularGrid(shape=(256, 256))
     >>> model1 = SquaredExponentialModel()
     >>> model1.rho = 12
@@ -461,8 +460,8 @@ class DebiasedWhittle:
 
         Examples
         --------
-        >>> from debiased_spatial_whittle.grids import RectangularGrid
-        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
         >>> model = ExponentialModel(rho=30, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
@@ -569,8 +568,8 @@ class DebiasedWhittle:
         --------
         >>> import numpy.random as nrrandom
         >>> nrrandom.seed(1712)
-        >>> from debiased_spatial_whittle.grids import RectangularGrid
-        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
         >>> model = ExponentialModel(rho=12, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
@@ -620,8 +619,8 @@ class DebiasedWhittle:
         --------
         >>> import numpy.random as nrrandom
         >>> nrrandom.seed(1712)
-        >>> from debiased_spatial_whittle.grids import RectangularGrid
-        >>> from debiased_spatial_whittle.models import ExponentialModel
+        >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
         >>> model = ExponentialModel(rho=12., sigma=4.)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))

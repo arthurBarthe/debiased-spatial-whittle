@@ -1,5 +1,5 @@
 from debiased_spatial_whittle.backend import BackendManager
-from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
 from abc import ABCMeta, abstractmethod
 
 xp = BackendManager.get_backend()
@@ -9,6 +9,9 @@ gamma = BackendManager.get_gamma()
 
 
 class SpectralModel(CovarianceModel):
+    """
+    Base class to define a covariance model from a spectral density function.
+    """
     @abstractmethod
     def spectral_density(self, frequencies: xp.ndarray) -> xp.ndarray:
         """

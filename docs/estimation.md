@@ -2,9 +2,9 @@ The Debiased Whittle Likelihood estimator is based on the periodogram
 of the data and the expected periodogram corresponding to the combination
 of a sampling grid and covariance model.
 
-## ::: debiased_spatial_whittle.periodogram
+## :::debiased_spatial_whittle.inference.periodogram
     options:
-      members: false
+        members: false
 This module provides tools to define a periodogram and to obtain
 its expectation, the expected periodogram.
 
@@ -25,24 +25,25 @@ where the summation is over grid points, and where $g_{\mathbf{s}}$
 is obtained from both the grid mask and the periodogram taper function.
 In practice, this is implemented using the Fast Fourier Transform.
 
-### ::: debiased_spatial_whittle.periodogram.Periodogram
+::: debiased_spatial_whittle.inference.periodogram
+    options:
+        show_root_heading: false
+        show_root_toc_entry: false
 
-### ::: debiased_spatial_whittle.periodogram.ExpectedPeriodogram
 
-
-## ::: debiased_spatial_whittle.multivariate_periodogram
+## ::: debiased_spatial_whittle.inference.multivariate_periodogram
     options:
       members: false
-
 This module provides a class for the definition of a multi-variate periodogram.
 
-### ::: debiased_spatial_whittle.multivariate_periodogram.Periodogram
+::: debiased_spatial_whittle.inference.multivariate_periodogram
+    options:
+        show_root_heading: false
+        show_root_toc_entry: false
 
-
-## ::: debiased_spatial_whittle.likelihood
+## ::: debiased_spatial_whittle.inference.likelihood
     options:
       members: false
-
 This module provides tools to define the Debiased Whittle Likelihood
 and the associated estimator. More specifically, the Debiased Whittle Likelihood
 is defined by,
@@ -73,18 +74,31 @@ $$
 $$
 where $\Theta$ is the parameter space, defined within the specified model.
 
-### ::: debiased_spatial_whittle.likelihood.DebiasedWhittle
-
-### ::: debiased_spatial_whittle.likelihood.MultivariateDebiasedWhittle
-
-### ::: debiased_spatial_whittle.likelihood.Estimator
-
-## ::: debiased_spatial_whittle.least_squares
+::: debiased_spatial_whittle.inference.likelihood
     options:
-      members: false
+        show_root_heading: false
+        show_root_toc_entry: false
 
+## ::: debiased_spatial_whittle.inference.least_squares
+    options:
+          members: false
 This module provides a method for a least-squares fit of the expected periodogram
 to the periodogram. This can be used for instance to obtain an initial guess
 before using Debiased Whittle estimation.
 
-### ::: debiased_spatial_whittle.least_squares.LeastSquareEstimator
+::: debiased_spatial_whittle.inference.least_squares
+    options:
+        show_root_heading: false
+        show_root_toc_entry: false
+
+## ::: debiased_spatial_whittle.inference.diagnostics
+    options:
+          members: false
+
+This module provides some diagnostic tools to assess how a covariance
+model fits a sampled random field.
+
+::: debiased_spatial_whittle.inference.diagnostics
+    options:
+        show_root_heading: false
+        show_root_toc_entry: false

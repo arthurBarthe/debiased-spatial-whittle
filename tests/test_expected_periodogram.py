@@ -1,22 +1,20 @@
 import numpy as np
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle.cov_funcs import exp_cov
-from debiased_spatial_whittle.simulation import sim_circ_embedding
-from debiased_spatial_whittle.periodogram import autocov, compute_ep_old
-from debiased_spatial_whittle.likelihood import periodogram
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import (
+from debiased_spatial_whittle.models.old import exp_cov
+from debiased_spatial_whittle.sampling.old import sim_circ_embedding
+from debiased_spatial_whittle.inference.periodogram import autocov, compute_ep_old
+from debiased_spatial_whittle.inference.likelihood import periodogram
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.periodogram import (
     Periodogram,
-    SeparableExpectedPeriodogram,
     ExpectedPeriodogram,
 )
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import (
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
     SquaredExponentialModel,
-    SeparableModel,
 )
-from debiased_spatial_whittle.confidence import CovarianceFFT
+from debiased_spatial_whittle.inference.confidence import CovarianceFFT
 
 
 def test_non_negative():
@@ -261,10 +259,10 @@ def test_gradient_expected_periodogram():
     assert_allclose(g, g2, rtol=1e-3)
 
 
-from debiased_spatial_whittle.multivariate_periodogram import (
+from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as PeriodogramMulti,
 )
-from debiased_spatial_whittle.models import BivariateUniformCorrelation
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
 
 
 def test_gradient_expected_periodogram_bivariate():

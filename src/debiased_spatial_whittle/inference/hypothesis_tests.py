@@ -5,7 +5,7 @@ inv = BackendManager.get_inv()
 from numpy.linalg import eig
 
 from debiased_spatial_whittle.models import CovarianceModel
-from debiased_spatial_whittle.likelihood import (
+from debiased_spatial_whittle.inference.likelihood import (
     DebiasedWhittle,
     MultivariateDebiasedWhittle,
     Estimator,

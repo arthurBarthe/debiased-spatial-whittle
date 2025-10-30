@@ -1,10 +1,10 @@
-from .backend import BackendManager
+from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 
 from typing import Tuple
 
-from debiased_spatial_whittle.spatial_kernel import spatial_kernel
+from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.utils import prod_list
 
 fft = np.fft.fft
@@ -136,9 +136,9 @@ def compute_ep_old(cov_func, grid, fold=True):
 
 ####NEW OOP VERSION
 from typing import Union
-from debiased_spatial_whittle.models import CovarianceModel, ModelParameter
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.samples import SampleOnRectangularGrid
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
 
 ones = BackendManager.get_ones()
 

@@ -1,54 +1,22 @@
-import sys
-
-from debiased_spatial_whittle.backend import BackendManager
-
-np = BackendManager.get_backend()
-
-import warnings
-from debiased_spatial_whittle.periodogram import autocov
-from typing import List
-
-fftn, ifftn = BackendManager.get_fft_methods()
-randn = BackendManager.get_randn()
-arange = BackendManager.get_arange()
-
-
-def prod_list(l: List[int]):
-    l = list(l)
-    if l == []:
-        return 1
-    else:
-        return l[0] * prod_list(l[1:])
-
-
-# TODO make this work for 1-d and 3-d
-def sim_circ_embedding(cov_func, shape):
-    cov = autocov(cov_func, shape)
-    f = prod_list(shape) * ifftn(cov)
-    min_ = np.min(f)
-    if min_ < 0:
-        sys.exit(0)
-        warnings.warn(f"Embedding is not positive definite, min value {min_}.")
-    e = np.random.randn(*f.shape) + 1j * np.random.randn(*f.shape)
-    z = np.sqrt(np.maximum(f, 0)) * e
-    z_inv = 1 / np.sqrt(prod_list(shape)) * np.real(fftn(z))
-    for i, n in enumerate(shape):
-        z_inv = np.take(z_inv, np.arange(n), i)
-    return z_inv, min_
-
-
-####NEW OOP VERSION
+import sys, warnings
 from typing import Tuple
 from scipy.stats import multivariate_normal
-from debiased_spatial_whittle.models import (
+from debiased_spatial_whittle.models.base import (
     CovarianceModel,
     TMultivariateModel,
     SquaredModel,
     ChiSquaredModel,
-    BivariateUniformCorrelation,
     SeparableModel,
 )
-from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.backend import BackendManager
+
+
+np = BackendManager.get_backend()
+fftn, ifftn = BackendManager.get_fft_methods()
+randn = BackendManager.get_randn()
+arange = BackendManager.get_arange()
 
 
 def prod_list(l: Tuple[int]):
@@ -84,8 +52,8 @@ class SamplerOnRectangularGrid:
 
     Examples
     --------
-    >>> from debiased_spatial_whittle.models import ExponentialModel
-    >>> from debiased_spatial_whittle.grids import RectangularGrid
+    >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
+    >>> from debiased_spatial_whittle.grids.base import RectangularGrid
     >>> model = ExponentialModel(rho=12., sigma=1.)
     >>> grid = RectangularGrid((256, 128))
     >>> sampler = SamplerOnRectangularGrid(model, grid)
@@ -279,57 +247,6 @@ class MultivariateSamplerOnRectangularGrid:
             Simulated sample.
         """
         return self._sample()
-
-
-class TSamplerOnRectangularGrid:
-    """
-    Class for the sampling of a t-multivariate random field
-    """
-
-    def __init__(self, model: TMultivariateModel, grid: RectangularGrid):
-        self.model = model
-        self.grid = grid
-        self.gaussian_sampler = SamplerOnRectangularGrid(model.covariance_model, grid)
-
-    def __call__(self):
-        nu = self.model.nu_1.value
-        chi = np.random.chisquare(nu) / nu
-        # chi = np.random.chisquare(nu, self.grid.n) / nu  # this is a different model
-        z = self.gaussian_sampler()
-        return z / np.sqrt(chi)
-
-
-class SquaredSamplerOnRectangularGrid:
-    """
-    Class for the sampling of a SquaredModel
-    """
-
-    def __init__(self, model: SquaredModel, grid: RectangularGrid):
-        self.model = model
-        self.grid = grid
-        self.latent_sampler = SamplerOnRectangularGrid(self.model.latent_model, grid)
-
-    def __call__(self):
-        z = self.latent_sampler()
-        return z**2
-
-
-class ChiSquaredSamplerOnRectangularGrid:
-    """
-    Class for the sampling of a Chi Squared model on a rectangular grid
-    """
-
-    def __init__(self, model: ChiSquaredModel, grid: RectangularGrid):
-        self.model = model
-        self.grid = grid
-        self.latent_sampler = SamplerOnRectangularGrid(self.model.latent_model, grid)
-
-    def __call__(self):
-        zs = []
-        for i in range(self.model.dof_1.value):
-            zs.append(self.latent_sampler())
-        zs = np.stack(zs, axis=0)
-        return np.sum(zs**2, axis=0)
 
 
 class SamplerSeparable:

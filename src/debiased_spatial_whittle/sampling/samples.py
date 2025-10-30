@@ -1,5 +1,5 @@
 import numpy as np
-from debiased_spatial_whittle.grids import Grid, RectangularGrid
+from debiased_spatial_whittle.grids.base import RectangularGrid
 
 
 class Sample:
@@ -8,7 +8,7 @@ class Sample:
     periodograms etc.
     """
 
-    def __init__(self, grid: Grid, values: np.ndarray):
+    def __init__(self, grid: RectangularGrid, values: np.ndarray):
         self.grid = grid
         self.values = values
         self.periodograms = dict()

@@ -16,7 +16,7 @@ plugins:
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py', 'france_interpolation.py']
-    execute: true
+    execute: false
 - mkdocstrings:
     handlers:
       python:
@@ -70,5 +70,5 @@ nav:
   - Reference:
       - Grids: grids.md
       - Models: models.md
-      - Estimation: periodogram.md
+      - Estimation: estimation.md
   - Contributing: contribute.md

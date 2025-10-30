@@ -4,6 +4,7 @@ the list of [issues](https://github.com/arthurBarthe/debiased-spatial-whittle/is
 ## Development
 
 The general steps to follow to make a contribution are:
+
 1. **Fork the Repository**: You create your own copy of the repository by forking it. This allows you to make changes without affecting the original repository.
 
 2. **Clone the Fork**: You then clone your fork to your local machine to work on the changes.

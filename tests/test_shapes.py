@@ -1,16 +1,14 @@
 import numpy as np
-from numpy.testing import assert_allclose
 
-from debiased_spatial_whittle.likelihood import (
+from debiased_spatial_whittle.inference.likelihood import (
     DebiasedWhittle,
     MultivariateDebiasedWhittle,
 )
-from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
-from debiased_spatial_whittle.models import SquaredExponentialModel
-from debiased_spatial_whittle.models import BivariateUniformCorrelation
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import ExpectedPeriodogram, Periodogram
-from debiased_spatial_whittle.multivariate_periodogram import (
+from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram, Periodogram
+from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as MultivariatePeriodogram,
 )
 

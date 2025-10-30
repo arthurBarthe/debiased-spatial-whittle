@@ -1,32 +1,32 @@
 import numpy as np
 from numpy.testing import assert_allclose
 
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import (
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.periodogram import (
     Periodogram,
     ExpectedPeriodogram,
     compute_ep_old,
 )
-from debiased_spatial_whittle.multivariate_periodogram import (
+from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as PeriodogramMulti,
 )
-from debiased_spatial_whittle.likelihood import (
+from debiased_spatial_whittle.inference.likelihood import (
     DebiasedWhittle,
     whittle,
     Estimator,
     periodogram,
     MultivariateDebiasedWhittle,
 )
-from debiased_spatial_whittle.simulation import (
+from debiased_spatial_whittle.sampling.simulation import (
     SamplerOnRectangularGrid,
     SamplerBUCOnRectangularGrid,
 )
-from debiased_spatial_whittle.models import (
+from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
     SquaredExponentialModel,
-    BivariateUniformCorrelation,
 )
-from debiased_spatial_whittle.cov_funcs import exp_cov
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.models.old import exp_cov
 
 
 def test_oop():

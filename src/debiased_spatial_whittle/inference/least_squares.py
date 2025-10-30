@@ -1,12 +1,17 @@
+"""
+This module provides a method for a least-squares fit of the expected periodogram
+to the periodogram. This can be used for instance to obtain an initial guess
+before using Debiased Whittle estimation.
+"""
+
 from typing import Callable
 
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.models import CovarianceModel
-from debiased_spatial_whittle.samples import SampleOnRectangularGrid
 from scipy.optimize import least_squares
 
 
