@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose
 from debiased_spatial_whittle.models.old import exp_cov
 from debiased_spatial_whittle.sampling.old import sim_circ_embedding
 from debiased_spatial_whittle.inference.periodogram import autocov, compute_ep_old
-from debiased_spatial_whittle.inference.likelihood import periodogram
+from debiased_spatial_whittle.inference.old import periodogram
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.inference.periodogram import (
     Periodogram,

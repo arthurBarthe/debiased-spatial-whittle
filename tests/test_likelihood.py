@@ -12,11 +12,10 @@ from debiased_spatial_whittle.inference.multivariate_periodogram import (
 )
 from debiased_spatial_whittle.inference.likelihood import (
     DebiasedWhittle,
-    whittle,
     Estimator,
-    periodogram,
     MultivariateDebiasedWhittle,
 )
+from debiased_spatial_whittle.inference.old import whittle, periodogram
 from debiased_spatial_whittle.sampling.simulation import (
     SamplerOnRectangularGrid,
     SamplerBUCOnRectangularGrid,

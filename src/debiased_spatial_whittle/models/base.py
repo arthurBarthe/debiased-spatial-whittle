@@ -323,10 +323,6 @@ class ModelInterface(param.Parameterized):
 class CovarianceModel(ModelInterface):
     """
     Class to define low-level covariance modes (e.g. exponential, squared exponential).
-
-    Attributes
-    ----------
-
     """
 
     @property
@@ -372,7 +368,18 @@ class CovarianceModel(ModelInterface):
 
 
 class CompoundModel(ModelInterface):
-    def __init__(self, children, *args, **kwargs):
+    """
+    Class that permits to combine several covariance models to define a new covariance model. For instance, this
+    allows to define a sum covariance model, or a space-time covariance model that uses a spatial component and
+    a temporal component.
+    """
+    def __init__(self, children: list[ModelInterface], *args, **kwargs):
+        """
+        Parameters
+        ----------
+        children
+            list of children covariance models
+        """
         super().__init__(*args, **kwargs)
         self.children = children
 
@@ -439,7 +446,7 @@ class CompoundModel(ModelInterface):
 
 class SumModel(CompoundModel):
     """
-    Implements a covariance model defined as the sum of two several covariance models.
+    Implements a covariance model defined as the sum of two covariance models.
 
     Examples
     --------
