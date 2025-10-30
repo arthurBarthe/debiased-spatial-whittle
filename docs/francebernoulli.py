@@ -7,6 +7,8 @@ from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.grids.old import ImgGrid
+
 
 shape = (620, 620)
 
@@ -15,7 +17,7 @@ model = SquaredExponentialModel(rho=16, sigma=1)
 p_obs = 0.9
 mask_bernoulli = np.random.rand(*shape) <= p_obs
 
-mask_france = grids.ImgGrid(shape).get_new() * mask_bernoulli
+mask_france = ImgGrid(shape).get_new() * mask_bernoulli
 print(f"Number of observations: {np.sum(mask_france)}")
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france

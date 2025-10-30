@@ -11,7 +11,7 @@ from debiased_spatial_whittle.backend import BackendManager
 np = BackendManager.get_backend()
 
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.models import CovarianceModel
+from debiased_spatial_whittle.models.base import CovarianceModel
 from scipy.optimize import least_squares
 
 

@@ -14,6 +14,7 @@ from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.grids.old import ImgGrid
 
 
 # ##Model specification
@@ -23,7 +24,7 @@ model = SquaredExponentialModel(rho=7, sigma=0.9)
 # ##Grid specification
 
 shape = (128, 128)
-mask_france = grids.ImgGrid(shape).get_new().astype(bool)
+mask_france = ImgGrid(shape).get_new().astype(bool)
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france
 sampler = SamplerOnRectangularGrid(model, grid_france)
