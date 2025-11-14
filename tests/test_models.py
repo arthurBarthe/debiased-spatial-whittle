@@ -1,6 +1,5 @@
 from debiased_spatial_whittle.backend import BackendManager
 
-BackendManager.set_backend("numpy")
 np = BackendManager.get_backend()
 from numpy.testing import assert_allclose
 from debiased_spatial_whittle.grids.base import RectangularGrid

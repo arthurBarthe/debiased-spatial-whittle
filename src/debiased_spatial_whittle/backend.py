@@ -1,6 +1,7 @@
 import numpy
 import warnings
 
+
 import scipy.special
 
 TORCH_INSTALLED = True
@@ -13,6 +14,7 @@ except ModuleNotFoundError:
 
 try:
     import cupy
+    from cupy_backends.cuda.api.runtime import CUDARuntimeError
     import cupyx.scipy.special
 except ModuleNotFoundError:
     CUPY_INSTALLED = False
@@ -52,17 +54,45 @@ def ravel_multi_index(coords, shape):
 class BackendManager:
     backend_name = "numpy"
     device = "cpu"
+    block = False
+
+    @classmethod
+    def list_avail(cls):
+        """list available backends. As Cupy can only be used on GPU, it will be listed as available only if the package
+        is installed and a GPU device is available"""
+        if TORCH_INSTALLED:
+            print("Torch CPU available")
+        if TORCH_INSTALLED and torch.cuda.is_available():
+            print("Torch GPU available")
+        if CUPY_INSTALLED:
+            try:
+                cupy.zeros(1)
+                print("CUPY GPU available")
+            except CUDARuntimeError as e:
+                pass
 
     @classmethod
     def set_backend(cls, name: str):
+        if cls.block:
+            # raise an error as the backend should be set before usage
+            raise Exception(
+                f"Cannot change backend (current: {cls.backend_name}). Make sure you set the backend first thing."
+            )
         if name == "cupy" and (not CUPY_INSTALLED):
-            warnings.warn("Module Cupy not found, will not be available as backend.")
+            warnings.warn(
+                "Module Cupy not found, will not be available as backend. Falling back to numpy."
+            )
+            name = "numpy"
         elif name == "torch" and (not TORCH_INSTALLED):
-            warnings.warn("Module Torch not found, will not be available as backend.")
+            warnings.warn(
+                "Module Torch not found, will not be available as backend. Falling back to numpy"
+            )
+            name = "numpy"
         cls.backend_name = name
 
     @classmethod
     def get_backend(cls):
+        cls.block = True
         if cls.backend_name == "numpy":
             numpy.to_cpu = lambda x: x
             numpy.item = lambda x: x
