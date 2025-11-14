@@ -12,10 +12,10 @@ class ExponentialModel(CovarianceModel):
 
     Attributes
     ----------
-    rho: float
+    rho: ModelParameter
         length scale parameter
 
-    sigma: float
+    sigma: ModelParameter
         amplitude parameter
 
     Examples
@@ -23,6 +23,16 @@ class ExponentialModel(CovarianceModel):
     >>> model = ExponentialModel(rho=5, sigma=1.41)
     >>> model(np.array([[0., 1.], [0., 0.]]))
     array([1.9881    , 1.62771861])
+    >>> model.rho = 3
+    >>> model.rho
+    3
+    >>> model.param.rho.bounds
+    (0, inf)
+    >>> model.free_parameters
+    ['rho', 'sigma']
+    >>> model.fix_parameter("rho")
+    >>> model.free_parameters
+    ['sigma']
     """
 
     rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
@@ -47,10 +57,10 @@ class SquaredExponentialModel(CovarianceModel):
 
     Attributes
     ----------
-    rho: float
+    rho: ModelParameter
         length scale parameter
 
-    sigma: float
+    sigma: ModelParameter
         amplitude parameter
 
     Examples
@@ -95,10 +105,10 @@ class Matern32Model(CovarianceModel):
 
     Attributes
     ----------
-    rho: float
+    rho: ModelParameter
         length scale parameter of the kernel
 
-    sigma: float
+    sigma: ModelParameter
         amplitude parameter of the kernel
 
     Examples
@@ -130,10 +140,10 @@ class Matern52Model(CovarianceModel):
 
     Attributes
     ----------
-    rho: float
+    rho: ModelParameter
         length scale parameter of the kernel
 
-    sigma: float
+    sigma: ModelParameter
         amplitude parameter of the kernel
 
     Examples
@@ -163,13 +173,13 @@ class RationalQuadraticModel(CovarianceModel):
 
     Attributes
     ----------
-    rho: float
+    rho: ModelParameter
         length scale parameter of the kernel
 
-    alpha: float
+    alpha: ModelParameter
         alpha parameter of the kernel
 
-    sigma: float
+    sigma: ModelParameter
         amplitude parameter of the kernel
 
     Examples
@@ -240,13 +250,13 @@ class AnisotropicModel(CompoundModel):
 
     Attributes
     ----------
-    base_model
-        Covariance model
+    base_model: ModelInterface
+        Underlying covariance modelCovariance model
 
-    eta
+    eta: ModelParameter
         Scaling factor
 
-    phi
+    phi: ModelParameter
         Rotation angle
 
     Examples

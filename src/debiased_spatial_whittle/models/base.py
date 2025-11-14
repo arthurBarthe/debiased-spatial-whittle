@@ -464,9 +464,15 @@ class SumModel(CompoundModel):
 
     Examples
     --------
+    >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, ExponentialModel
     >>> model_1 = SquaredExponentialModel(rho=32)
     >>> model_2 = ExponentialModel(rho=5)
     >>> model = model_1 + model_2
+    >>> model.free_parameter_values_to_array_deep()
+    array([32.,  1.,  5.,  1.])
+    >>> model_1.rho = 30
+    >>> model.free_parameter_values_to_array_deep()
+    array([30.,  1.,  5.,  1.])
     """
 
     def __new__(cls, *args, **kwargs):
