@@ -16,7 +16,7 @@ plugins:
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py', 'france_interpolation.py']
-    execute: true
+    execute: false
 - mkdocstrings:
     handlers:
       python:
@@ -68,7 +68,8 @@ nav:
           - 'Non-overlapping grids': multivariate_two_grids.py
       - Interpolation: france_interpolation.py
   - Reference:
-      - Grids: grids.md
-      - Models: models.md
-      - Estimation: estimation.md
+      - grids: grids.md
+      - models: models.md
+      - sampling: sampling.md
+      - inference: estimation.md
   - Contributing: contribute.md

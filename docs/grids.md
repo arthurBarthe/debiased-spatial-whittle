@@ -1,4 +1,4 @@
-## ::: debiased_spatial_whittle.grids
+## grids
     options:
       members: false
 This package provides tools to define sampling grids. Currently, the code
@@ -7,13 +7,4 @@ method, and it would not be very hard to generalize to non-orthogonal grids.
 
 ### ::: debiased_spatial_whittle.grids.base
 
-
-## ::: debiased_spatial_whittle.sampling
-This package provides tools to efficiently sample from covariance models on
-grids using circulant embeddings and the Fast Fourier Transform.
-
-### ::: debiased_spatial_whittle.sampling.simulation
-
-### ::: debiased_spatial_whittle.sampling.samples
-
-## ::: debiased_spatial_whittle.grids.spatial_kernel
+### ::: debiased_spatial_whittle.grids.spatial_kernel

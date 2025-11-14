@@ -1,8 +1,3 @@
-
-## ::: debiased_spatial_whittle.models
-    options:
-      members: false
-
 This package provides tools to define covariance models. A few pre-defined covariance
 models are made available. To define your own covariance model, you need
 to inherit from CovarianceModel or CompoundCovarianceModel.
