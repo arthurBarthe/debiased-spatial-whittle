@@ -87,6 +87,23 @@ def _parameterized_repr_html(p, open):
 
 
 class ModelParameter(param.Parameter):
+    """
+    Class used to represent a covariance model's parameter. When writing a new model, any parameter should be of
+    this type. See for instance the models defined in the univariate module.
+
+    Attributes
+    ----------
+    bounds: tuple[float, float]
+        Range of possible parameter values. Used by the optimizers during inference.
+
+    default: float
+        Default value of the parameter.
+
+    free: bool
+        True if the parameter is free, i.e. can be modified. By default all parameters are free. However one can
+        fix a model parameter using the fix_parameter method of ModelInterface. In particular, this is relevant
+        for optimization: the optimizers will only work with the free parameters.
+    """
     __slots__ = [
         "bounds",
     ]
@@ -103,15 +120,12 @@ class ModelParameter(param.Parameter):
 
 class ModelInterface(param.Parameterized):
     """
-    Class defining the general interface for covariance models
+    Class defining the general interface for covariance models.
 
     Attributes
     ----------
 
     """
-
-    free_only = param.Boolean(per_instance=True, default=True)
-
     @abstractmethod
     def __call__(self, lags: np.ndarray):
         """
