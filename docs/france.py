@@ -3,18 +3,15 @@
 
 # ##Imports
 
-from debiased_spatial_whittle.backend import BackendManager
-
 
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.models import ExponentialModel
-from debiased_spatial_whittle.sdf_models import SpectralMatern
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
-
+from debiased_spatial_whittle.models.spectral import SpectralMatern
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.grids.old import ImgGrid
 
 # ##Model specification
 
@@ -23,7 +20,7 @@ model = SpectralMatern(rho=15, nu=2.0)
 # ##Grid specification
 
 shape = (512, 512)
-mask_france = grids.ImgGrid(shape).get_new()
+mask_france = ImgGrid(shape).get_new()
 grid_france = RectangularGrid(shape)
 grid_france.mask = mask_france
 sampler = SamplerOnRectangularGrid(model, grid_france)

@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from debiased_spatial_whittle.models import ExponentialModel, SquaredExponentialModel
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
-from debiased_spatial_whittle.diagnostics import GoodnessOfFit
+from debiased_spatial_whittle.models.univariate import ExponentialModel, SquaredExponentialModel
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.inference.diagnostics import GoodnessOfFit
 
 model = ExponentialModel()
 model.nugget = 0.1

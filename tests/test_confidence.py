@@ -1,10 +1,9 @@
 import numpy as np
 
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle
-from debiased_spatial_whittle.confidence import CovarianceFFT
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.models.univariate import ExponentialModel
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle
 
 
 def test_jmat():

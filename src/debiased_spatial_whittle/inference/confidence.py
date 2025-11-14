@@ -1,16 +1,12 @@
-from typing import Tuple
-
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
 
-from numpy.random import randint, rand
 from progressbar import progressbar
-import matplotlib.pyplot as plt
 
-from .models import CovarianceModel
-from .grids import RectangularGrid
-from .periodogram import ExpectedPeriodogram
+from debiased_spatial_whittle.models.base import CovarianceModel
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram
 
 
 class CovarianceFFT:

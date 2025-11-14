@@ -4,12 +4,12 @@ BackendManager.set_backend("cupy")
 
 np = BackendManager.get_backend()
 
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import SquaredExponentialModel, NuggetModel
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.least_squares import LeastSquareEstimator
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.least_squares import LeastSquareEstimator
+from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, Estimator
 
 grid = RectangularGrid((512, 512))
 model = SquaredExponentialModel(rho=12.0, sigma=1.2)

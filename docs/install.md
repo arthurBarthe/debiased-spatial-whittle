@@ -5,13 +5,11 @@ The package can be installed via one of the following methods.
 The package can be installed via one of the following methods.
 
 1. Via the use of [Poetry](https://python-poetry.org/), by running the following command:
-
-   ```bash
-   poetry add debiased-spatial-whittle
-   ```
+    ```bash
+    poetry add debiased-spatial-whittle
+    ```
 
 2. Otherwise, you can directly install via pip:
-
     ```bash
     pip install debiased-spatial-whittle
     ```

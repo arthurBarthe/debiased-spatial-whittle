@@ -68,7 +68,8 @@ nav:
           - 'Non-overlapping grids': multivariate_two_grids.py
       - Interpolation: france_interpolation.py
   - Reference:
-      - Grids: grids.md
-      - Models: models.md
-      - Estimation: periodogram.md
+      - grids: grids.md
+      - models: models.md
+      - sampling: sampling.md
+      - inference: estimation.md
   - Contributing: contribute.md

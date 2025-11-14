@@ -10,15 +10,13 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
 
-from debiased_spatial_whittle.models import (
-    SquaredExponentialModel,
-    BivariateUniformCorrelation,
-)
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram
-from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.inference.multivariate_periodogram import Periodogram
+from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import MultivariateDebiasedWhittle
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid
 
 # ##Grid specification
 

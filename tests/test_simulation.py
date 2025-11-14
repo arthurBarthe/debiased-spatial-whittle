@@ -1,18 +1,16 @@
-from debiased_spatial_whittle.simulation import (
+from debiased_spatial_whittle.sampling.simulation import (
     SamplerOnRectangularGrid,
     MultivariateSamplerOnRectangularGrid,
 )
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
-    BivariateUniformCorrelation,
-)
-from debiased_spatial_whittle.grids import RectangularGrid
+from debiased_spatial_whittle.models.univariate import ExponentialModel
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.grids.base import RectangularGrid
 
 
 def test_simulation_1d():
     from numpy.random import seed
-    from debiased_spatial_whittle.grids import RectangularGrid
-    from debiased_spatial_whittle.models import ExponentialModel
+    from debiased_spatial_whittle.grids.base import RectangularGrid
+    from debiased_spatial_whittle.models.univariate import ExponentialModel
 
     seed(1712)
     model = ExponentialModel()

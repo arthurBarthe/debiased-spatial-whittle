@@ -1,5 +1,5 @@
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.models.univariate import ExponentialModel
 
 
 def test_covariance_matrix():

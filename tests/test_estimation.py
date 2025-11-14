@@ -1,11 +1,12 @@
 import numpy as np
 from numpy.testing import assert_almost_equal
-from debiased_spatial_whittle.cov_funcs import exp_cov
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator, fit
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.models import ExponentialModel, SeparableModel
+from debiased_spatial_whittle.models.old import exp_cov
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, Estimator
+from debiased_spatial_whittle.inference.old import fit
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.models.univariate import ExponentialModel
 
 
 def test_expcov():

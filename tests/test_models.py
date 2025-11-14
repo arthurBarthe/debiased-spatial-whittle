@@ -3,12 +3,12 @@ from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend("numpy")
 np = BackendManager.get_backend()
 from numpy.testing import assert_allclose
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import (
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
     SquaredExponentialModel,
 )
-from debiased_spatial_whittle.models import BivariateUniformCorrelation
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
 
 
 def test_model():

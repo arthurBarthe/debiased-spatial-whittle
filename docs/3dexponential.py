@@ -3,19 +3,14 @@
 # ##Imports
 import matplotlib.pyplot as plt
 from IPython.display import HTML
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, Estimator
+from debiased_spatial_whittle.models.univariate import (
     SquaredExponentialModel,
     NuggetModel,
 )
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.simulation import (
-    SamplerOnRectangularGrid,
-    SamplerSeparable,
-)
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.utils import video_plot_3d
 
 # ##Grid and model specification
