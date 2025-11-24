@@ -3,16 +3,16 @@ from debiased_spatial_whittle.models.base import CovarianceModel
 from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.backend import BackendManager
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 
-fftn = np.fft.fftn
-ifftn = np.fft.ifftn
-fftshift = np.fft.fftshift
-ifftshift = np.fft.ifftshift
+fftn = xp.fft.fftn
+ifftn = xp.fft.ifftn
+fftshift = xp.fft.fftshift
+ifftshift = xp.fft.ifftshift
 arange = BackendManager.get_arange()
 ones = BackendManager.get_ones()
-fftfreq = np.fft.fftfreq
+fftfreq = xp.fft.fftfreq
 
 
 
@@ -67,7 +67,7 @@ class RectangularGrid:
         self,
         shape: tuple[int, ...],
         delta: tuple[float, ...] = None,
-        mask: np.ndarray = None,
+        mask: xp.ndarray = None,
         nvars: int = 1,
     ):
         """
@@ -141,7 +141,7 @@ class RectangularGrid:
         self._nvars = value
 
     @property
-    def mask(self) -> np.ndarray:
+    def mask(self) -> xp.ndarray:
         """
         array of 0's (missing) and 1's (observed) indicating for each point of the grid whether the random field is
         observed at that location.
@@ -151,7 +151,7 @@ class RectangularGrid:
         return self._mask
 
     @mask.setter
-    def mask(self, value: np.ndarray):
+    def mask(self, value: xp.ndarray):
         if value is None:
             value = ones(self.n)
             if self.nvars > 1:
@@ -168,7 +168,7 @@ class RectangularGrid:
     @property
     def n_points(self) -> int:
         """total number of points of the grid, irrespective of the mask"""
-        return np.prod(np.array(self.n))
+        return xp.prod(xp.array(self.n))
 
     @property
     def extent(self) -> tuple[float, ...]:
@@ -185,7 +185,7 @@ class RectangularGrid:
         return imshow_extent
 
     @property
-    def fourier_frequencies(self) -> np.ndarray:
+    def fourier_frequencies(self) -> xp.ndarray:
         r"""
         Grid of Fourier frequencies corresponding to the spatial grid. For instance, in dimension 1, for
         a grid with $n$ points and a step size $\delta$,
@@ -196,13 +196,13 @@ class RectangularGrid:
             .
         $
         """
-        mesh = np.meshgrid(
+        mesh = xp.meshgrid(
             *[fftfreq(n_i, d_i) for n_i, d_i in zip(self.n, self.delta)], indexing="ij"
         )
-        return np.stack(mesh, axis=-1)
+        return xp.stack(mesh, axis=-1)
 
     @property
-    def fourier_frequencies2(self) -> np.ndarray:
+    def fourier_frequencies2(self) -> xp.ndarray:
         r"""
         Grid of Fourier frequencies corresponding to the grid of lags. For instance, in dimension 1, for
         a grid with $n$ points and a step size $\delta$,
@@ -213,49 +213,49 @@ class RectangularGrid:
             .
         $
         """
-        mesh = np.meshgrid(
+        mesh = xp.meshgrid(
             *[fftfreq(2 * n_i - 1, d_i) for n_i, d_i in zip(self.n, self.delta)],
             indexing="ij",
         )
-        out = np.stack(mesh, axis=-1)
+        out = xp.stack(mesh, axis=-1)
         return BackendManager.convert(out)
 
     @cached_property
-    def lags_unique(self) -> np.ndarray:
+    def lags_unique(self) -> xp.ndarray:
         """shape (2 * n1 + 1, ..., 2 * nd + 1), with d the number of dimensions of the grid."""
         shape = self.n
         delta = self.delta
-        lags = np.meshgrid(
+        lags = xp.meshgrid(
             *(
-                arange(-n + 1, n, dtype=np.float64) * delta_i
+                arange(-n + 1, n, dtype=xp.float64) * delta_i
                 for n, delta_i in zip(shape, delta)
             ),
             indexing="ij",
         )
-        return np.stack(lags, axis=0)
+        return xp.stack(lags, axis=0)
 
     @property
-    def grid_points(self) -> np.ndarray:
+    def grid_points(self) -> xp.ndarray:
         """list of grid ticks."""
         return tuple(
-            [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
+            [xp.arange(s, dtype=xp.int64) * d for s, d in zip(self.n, self.delta)]
         )
 
     @cached_property
-    def lag_matrix(self) -> np.ndarray:
+    def lag_matrix(self) -> xp.ndarray:
         """
         shape (n_points, n_points, n_dimensions),
         matrix of lags between the points of the grids ordered according
         to their coordinates. The matrix may be very large for large grid sizes.
         """
-        xs = [np.arange(s, dtype=np.int64) * d for s, d in zip(self.n, self.delta)]
-        grid = np.meshgrid(*xs, indexing="ij")
+        xs = [xp.arange(s, dtype=xp.int64) * d for s, d in zip(self.n, self.delta)]
+        grid = xp.meshgrid(*xs, indexing="ij")
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
-        return np.array(lags)
+        return xp.array(lags)
 
     @lru_cache(maxsize=5)
-    def spatial_kernel(self, taper_values: np.ndarray = None):
+    def spatial_kernel(self, taper_values: xp.ndarray = None):
         """
         Compute the spatial kernel from the grid's mask and the taper values.
 
@@ -287,7 +287,7 @@ class RectangularGrid:
         covmat: ndarray
             shape (n_points, n_points), covariance matrix
         """
-        return model(self.lag_matrix) * np.dot(
+        return model(self.lag_matrix) * xp.dot(
             self.mask.reshape((-1, 1)), self.mask.reshape((1, -1))
         )
 
@@ -334,7 +334,7 @@ class RectangularGrid:
             model, SeparableModel
         ), "You can only call autocov_separable on a separable model"
         n1, n2 = self.n
-        lag1, lag2 = np.arange(-n1 + 1, n1), np.arange(-n2 + 1, n2)
+        lag1, lag2 = xp.arange(-n1 + 1, n1), xp.arange(-n2 + 1, n2)
         lag1, lag2 = ifftshift(lag1), ifftshift(lag2)
         model1, model2 = model.models
         cov1 = model1(
@@ -350,7 +350,7 @@ class RectangularGrid:
         return cov1 * cov2
 
     def separate(self, dims):
-        shape = np.ones(self.ndim, dtype=np.int64)
+        shape = xp.ones(self.ndim, dtype=xp.int64)
         for d in dims:
             shape[d] = self.n[d]
         g = RectangularGrid(shape)

@@ -8,7 +8,7 @@ from typing import Callable
 
 from debiased_spatial_whittle.backend import BackendManager
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.models.base import CovarianceModel
@@ -49,7 +49,7 @@ class LeastSquareEstimator:
         self.expected_periodogram = expected_periodogram
         self.verbose = verbose
 
-    def __call__(self, data: np.array, model: CovarianceModel) -> CovarianceModel:
+    def __call__(self, data: xp.array, model: CovarianceModel) -> CovarianceModel:
         """
         Carries out the Least-Square estimation.
 
@@ -65,11 +65,11 @@ class LeastSquareEstimator:
             Fitted covariance model
         """
         x0 = model.free_parameter_values_to_array_deep()
-        bounds = np.array(list(zip(*model.free_parameter_bounds_to_list_deep())))
+        bounds = xp.array(list(zip(*model.free_parameter_bounds_to_list_deep())))
 
         # convert to cpu
-        x0 = np.to_cpu(x0)
-        bounds = np.to_cpu(bounds)
+        x0 = xp.to_cpu(x0)
+        bounds = xp.to_cpu(bounds)
 
         least_squares(
             self._get_opt_func(data, model),
@@ -85,11 +85,11 @@ class LeastSquareEstimator:
 
         def opt_func(x):
             # convert to gpu if necessary
-            x = np.asarray(x)
+            x = xp.asarray(x)
             model.update_free_parameters(x)
             model_ep = self.expected_periodogram(model)
             ratio = (data_periodogram / model_ep).flatten()
-            residuals = ratio - np.ones_like(ratio)
-            return np.to_cpu(residuals)
+            residuals = ratio - xp.ones_like(ratio)
+            return xp.to_cpu(residuals)
 
         return opt_func

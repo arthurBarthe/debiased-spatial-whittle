@@ -2,7 +2,7 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import (
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 grid = RectangularGrid((256, 256))
 model = SquaredExponentialModel(rho=12.0)
-model = AnisotropicModel(model, eta=1.7, phi=np.pi / 4)
+model = AnisotropicModel(model, eta=1.7, phi=xp.pi / 4)
 model = NuggetModel(model, nugget=1e-2)
 model
 

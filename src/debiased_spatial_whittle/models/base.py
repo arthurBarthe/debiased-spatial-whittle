@@ -2,10 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 import pickle
 from debiased_spatial_whittle.backend import BackendManager
 
-try:
-    np = BackendManager.get_backend()
-except:
-    import numpy as np
+xp = BackendManager.get_backend()
 
 import numpy
 import param
@@ -127,7 +124,7 @@ class ModelInterface(param.Parameterized):
 
     """
     @abstractmethod
-    def __call__(self, lags: np.ndarray):
+    def __call__(self, lags: xp.ndarray):
         """
         Evaluate the covariance model at the passed lags.
 
@@ -171,7 +168,7 @@ class ModelInterface(param.Parameterized):
         pass
 
     @abstractmethod
-    def update_free_parameters(self, param_values: np.ndarray):
+    def update_free_parameters(self, param_values: xp.ndarray):
         """Update free parameters of the model recursively from array values.
         Useful for numerical optimization."""
         pass
@@ -220,7 +217,7 @@ class ModelInterface(param.Parameterized):
         with open(file, "wb") as f:
             pickle.dump(self, f)
 
-    def gradient(self, lags: np.ndarray, params: list[ModelParameter]) -> np.ndarray:
+    def gradient(self, lags: xp.ndarray, params: list[ModelParameter]) -> xp.ndarray:
         """
         Compute the gradient of the model with respect to the passed parameters
 
@@ -253,16 +250,16 @@ class ModelInterface(param.Parameterized):
         for p in params:
             out.append(grad[p.name])
         n_spatial_dims = lags.shape[0]
-        return np.stack(out, n_spatial_dims)
+        return xp.stack(out, n_spatial_dims)
 
-    def _gradient(self, lags: np.ndarray):
+    def _gradient(self, lags: xp.ndarray):
         raise NotImplementedError()
 
     @abstractmethod
     def _repr_html_(self):
         pass
 
-    def cov_mat_x1_x2(self, x1: np.ndarray, x2: np.ndarray = None) -> np.ndarray:
+    def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None) -> xp.ndarray:
         """
         Compute the covariance matrix between between points in x1 and points in x2.
 
@@ -280,17 +277,17 @@ class ModelInterface(param.Parameterized):
         """
         if x2 is None:
             x2 = x1
-        x1 = np.expand_dims(x1, axis=1)
-        x2 = np.expand_dims(x2, axis=0)
+        x1 = xp.expand_dims(x1, axis=1)
+        x2 = xp.expand_dims(x2, axis=0)
         lags = x1 - x2
-        lags = np.transpose(lags, (2, 0, 1))
+        lags = xp.transpose(lags, (2, 0, 1))
         return self(lags)
 
     def predict(
         self,
-        x_obs: np.ndarray,
-        y_obs: np.ndarray,
-        x_pred: np.ndarray,
+        x_obs: xp.ndarray,
+        y_obs: xp.ndarray,
+        x_pred: xp.ndarray,
         return_variance: bool = False,
     ):
         """
@@ -310,27 +307,27 @@ class ModelInterface(param.Parameterized):
         y_pred
             shape (n_pred, 1), array of predicted values
         """
-        x_obs = np.expand_dims(x_obs, 1)
+        x_obs = xp.expand_dims(x_obs, 1)
         # x_obs (n_obs, 1, d)
-        lags_xx = x_obs - np.transpose(x_obs, (1, 0, 2))
+        lags_xx = x_obs - xp.transpose(x_obs, (1, 0, 2))
         # lags_xx (n_obs, n_obs, d)
 
-        cov_mat_xx = self(np.transpose(lags_xx, (2, 0, 1)))
+        cov_mat_xx = self(xp.transpose(lags_xx, (2, 0, 1)))
         # cov_mat_xx (n_obs, n_obs)
         cov_mat_xx_inv = inv(cov_mat_xx)
 
-        x_pred = np.expand_dims(x_pred, 1)
+        x_pred = xp.expand_dims(x_pred, 1)
         # x_pred (n_pred, 1, d)
 
-        lags_yx = x_pred - np.transpose(x_obs, (1, 0, 2))
+        lags_yx = x_pred - xp.transpose(x_obs, (1, 0, 2))
         # lags_yx (n_pred, n_obs, d)
 
-        sigma_yx = self(np.transpose(lags_yx, (2, 0, 1)))
+        sigma_yx = self(xp.transpose(lags_yx, (2, 0, 1)))
         # sigma_yx (n_pred, n_obs)
 
-        weights = np.dot(sigma_yx, cov_mat_xx_inv)
+        weights = xp.dot(sigma_yx, cov_mat_xx_inv)
         # weights (n_pred, n_obs)
-        y_pred = np.matmul(weights, y_obs)
+        y_pred = xp.matmul(weights, y_obs)
         return y_pred
 
 
@@ -343,7 +340,7 @@ class CovarianceModel(ModelInterface):
     def n_free_parameters_deep(self):
         return len(self.free_parameters)
 
-    def update_free_parameters(self, param_values: np.ndarray):
+    def update_free_parameters(self, param_values: xp.ndarray):
         """In the case of a simple model, we simply update the free parameters"""
         a, b = (
             param_values[: self.n_free_parameters],
@@ -356,7 +353,7 @@ class CovarianceModel(ModelInterface):
         list_values = []
         for p in self.free_parameters:
             list_values.append(getattr(self, p))
-        return np.array(list_values)
+        return xp.array(list_values)
 
     def free_parameter_bounds_to_list_deep(self):
         list_bounds = []
@@ -367,14 +364,14 @@ class CovarianceModel(ModelInterface):
     def _repr_html_(self):
         return _parameterized_repr_html(self, True)
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         raise NotImplementedError()
 
-    def __call__(self, lags: np.ndarray):
+    def __call__(self, lags: xp.ndarray):
         ndim = lags.ndim
-        out = self._compute(np.expand_dims(lags, -1))
+        out = self._compute(xp.expand_dims(lags, -1))
         if out.shape[ndim - 1] == 1:
-            out = np.squeeze(out, ndim - 1)
+            out = xp.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -420,8 +417,8 @@ class CompoundModel(ModelInterface):
         list_values = []
         for p in self.free_parameters:
             list_values.append(getattr(self, p))
-        array_values = np.array(list_values)
-        return np.concatenate(
+        array_values = xp.array(list_values)
+        return xp.concatenate(
             [
                 array_values,
             ]
@@ -444,14 +441,14 @@ class CompoundModel(ModelInterface):
             + "</div>"
         )
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         raise NotImplementedError()
 
-    def __call__(self, lags: np.ndarray):
+    def __call__(self, lags: xp.ndarray):
         ndim = lags.ndim
-        out = self._compute(np.expand_dims(lags, -1))
+        out = self._compute(xp.expand_dims(lags, -1))
         if out.shape[ndim - 1] == 1:
-            out = np.squeeze(out, ndim - 1)
+            out = xp.squeeze(out, ndim - 1)
         return out
 
     def __add__(self, other):
@@ -488,7 +485,7 @@ class SumModel(CompoundModel):
         children = args
         super().__init__(children, **kwargs)
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         values = (child._compute(lags) for child in self.children)
         out = sum(values)
         return out

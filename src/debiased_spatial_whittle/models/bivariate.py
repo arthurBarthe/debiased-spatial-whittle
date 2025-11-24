@@ -3,7 +3,7 @@ from debiased_spatial_whittle.models.base import CovarianceModel, CompoundModel,
 from debiased_spatial_whittle.backend import BackendManager
 
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 
 class BivariateUniformCorrelation(CompoundModel):
@@ -49,7 +49,7 @@ class BivariateUniformCorrelation(CompoundModel):
     def base_model(self, model):
         raise AttributeError("Base model cannot be set")
 
-    def _compute(self, lags: np.ndarray):
+    def _compute(self, lags: xp.ndarray):
         """
         Evaluates the covariance model at the passed lags. Since the model is bivariate,
         the returned array has two extra dimensions compared to the array lags, both of size
@@ -66,12 +66,12 @@ class BivariateUniformCorrelation(CompoundModel):
 
         """
         acv11 = self.base_model._compute(lags)
-        fill_in = np.ones_like(self.r * self.f)
-        column1 = np.stack((acv11 * fill_in, acv11 * self.r * self.f), -1)
-        column2 = np.stack((acv11 * self.r * self.f, acv11 * fill_in * self.f**2), -1)
-        return np.stack((column1, column2), -1)
+        fill_in = xp.ones_like(self.r * self.f)
+        column1 = xp.stack((acv11 * fill_in, acv11 * self.r * self.f), -1)
+        column2 = xp.stack((acv11 * self.r * self.f, acv11 * fill_in * self.f ** 2), -1)
+        return xp.stack((column1, column2), -1)
 
-    def _gradient(self, x: np.ndarray):
+    def _gradient(self, x: xp.ndarray):
         """
 
         Parameters
@@ -88,11 +88,11 @@ class BivariateUniformCorrelation(CompoundModel):
         acv_base_model = self.base_model(x)
         gradient_base_model = self.base_model._gradient(x)
         # derivative w.r.t. r
-        d_r = np.zeros(acv_base_model.shape + (2, 2))
+        d_r = xp.zeros(acv_base_model.shape + (2, 2))
         d_r[..., 0, 1] = acv_base_model * self.f
         d_r[..., 1, 0] = acv_base_model * self.f
         # derivative w.r.t. f
-        d_f = np.zeros(acv_base_model.shape + (2, 2))
+        d_f = xp.zeros(acv_base_model.shape + (2, 2))
         d_f[..., 1, 1] = 2 * self.f * acv_base_model
         d_f[..., 0, 1] = acv_base_model * self.r
         d_f[..., 1, 0] = acv_base_model * self.r

@@ -2,7 +2,7 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("cupy")
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
@@ -41,7 +41,7 @@ print(debiased_whittle(data, model_est_))
 model_est.sigma = 1
 p = periodogram(data)
 ep = expected_periodogram(model_est_)
-print(np.sqrt(np.mean(p / ep)))
+print(xp.sqrt(xp.mean(p / ep)))
 
-model_est.sigma = np.sqrt(np.mean(p / ep))
+model_est.sigma = xp.sqrt(xp.mean(p / ep))
 print(debiased_whittle(data, model_est_))
