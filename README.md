@@ -16,6 +16,10 @@ This package implements the Spatial Debiased Whittle Likelihood (SDW) as present
 - Sofia C. Olhede
 - Frederik J. Simons
 
+Additionally, the following people have greatly contributed to further developments of the method and its implementation:
+- Thomas Goodwin
+- Olivia L. Walbert
+
 The SDW extends ideas from the Whittle likelihood and Debiased Whittle Likelihood to random fields and spatio-temporal data. In particular, it directly addresses the bias issue of the Whittle likelihood for observation domains with dimension greater than 2. It also allows us to work with rectangular domains (i.e., rather than square), missing observations, and complex shapes of data.
 
 The documentation is available [here](https://debiased-spatial-whittle.readthedocs.io/en/latest/?badge=latest).
