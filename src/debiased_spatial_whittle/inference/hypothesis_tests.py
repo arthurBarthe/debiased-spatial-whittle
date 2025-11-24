@@ -1,6 +1,6 @@
 from debiased_spatial_whittle.backend import BackendManager
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
 from numpy.linalg import eig
 
@@ -54,12 +54,12 @@ class FixedParametersHT:
 
     def _sample_generalized_chi_squared(self, lambdas):
         n = lambdas.shape[0]
-        zs = np.random.randn(1000, n)
+        zs = xp.random.randn(1000, n)
         lambdas = lambdas.reshape((n, 1))
-        sample = np.matmul(zs**2, lambdas)
+        sample = xp.matmul(zs ** 2, lambdas)
         return sample
 
-    def __call__(self, z: np.array, level=0.05):
+    def __call__(self, z: xp.array, level=0.05):
         params = self.full_model.free_params
         with TemporaryModel(self.full_model, dict()) as full_model:
             self.estimator(full_model, z)
@@ -73,15 +73,15 @@ class FixedParametersHT:
             j_full = self.likelihood.jmatrix_sample(null_model, params)
         lkh_ratio = -(lkh_full - lkh_null) * z.shape[0] * z.shape[1]
         h_full_inv = inv(h_full)
-        h_null_inv = np.pad(inv(h_null), ((1, 0), (1, 0)))
+        h_null_inv = xp.pad(inv(h_null), ((1, 0), (1, 0)))
         w_matrix = (
-            z.shape[0] * z.shape[1] / 2 * np.matmul(j_full, -h_null_inv + h_full_inv)
+                z.shape[0] * z.shape[1] / 2 * xp.matmul(j_full, -h_null_inv + h_full_inv)
         )
         eigenvalues = eig(w_matrix)[0]
         sample_dist = self._sample_generalized_chi_squared(eigenvalues)
-        test = lkh_ratio < np.quantile(sample_dist, 1 - level)
-        p_value = np.mean(lkh_ratio <= sample_dist)
+        test = lkh_ratio < xp.quantile(sample_dist, 1 - level)
+        p_value = xp.mean(lkh_ratio <= sample_dist)
         print(test)
         return HypothesisTestResult(
-            lkh_ratio, np.max(np.abs(eigenvalues)), p_value, test
+            lkh_ratio, xp.max(xp.abs(eigenvalues)), p_value, test
         )

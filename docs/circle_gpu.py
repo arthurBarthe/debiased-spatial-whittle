@@ -6,7 +6,7 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("cupy")
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 # ##Imports
 
@@ -26,7 +26,7 @@ model = SquaredExponentialModel(rho=32, sigma=0.9)
 m = 1024
 shape = (m, m)
 x_0, y_0, diameter = m // 2, m // 2, m
-x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
+x, y = xp.meshgrid(xp.arange(shape[0]), xp.arange(shape[1]), indexing="ij")
 circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
 circle = circle * 1.0
 grid_circle = RectangularGrid(shape)
@@ -37,7 +37,7 @@ grid_circle.mask = circle
 sampler = SamplerOnRectangularGrid(model, grid_circle)
 z = sampler()
 
-plt.imshow(np.to_cpu(z), origin="lower", cmap="Spectral")
+plt.imshow(xp.to_cpu(z), origin="lower", cmap="Spectral")
 plt.show()
 
 # ##Inference

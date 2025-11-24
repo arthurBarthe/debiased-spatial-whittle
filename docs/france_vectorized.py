@@ -6,7 +6,7 @@
 from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 import matplotlib.pyplot as plt
 import debiased_spatial_whittle.grids as grids
@@ -48,5 +48,5 @@ model_est = SquaredExponentialModel()
 model_est.sigma = 0.9
 model_est.fix_parameter("sigma")
 
-model.rho = np.arange(5, 20)
+model.rho = xp.arange(5, 20)
 print(debiased_whittle(z, model))

@@ -2,7 +2,7 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("cupy")
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import (
@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 # ##Set up grid and model
 
 grid = RectangularGrid((512, 512))
-model_1 = ExponentialModel(rho=5.0, sigma=np.sqrt(1 / 3))
-model_2 = SquaredExponentialModel(rho=32.0, sigma=np.sqrt(2 / 3))
+model_1 = ExponentialModel(rho=5.0, sigma=xp.sqrt(1 / 3))
+model_2 = SquaredExponentialModel(rho=32.0, sigma=xp.sqrt(2 / 3))
 model = model_1 + model_2
 model = NuggetModel(model, nugget=1e-2)
 model
