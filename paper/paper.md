@@ -50,7 +50,7 @@ spatio-temporal covariance models for univariate or multivariate processes from
 gridded data with potential missing observations, e.g. due to natural boundaries.
 It leverages the Fast Fourier Transform, and therefore can benefit from further computational
 gains through GPU implementations offered by PyTorch [@paszke2019pytorch] or
-Cupy [@nishino2017cupy], both made available within
+Cupy [@cupy_learningsys2017], both made available within
 the package as alternative backends to Numpy [@harris2020array]. As such, DSWL on GPU allows to fit
 covariance models to data observed on grids with tens of millions of locations.
 
