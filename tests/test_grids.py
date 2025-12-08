@@ -9,3 +9,7 @@ def test_covariance_matrix():
     model.sigma = 1
     cov_mat = grid.covariance_matrix(model)
     assert cov_mat.shape == (64, 64)
+
+def test_france_img():
+    from debiased_spatial_whittle.grids.old import ImgGrid
+    mask_france = ImgGrid((64, 64)).get_new()

@@ -9,13 +9,14 @@ from pathlib import Path
 from functools import cached_property, lru_cache
 from typing import Tuple
 import matplotlib.pyplot as plt
+from importlib.resources import files
 
 ones = BackendManager.get_ones()
 
 fftfreq = np.fft.fftfreq
 from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 
-PATH_TO_FRANCE_IMG = str(Path(__file__).parents[3] / "france.jpg")
+PATH_TO_FRANCE_IMG = str(files("debiased_spatial_whittle") / "france.jpg")
 
 
 class Grid(ABC):
