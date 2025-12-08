@@ -7,4 +7,4 @@ dependencies:
   - matplotlib      # Conda package
   - pip             # Ensure pip is available in the environment
   - pip:
-      - debiased_spatial_whittle==1.0.0
+      - debiased_spatial_whittle
