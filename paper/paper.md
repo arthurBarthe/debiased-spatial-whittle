@@ -154,7 +154,7 @@ categories:
   - `inference.periodogram`: this module allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model and grid combination.
   - `inference.multivariate_periodogram`: this module allows to compute the periodogram for multivariate data.
-  - `inference.likelihood.py`: this module allows to define the Debiased Whittle Likelihood and the corresponding
+  - `inference.likelihood`: this module allows to define the Debiased Whittle Likelihood and the corresponding
     estimator. The optimizer can be selected among those offered by the optimize
     package of the Scipy library [@virtanen2020scipy].
 
