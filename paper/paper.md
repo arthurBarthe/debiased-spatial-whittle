@@ -143,7 +143,7 @@ categories:
   set to specify potential missing observations, for instance to account for natural
   boundaries
   - `sampling.simulation`: this module allows to efficiently sample a realization from a model on a grid
-  via circulant embedding [@dietrich_fast_1997].
+  via circulant embedding [@dietrich_fast_1997]. The method is also implemented formultivariate random fields [@chanwood].
 - models:
   - `models`: this package allows to define a covariance model.
     Standard covariance models are pre-defined, such as the exponential
