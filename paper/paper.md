@@ -96,7 +96,7 @@ predicted distribution of estimates, which can be used to build confidence
 intervals.
 
 The package allows the user to treat multivariate data, including those cases where the
-missingness patterns might differ between the variates. For instance,
+sampling patterns might differ between the variates. For instance,
 in \autoref{fig:bivariate} we show a realization of a bivariate random field
 with distinct patterns of missing observations between the two variates, from which
 we can still infer the parameters of the model, such as the correlation between
@@ -138,23 +138,23 @@ The software is organized around several modules that can be grouped into the fo
 categories:
 
 - grids and sampling:
-  - `grids.py`: this module is used to define the rectangular grids where the data sit via the
+  - `grids.base`: this module is used to define the rectangular grids where the data sit via the
   class RectangularGrid. A mask of zeros (missing) and ones (not missing) can be
   set to specify potential missing observations, for instance to account for natural
   boundaries
-  - `simulation.py`: this module allows to efficiently sample a realization from a model on a grid
-  via circulant embedding [@dietrich_fast_1997].
+  - `sampling.simulation`: this module allows to efficiently sample a realization from a model on a grid
+  via circulant embedding [@dietrich_fast_1997]. The method is also implemented formultivariate random fields [@chanwood].
 - models:
-  - `models.py`: this module allows to define a covariance model.
+  - `models`: this package allows to define a covariance model.
     Standard covariance models are pre-defined, such as the exponential
     covariance model, the squared exponential (Gaussian) covariance model and
     the Matérn covariance model. These standard covariance models can also
     be combined (e.g. via summation) to form more complex covariance models.
 - estimation:
-  - `periodogram.py`: this module allows to compute the periodogram of the data, and to obtain
+  - `inference.periodogram`: this module allows to compute the periodogram of the data, and to obtain
     the expected periodogram for a given model and grid combination.
-  - `multivariate_periodogram.py`: this module allows to compute the periodogram for multivariate data.
-  - `likelihood.py`: this module allows to define the Debiased Whittle Likelihood and the corresponding
+  - `inference.multivariate_periodogram`: this module allows to compute the periodogram for multivariate data.
+  - `inference.likelihood`: this module allows to define the Debiased Whittle Likelihood and the corresponding
     estimator. The optimizer can be selected among those offered by the optimize
     package of the Scipy library [@virtanen2020scipy].
 
