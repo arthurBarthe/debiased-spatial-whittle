@@ -158,7 +158,7 @@ categories:
     estimator. The optimizer can be selected among those offered by the optimize
     package of the Scipy library [@virtanen2020scipy].
 
-A [documentation](https://debiased-spatial-whittle.readthedocs.io/en/latest/index.html)
+A [documentation](https://debiased-spatial-whittle.readthedocs.io/latest/index.html)
 including example notebooks is available, and issues can be raised on
 [Github](https://github.com/arthurBarthe/debiased-spatial-whittle). Example notebooks can also be run directly in the browser
 via [mybinder.org](https://mybinder.org/v2/gh/arthurBarthe/debiased-spatial-whittle/master).
