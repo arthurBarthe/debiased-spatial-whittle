@@ -18,17 +18,19 @@ param = "^2.1.1"
 autograd = "^1.5"
 seaborn = "^0.12.2"
 
-cupy-cuda12x = {version="^13.0.0", optional= true}
-cupy-cuda11x = {version="*", optional= true}
-torch = {version="2.2.2", optional=true}
-
-[tool.poetry.extras]
-gpu13 = ["jax[cuda13]"]
-gpu12 = ["cupy-cuda12x", "torch", "jax[cuda12]"]
-gpu11 = ["cupy-cuda11x", "torch"]
+[tool.poetry.group.gpu12]
+optional = true
 
 [tool.poetry.group.gpu12.dependencies]
 jax = { extras = ["cuda12"], version = "^0.7.0", platform = "linux" }
+cupy-cuda12x = {version="^13.0.0"}
+
+[tool.poetry.group.gpu13]
+optional = true
+
+[tool.poetry.group.gpu13.dependencies]
+jax = { extras = ["cuda13"], version = "^0.7.0", platform = "linux" }
+
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.3.1"
