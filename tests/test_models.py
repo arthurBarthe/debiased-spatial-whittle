@@ -5,7 +5,7 @@ from numpy.testing import assert_allclose
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
-    SquaredExponentialModel,
+    SquaredExponentialModel, Matern32Model,
 )
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
 
@@ -70,6 +70,28 @@ def test_gradient_sqExpCov():
     assert_allclose(g_sigma, g3)
 
 
+def test_gradient_Matern32():
+    """
+    This test verifies that the analytical gradient of the covariance is close to a
+    numerical approximation to that gradient, for the Matern32 model.
+    """
+    g = RectangularGrid((64, 64))
+    model = Matern32Model(rho=25, sigma=1)
+    epsilon = 1e-7
+    acv1 = model(g.lags_unique)
+    model.rho = model.rho + epsilon
+    acv2 = model(g.lags_unique)
+    model.rho = model.rho - epsilon
+    model.sigma = model.sigma + epsilon
+    acv3 = model(g.lags_unique)
+    gradient = model.gradient(g.lags_unique, [model.param.rho, model.param.sigma])
+    g_rho, g_sigma = gradient[..., 0], gradient[..., 1]
+    g2 = (acv2 - acv1) / epsilon
+    g3 = (acv3 - acv1) / epsilon
+    assert_allclose(g_rho, g2, rtol=1e-5)
+    assert_allclose(g_sigma, g3)
+
+
 def test_gradient_bivariate():
     """
     This test checks that the gradient has the right shape in the case of a bivariate model.
@@ -119,7 +141,6 @@ def test_gradient_cov_separable():
     g2 = (acv2 - acv1) / epsilon
     assert_allclose(g, g2, rtol=1e-2)
 """
-
 
 def test_cov_mat_x1_x2():
     model = SquaredExponentialModel(rho=10, sigma=1)

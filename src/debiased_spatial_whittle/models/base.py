@@ -149,7 +149,7 @@ class ModelInterface(param.Parameterized):
         pass
 
     @property
-    def free_parameters(self):
+    def free_parameters(self) -> list[str]:
         """free parameters of the model - not deep"""
         out = []
         for p in self.param.objects().values():
@@ -158,12 +158,12 @@ class ModelInterface(param.Parameterized):
         return out
 
     @property
-    def n_free_parameters(self):
+    def n_free_parameters(self) -> int:
         """number of free parameters of the model - not deep"""
         return len(self.free_parameters)
 
     @abstractproperty
-    def n_free_parameters_deep(self):
+    def n_free_parameters_deep(self) -> int:
         """number of free parameters, recursive"""
         pass
 
@@ -174,7 +174,7 @@ class ModelInterface(param.Parameterized):
         pass
 
     @abstractmethod
-    def free_parameter_values_to_array_deep(self):
+    def free_parameter_values_to_array_deep(self) -> xp.ndarray:
         """provide the free parameter values. Useful to pass to the x0 parameter of
         a numerical optimizer"""
         pass
@@ -183,6 +183,11 @@ class ModelInterface(param.Parameterized):
     def free_parameter_bounds_to_list_deep(self):
         """provide the free parameter bounds as a list. Useful to pass to bounds parameter of
         a numerical optimizer"""
+        pass
+
+    @abstractmethod
+    def param_objects(self) -> list[ModelParameter]:
+        """return all parameters objects"""
         pass
 
     def set_param_bounds(self, bounds: dict[str, tuple[float, float]]):
@@ -245,14 +250,20 @@ class ModelInterface(param.Parameterized):
 
 
         """
-        grad = self._gradient(lags)
+        try:
+            grad = self._gradient(lags)
+        except NotImplementedError:
+            grad = self._gradient_torch(lags)
         out = []
         for p in params:
-            out.append(grad[p.name])
-        n_spatial_dims = lags.shape[0]
-        return xp.stack(out, n_spatial_dims)
+            out.append(grad[p])
+        return xp.stack(out, -1)
 
     def _gradient(self, lags: xp.ndarray):
+        """
+        Should be implemented by subclasses, and return a dictionary with instances of ModelParameter for keys, and
+        the gradients for values.
+        """
         raise NotImplementedError()
 
     @abstractmethod
@@ -361,6 +372,26 @@ class CovarianceModel(ModelInterface):
             list_bounds.append(getattr(self.param, p).bounds)
         return list_bounds
 
+    def param_objects(self) -> list[ModelParameter]:
+        return list(filter(lambda p: isinstance(p, ModelParameter), self.param.objects().values()))
+
+    def _gradient_torch(self, lags: xp.ndarray):
+        import torch.autograd.functional as F
+        import torch
+        x = [p.__get__(p.owner, type(p.owner)) for p in self.param_objects()]
+        x = torch.cat(x)
+        x = x.detach().clone()
+        x.requires_grad = True
+
+        def func(x):
+            for i, p in enumerate(self.param_objects()):
+                p.__set__(p.owner, x[i: i + 1])
+            return self.__call__(lags)
+
+        grad = F.jacobian(func, x, strategy="forward-mode", vectorize=True)
+        out_dict = dict(list(zip(self.param_objects(), torch.unbind(grad, -1))))
+        return out_dict
+
     def _repr_html_(self):
         return _parameterized_repr_html(self, True)
 
@@ -432,6 +463,29 @@ class CompoundModel(ModelInterface):
         for child in self.children:
             list_bounds.extend(child.free_parameter_bounds_to_list_deep())
         return list_bounds
+
+    def param_objects(self) -> list[ModelParameter]:
+        out = list(filter(lambda p: isinstance(p, ModelParameter), self.param.objects().values()))
+        for child in self.children:
+            out.extend(child.param_objects())
+        return out
+
+    def _gradient_torch(self, lags: xp.ndarray):
+        import torch.autograd.functional as F
+        import torch
+        x = [p.__get__(p.owner, type(p.owner)) for p in self.param_objects()]
+        x = torch.cat(x)
+        x = x.detach().clone()
+        x.requires_grad = True
+
+        def func(x):
+            for i, p in enumerate(self.param_objects()):
+                p.__set__(p.owner, x[i: i + 1])
+            return self.__call__(lags)
+
+        grad = F.jacobian(func, x)
+        out_dict = dict(list(zip(self.param_objects(), torch.unbind(grad, -1))))
+        return out_dict
 
     def _repr_html_(self):
         return (

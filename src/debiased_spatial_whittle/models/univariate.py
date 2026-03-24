@@ -48,7 +48,7 @@ class ExponentialModel(CovarianceModel):
         d = xp.sqrt(sum((lag ** 2 for lag in lags)))
         d_rho = (self.sigma / self.rho) ** 2 * d * xp.exp(-d / self.rho)
         d_sigma = 2 * self.sigma * xp.exp(-d / self.rho)
-        return dict(rho=d_rho, sigma=d_sigma)
+        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
 
 
 class SquaredExponentialModel(CovarianceModel):
@@ -96,7 +96,7 @@ class SquaredExponentialModel(CovarianceModel):
                 self.rho ** (-3) * d2 * self.sigma ** 2 * xp.exp(-1 / 2 * d2 / self.rho ** 2)
         )
         d_sigma = 2 * self.sigma * xp.exp(-1 / 2 * d2 / self.rho ** 2)
-        return dict(rho=d_rho, sigma=d_sigma)
+        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
 
 
 class Matern32Model(CovarianceModel):
@@ -131,7 +131,12 @@ class Matern32Model(CovarianceModel):
         )
 
     def _gradient(self, lags: xp.ndarray):
-        raise NotImplementedError()
+        d = xp.sqrt(xp.sum(lags ** 2, 0))
+        d_rho_1 = self.sigma ** 2 * (- xp.sqrt(3) * d) / self.rho ** 2 * xp.exp(-xp.sqrt(3) * d / self.rho)
+        d_rho_2 = self.sigma ** 2 * (1 + xp.sqrt(3) * d / self.rho) * xp.exp(-xp.sqrt(3) * d / self.rho) * (xp.sqrt(3) * d / self.rho ** 2)
+        d_rho = d_rho_1 + d_rho_2
+        d_sigma = 2 * self.sigma * (1 + xp.sqrt(3) * d / self.rho) * xp.exp(-xp.sqrt(3) * d / self.rho)
+        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
 
 
 class Matern52Model(CovarianceModel):
@@ -241,6 +246,18 @@ class NuggetModel(CompoundModel):
         return xp.all(lags == 0, 0) * self.nugget * variance + (
             1 - self.nugget
         ) * self.children[0]._compute(lags)
+
+    def _gradient(self, lags: xp.ndarray):
+        n_spatial_dim = lags.shape[0]
+        zero_lag = xp.zeros((n_spatial_dim, lags.shape[-1]))
+        variance = self.children[0]._compute(zero_lag)
+        d_nugget = xp.all(lags == 0, 0) * variance - self.children[0]._compute(lags)
+        d_child = self.children[0]._gradient(lags)
+        for k, v in d_child.items():
+            d_child[k] = v * (1 - self.nugget)
+        out = {self.param.nugget: d_nugget}
+        out.update(d_child)
+        return out
 
 
 class AnisotropicModel(CompoundModel):
