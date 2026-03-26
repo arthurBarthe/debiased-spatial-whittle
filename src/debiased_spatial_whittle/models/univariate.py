@@ -169,7 +169,14 @@ class Matern52Model(CovarianceModel):
         return self.sigma**2 * (1 + temp + temp**2 / 3) * xp.exp(-temp)
 
     def _gradient(self, lags: xp.ndarray):
-        raise NotImplementedError()
+        d = xp.sqrt(xp.sum(lags ** 2, 0))
+        temp = xp.sqrt(5) * d / self.rho
+        d_temp_d_rho = -xp.sqrt(5) * d / self.rho ** 2
+        d_rho_1 = self.sigma ** 2 * (1 + 2 / 3 * temp) * d_temp_d_rho
+        d_rho_2 = self.sigma ** 2 * (1 + temp + temp ** 2 / 3) * (- d_temp_d_rho)
+        d_rho = (d_rho_1 + d_rho_2) * xp.exp(-temp)
+        d_sigma = 2 * self.sigma * (1 + temp + temp**2 / 3) * xp.exp(-temp)
+        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
 
 
 class RationalQuadraticModel(CovarianceModel):
@@ -204,7 +211,15 @@ class RationalQuadraticModel(CovarianceModel):
         return self.sigma**2 * xp.power(1 + d2 / self.alpha, -self.alpha)
 
     def _gradient(self, lags: xp.ndarray):
-        raise NotImplementedError()
+        d2 = xp.sum(lags ** 2, 0) / (2 * self.rho ** 2)
+        d_d2_d_rho = -2 * d2 / self.rho
+        d_rho = self.sigma ** 2 * (-self.alpha * xp.power(1 + d2 / self.alpha, -self.alpha - 1)) * d_d2_d_rho / self.alpha
+        term1 = self.sigma**2 * xp.power(1 + d2 / self.alpha, -self.alpha)
+        term2 = - xp.log(1 + d2 / self.alpha)
+        term3 = - self.alpha * 1 / (1 + d2 / self.alpha) * (-d2 / self.alpha ** 2)
+        d_alpha = term1 * (term2 + term3)
+        d_sigma = 2 * term1 / self.sigma
+        return {self.param.rho:d_rho, self.param.alpha: d_alpha, self.param.sigma:d_sigma}
 
 
 class NuggetModel(CompoundModel):

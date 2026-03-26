@@ -512,6 +512,8 @@ class CompoundModel(ModelInterface):
 class SumModel(CompoundModel):
     """
     Implements a covariance model defined as the sum of two covariance models.
+    Note that currently, the gradient computation is incorrect in the case where a model parameter is shared between
+    several children models.
 
     Examples
     --------
@@ -543,6 +545,12 @@ class SumModel(CompoundModel):
         values = (child._compute(lags) for child in self.children)
         out = sum(values)
         return out
+
+    def _gradient(self, lags: xp.ndarray):
+        gradient = dict()
+        for child in self.children:
+            gradient.update(child._gradient(lags))
+        return gradient
 
 
 # TODO temporary fix
