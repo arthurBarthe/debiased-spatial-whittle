@@ -6,6 +6,7 @@
 [![.github/workflows/run_tests_on_push.yaml](https://github.com/arthurBarthe/debiased-spatial-whittle/actions/workflows/run_tests_on_push.yaml/badge.svg)](https://github.com/arthurBarthe/debiased-spatial-whittle/actions/workflows/run_tests_on_push.yaml)
 [![Pypi](https://github.com/arthurBarthe/debiased-spatial-whittle/actions/workflows/pypi.yml/badge.svg)](https://github.com/arthurBarthe/debiased-spatial-whittle/actions/workflows/pypi.yml)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/arthurBarthe/debiased-spatial-whittle/master)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.08323/status.svg)](https://doi.org/10.21105/joss.08323)
 
 ## Introduction
 
@@ -19,6 +20,9 @@ This package implements the Spatial Debiased Whittle Likelihood (SDW) as present
 Additionally, the following people have greatly contributed to further developments of the method and its implementation:
 - Thomas Goodwin
 - Olivia L. Walbert
+
+The overall structure of the package has also greatly improved thanks to suggestions made by reviewers [@MarineChap](https://github.com/MarineChap) and [@weiji14](https://github.com/weiji14) 
+for [publication](https://joss.theoj.org/papers/10.21105/joss.08323) in the [Journal of Open Source Software](https://joss.theoj.org/). 
 
 The SDW extends ideas from the Whittle likelihood and Debiased Whittle Likelihood to random fields and spatio-temporal data. In particular, it directly addresses the bias issue of the Whittle likelihood for observation domains with dimension greater than 2. It also allows us to work with rectangular domains (i.e., rather than square), missing observations, and complex shapes of data.
 
