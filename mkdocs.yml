@@ -15,7 +15,7 @@ plugins:
 - search
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py', 'france_interpolation.py']
+    'anisotropic.py', 'france_interpolation.py', 'dual_remote_sensing.py']
     execute: true
 - mkdocstrings:
     handlers:
@@ -66,6 +66,7 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
+          - 'Dual remote sensing': dual_remote_sensing.py
       - Interpolation: france_interpolation.py
   - Reference:
       - grids: grids.md
