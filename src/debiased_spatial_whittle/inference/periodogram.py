@@ -388,7 +388,6 @@ class ExpectedPeriodogram:
         grid = self.grid
         shape = grid.n
         n_dim = grid.ndim
-        # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
             cg = grid.spatial_kernel(self.taper)
         else:

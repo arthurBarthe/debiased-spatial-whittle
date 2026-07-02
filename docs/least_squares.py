@@ -1,6 +1,6 @@
 from debiased_spatial_whittle.backend import BackendManager
 
-BackendManager.set_backend("cupy")
+BackendManager.set_backend("numpy")
 
 xp = BackendManager.get_backend()
 
@@ -20,9 +20,9 @@ data = sampler()
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid, periodogram)
 
-model_est = SquaredExponentialModel(rho=10.0)
-model_est.param.rho.bounds = (5, 100)
-model_est.param.sigma.bounds = (0.1, 10)
+model_est = SquaredExponentialModel(rho=10.0, name="sq")
+model_est.set_parameter_bounds("sq_rho", (5, 100))
+model_est.set_parameter_bounds("sq_sigma", (0.1, 10))
 model_est_ = NuggetModel(model_est, nugget=1e-1)
 
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)

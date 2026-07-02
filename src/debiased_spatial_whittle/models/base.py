@@ -15,7 +15,10 @@ class ModelParameter:
         self.long_name = f'{owner.__name__}_{name}'
         if not hasattr(owner, '_parameters'):
             owner._parameters = []
+        if not hasattr(owner, '_parameter_bounds'):
+            owner._parameter_bounds = dict()
         owner._parameters.append(name)
+        owner._parameter_bounds[self.name] = self.bounds
 
     def __get__(self, obj, objtype=None):
         if obj is None:
@@ -175,14 +178,27 @@ class CovarianceModel(ModelInterface):
         out = []
         for param_name in self._parameters:
             if not param_name in self._frozen_parameters:
-                out.append(getattr(self.__class__, param_name).bounds)
+                out.append(self._parameter_bounds[param_name])
         for child in self.children:
-            out.extend(child.free_parameter_bounds())
+            out.extend(child.free_parameter_bounds)
         return out
 
     # old method name
     def free_parameter_bounds_to_list_deep(self):
         return self.free_parameter_bounds
+
+    def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
+        model_name, param_name = name.split("_")
+        if model_name == self.name:
+            self._parameter_bounds[param_name] = bounds
+            return True
+        else:
+            for child in self.children:
+                value = child.set_parameter_bounds(name, bounds)
+                if value:
+                    return True
+            return False
+
 
     @property
     def parameter_names(self) -> tuple:
