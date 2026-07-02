@@ -1,4 +1,5 @@
 from debiased_spatial_whittle.backend import BackendManager
+from itertools import product
 
 xp = BackendManager.get_backend()
 
@@ -11,6 +12,7 @@ fftn, ifftn = BackendManager.get_fft_methods()
 fftshift, ifftshift = BackendManager.get_fftshift_methods()
 ndarray = xp.ndarray
 arange = BackendManager.get_arange()
+zeros = BackendManager.get_zeros()
 
 
 def autocov(cov_func, shape):
@@ -385,79 +387,30 @@ class ExpectedPeriodogram:
         For standard use cases, this should not be called directly. Instead, one should directly call
         the __call__ method.
         """
-        grid = self.grid
-        shape = grid.n
-        n_dim = grid.ndim
-        if d == (0, 0):
-            cg = grid.spatial_kernel(self.taper)
-        else:
-            cg = spatial_kernel(self.grid.mask, d)
-        if acv.ndim > cg.ndim:
-            for i in range(acv.ndim - cg.ndim):
-                cg = xp.expand_dims(cg, n_dim)
-        cbar = acv
-        if apply_cg:
-            cbar = cg * acv
+        spatial_shape = self.grid.n
+        n_spatial_dim = self.grid.ndim
+        cg = self.grid.spatial_kernel(self.taper) if d == (0, 0) else spatial_kernel(self.grid.mask, d)
+        for i in range(acv.ndim - cg.ndim):
+            cg = xp.expand_dims(cg, n_spatial_dim)
+        cbar = cg * acv if apply_cg else acv
+
         # now we need to "fold" the spatial dimensions
-        zeros_ = ((0, 0),) * (acv.ndim - n_dim)
+        zeros_ = ((0, 0),) * (acv.ndim - n_spatial_dim)
         if fold:
-            if BackendManager.backend_name == "torch":
-                result = xp.zeros(
-                    shape + acv.shape[n_dim:],
-                    dtype=xp.complex128,
-                    device=BackendManager.device,
+            result = zeros(spatial_shape + acv.shape[n_spatial_dim:], dtype=xp.complex128)
+            
+            # Generic implementation for any dimension using product
+            for indexes in product(*[(0, 1) for _ in range(n_spatial_dim)]):
+                # Build slices for cbar
+                cbar_slices = tuple(
+                    slice(i * s, (i + 1) * s) for i, s in zip(indexes, spatial_shape)
                 )
-            else:
-                result = xp.zeros(shape + acv.shape[n_dim:], dtype=xp.complex128)
-            if n_dim == 1:
-                for i in range(2):
-                    res = cbar[i * shape[0] : (i + 1) * shape[0]]
-                    result += xp.pad(res, ((i, 0),) + zeros_, mode="constant")
-
-            elif n_dim == 2:
-                for i in range(2):
-                    for j in range(2):
-                        res = cbar[
-                            i * shape[0] : (i + 1) * shape[0],
-                            j * shape[1] : (j + 1) * shape[1],
-                        ]
-                        result += xp.pad(
-                            res,
-                            (
-                                (i, 0),
-                                (j, 0),
-                            )
-                            + zeros_,
-                            mode="constant",
-                        )  # autograd solution
-
-            elif n_dim == 3:
-                for i in range(2):
-                    for j in range(2):
-                        for k in range(2):
-                            res = cbar[
-                                i * shape[0] : (i + 1) * shape[0],
-                                j * shape[1] : (j + 1) * shape[1],
-                                k * shape[2] : (k + 1) * shape[2],
-                            ]
-                            result += xp.pad(
-                                res,
-                                (
-                                    (i, 0),
-                                    (j, 0),
-                                    (k, 0),
-                                )
-                                + zeros_,
-                                mode="constant",
-                            )
-
-            # else:
-            #     indexes = product(*[(0, 1) for i_dim in range(n_dim)])
-            #     for ijk in indexes:
-            #         result[tuple([slice(i, None) for i in ijk])] += \
-            #             cbar[tuple([slice(i * s, (i + 1) * s) for (i, s) in zip(ijk, shape)])]
+                res = cbar[cbar_slices]
+                # Build padding: (i, 0) for each spatial dimension + zeros_ for extra dims
+                padding = tuple((i, 0) for i in indexes) + zeros_
+                result += xp.pad(res, padding, mode="constant")
         else:
-            m, n = shape
+            m, n = spatial_shape
             result = xp.zeros((2 * m, 2 * n))
             result[:m, :n] = cbar[:m, :n]
             result[m + 1 :, :n] = cbar[m:, :n]
@@ -465,13 +418,13 @@ class ExpectedPeriodogram:
             result[:m, n + 1 :] = cbar[:m, n:]
 
         if d == (0, 0):
-            out = fftn(result, None, list(range(n_dim)))
-            if grid.nvars == 1:
+            out = fftn(result, None, list(range(n_spatial_dim)))
+            if self.grid.nvars == 1:
                 out = xp.real(out)
             return out
         out = fftn(result)
-        if grid.nvars == 1:
-            out = xp.reshape(out, grid.n)
+        if self.grid.nvars == 1:
+            out = xp.reshape(out, spatial_shape)
         return out
 
     def jacobian(self, model: ModelInterface, param_names = None):
@@ -491,7 +444,7 @@ class ExpectedPeriodogram:
         torch.Size([256, 512])
         """
         lags = self.grid.lags_unique
-        ndim = lags.shape[0]
+        ndim = self.grid.ndim
         d_acv = model.jacobian(lags, param_names=param_names)
         d_acv_values = xp.stack(tuple(d_acv.values()), ndim)
         aux = ifftshift(d_acv_values, list(range(lags.shape[0])))
