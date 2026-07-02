@@ -1,12 +1,12 @@
 import numpy
-from debiased_spatial_whittle.models.base import CovarianceModel, CompoundModel, ModelParameter
+from debiased_spatial_whittle.models.base import CovarianceModel, BaseCovarianceModel, ModelParameter
 from debiased_spatial_whittle.backend import BackendManager
 
 
 xp = BackendManager.get_backend()
 
 
-class ExponentialModel(CovarianceModel):
+class ExponentialModel(BaseCovarianceModel):
     """
     Implements the Exponential covariance model.
 
@@ -26,13 +26,10 @@ class ExponentialModel(CovarianceModel):
     >>> model.rho = 3
     >>> model.rho
     3
-    >>> model.param.rho.bounds
+    >>> model.rho.bounds
     (0, inf)
-    >>> model.free_parameters
-    ['rho', 'sigma']
-    >>> model.fix_parameter("rho")
-    >>> model.free_parameters
-    ['sigma']
+    >>> model.free_parameter_names
+    ('ExponentialModel_rho', 'ExponentialModel_sigma')
     """
 
     rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
@@ -40,18 +37,15 @@ class ExponentialModel(CovarianceModel):
         default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
     )
 
-    def _compute(self, lags: xp.ndarray):
-        d = xp.sqrt(xp.sum(lags ** 2, 0)) / self.rho
-        return self.sigma**2 * xp.exp(-d)
+    def __init__(self, rho=None, sigma=None, name=None):
+        super().__init__(rho, sigma, name=name)
 
-    def _gradient(self, lags: xp.ndarray):
-        d = xp.sqrt(sum((lag ** 2 for lag in lags)))
-        d_rho = (self.sigma / self.rho) ** 2 * d * xp.exp(-d / self.rho)
-        d_sigma = 2 * self.sigma * xp.exp(-d / self.rho)
-        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
+    def compute(self, lags: xp.ndarray, rho: xp.ndarray, sigma: xp.ndarray) -> xp.ndarray:
+        d = xp.sqrt(xp.sum(lags ** 2, 0)) / rho
+        return sigma**2 * xp.exp(-d)
 
 
-class SquaredExponentialModel(CovarianceModel):
+class SquaredExponentialModel(BaseCovarianceModel):
     """
     Implements the Squared Exponential covariance model, or Gaussian covariance model.
 
@@ -73,33 +67,15 @@ class SquaredExponentialModel(CovarianceModel):
     rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter")
     sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter")
 
-    def _compute(self, lags: xp.ndarray):
-        d = xp.sum(lags ** 2, 0) / (2 * self.rho ** 2)
-        return self.sigma**2 * xp.exp(-d)
+    def __init__(self, rho=None, sigma=None, name=None):
+        super().__init__(rho, sigma, name=name)
 
-    def _gradient(self, lags: xp.ndarray):
-        """
-        Provides the derivatives of the covariance model evaluated at the passed lags with respect to
-        the model's parameters.
-
-        Examples
-        --------
-        >>> model = SquaredExponentialModel(rho=2, sigma=1.41)
-        >>> model.gradient(xp.array([[0, 0, 1, 1], [0, 1, 0, 1]]), [model.param.rho, model.param.sigma])
-        array([[0.        , 2.82      ],
-               [0.21931151, 2.48864127],
-               [0.21931151, 2.48864127],
-               [0.38708346, 2.19621821]])
-        """
-        d2 = sum((lag**2 for lag in lags))
-        d_rho = (
-                self.rho ** (-3) * d2 * self.sigma ** 2 * xp.exp(-1 / 2 * d2 / self.rho ** 2)
-        )
-        d_sigma = 2 * self.sigma * xp.exp(-1 / 2 * d2 / self.rho ** 2)
-        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
+    def compute(self, lags: xp.ndarray, rho: xp.ndarray, sigma: xp.ndarray) -> xp.ndarray:
+        d = xp.sum(lags ** 2, 0) / (2 * rho ** 2)
+        return sigma**2 * xp.exp(-d)
 
 
-class Matern32Model(CovarianceModel):
+class Matern32Model(BaseCovarianceModel):
     """
     Implements the Matern Covariance kernel with slope parameter 3/2.
 
@@ -119,27 +95,20 @@ class Matern32Model(CovarianceModel):
     rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
     sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, rho=None, sigma=None, name=None):
+        super().__init__(rho, sigma, name=name)
 
-    def _compute(self, lags: xp.ndarray):
+    def compute(self, lags: xp.ndarray, rho: xp.ndarray, sigma: xp.ndarray) -> xp.ndarray:
         d = xp.sqrt(xp.sum(lags ** 2, 0))
+        sqrt3 = numpy.sqrt(3)
         return (
-                self.sigma ** 2
-                * (1 + xp.sqrt(3) * d / self.rho)
-                * xp.exp(-xp.sqrt(3) * d / self.rho)
+                sigma ** 2
+                * (1 + sqrt3 * d / rho)
+                * xp.exp(-sqrt3 * d / rho)
         )
 
-    def _gradient(self, lags: xp.ndarray):
-        d = xp.sqrt(xp.sum(lags ** 2, 0))
-        d_rho_1 = self.sigma ** 2 * (- xp.sqrt(3) * d) / self.rho ** 2 * xp.exp(-xp.sqrt(3) * d / self.rho)
-        d_rho_2 = self.sigma ** 2 * (1 + xp.sqrt(3) * d / self.rho) * xp.exp(-xp.sqrt(3) * d / self.rho) * (xp.sqrt(3) * d / self.rho ** 2)
-        d_rho = d_rho_1 + d_rho_2
-        d_sigma = 2 * self.sigma * (1 + xp.sqrt(3) * d / self.rho) * xp.exp(-xp.sqrt(3) * d / self.rho)
-        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
 
-
-class Matern52Model(CovarianceModel):
+class Matern52Model(BaseCovarianceModel):
     """
     Implements the Matern Covariance kernel with slope parameter 5/2.
 
@@ -160,26 +129,16 @@ class Matern52Model(CovarianceModel):
     rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
     sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, rho=None, sigma=None, name=None):
+        super().__init__(rho, sigma, name=name)
 
-    def _compute(self, lags: xp.ndarray):
+    def compute(self, lags: xp.ndarray, rho: xp.ndarray, sigma: xp.ndarray) -> xp.ndarray:
         d = xp.sqrt(xp.sum(lags ** 2, 0))
-        temp = xp.sqrt(5) * d / self.rho
-        return self.sigma**2 * (1 + temp + temp**2 / 3) * xp.exp(-temp)
-
-    def _gradient(self, lags: xp.ndarray):
-        d = xp.sqrt(xp.sum(lags ** 2, 0))
-        temp = xp.sqrt(5) * d / self.rho
-        d_temp_d_rho = -xp.sqrt(5) * d / self.rho ** 2
-        d_rho_1 = self.sigma ** 2 * (1 + 2 / 3 * temp) * d_temp_d_rho
-        d_rho_2 = self.sigma ** 2 * (1 + temp + temp ** 2 / 3) * (- d_temp_d_rho)
-        d_rho = (d_rho_1 + d_rho_2) * xp.exp(-temp)
-        d_sigma = 2 * self.sigma * (1 + temp + temp**2 / 3) * xp.exp(-temp)
-        return {self.param.rho:d_rho, self.param.sigma:d_sigma}
+        temp = numpy.sqrt(5) * d / rho
+        return sigma**2 * (1 + temp + temp**2 / 3) * xp.exp(-temp)
 
 
-class RationalQuadraticModel(CovarianceModel):
+class RationalQuadraticModel(BaseCovarianceModel):
     """
     Implements the Rational Quadratic Covariance Kernel.
 
@@ -203,26 +162,15 @@ class RationalQuadraticModel(CovarianceModel):
     alpha = ModelParameter(default=1.0, bounds=(0, xp.inf))
     sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, rho=None, alpha=None, sigma=None, name=None):
+        super().__init__(rho, alpha, sigma, name=name)
 
-    def _compute(self, lags: xp.array):
-        d2 = xp.sum(lags ** 2, 0) / (2 * self.rho ** 2)
-        return self.sigma**2 * xp.power(1 + d2 / self.alpha, -self.alpha)
-
-    def _gradient(self, lags: xp.ndarray):
-        d2 = xp.sum(lags ** 2, 0) / (2 * self.rho ** 2)
-        d_d2_d_rho = -2 * d2 / self.rho
-        d_rho = self.sigma ** 2 * (-self.alpha * xp.power(1 + d2 / self.alpha, -self.alpha - 1)) * d_d2_d_rho / self.alpha
-        term1 = self.sigma**2 * xp.power(1 + d2 / self.alpha, -self.alpha)
-        term2 = - xp.log(1 + d2 / self.alpha)
-        term3 = - self.alpha * 1 / (1 + d2 / self.alpha) * (-d2 / self.alpha ** 2)
-        d_alpha = term1 * (term2 + term3)
-        d_sigma = 2 * term1 / self.sigma
-        return {self.param.rho:d_rho, self.param.alpha: d_alpha, self.param.sigma:d_sigma}
+    def compute(self, lags: xp.array, rho: xp.ndarray, alpha: xp.ndarray, sigma: xp.ndarray) -> xp.ndarray:
+        d2 = xp.sum(lags ** 2, 0) / (2 * rho ** 2)
+        return sigma**2 * (1 + d2 / alpha) ** (-alpha)
 
 
-class NuggetModel(CompoundModel):
+class NuggetModel(CovarianceModel):
     """
     Allows to add a nugget to a base covariance model. The nugget parameter is between 0 and 1 and characterises the
     proportion of the variance due to the nugget. For instance, if the base model has variance 2, using a Nugget model
@@ -245,37 +193,24 @@ class NuggetModel(CompoundModel):
 
     nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
 
-    def __init__(self, model, *args, **kwargs):
-        super().__init__(
-            [
-                model,
-            ],
-            *args,
-            **kwargs,
-        )
+    def __init__(self, base_model, nugget=None, name=None):
+        super().__init__((base_model,), nugget, name=name)
 
-    def _compute(self, lags: xp.ndarray):
+    @property
+    def base_model(self):
+        return self.children[0]
+
+    def compute(self, lags: xp.ndarray, nugget: xp.ndarray, *params) -> xp.ndarray:
+        child_params = params
         n_spatial_dim = lags.shape[0]
         zero_lag = xp.zeros((n_spatial_dim, lags.shape[-1]))
-        variance = self.children[0]._compute(zero_lag)
-        return xp.all(lags == 0, 0) * self.nugget * variance + (
-            1 - self.nugget
-        ) * self.children[0]._compute(lags)
-
-    def _gradient(self, lags: xp.ndarray):
-        n_spatial_dim = lags.shape[0]
-        zero_lag = xp.zeros((n_spatial_dim, lags.shape[-1]))
-        variance = self.children[0]._compute(zero_lag)
-        d_nugget = xp.all(lags == 0, 0) * variance - self.children[0]._compute(lags)
-        d_child = self.children[0]._gradient(lags)
-        for k, v in d_child.items():
-            d_child[k] = v * (1 - self.nugget)
-        out = {self.param.nugget: d_nugget}
-        out.update(d_child)
-        return out
+        variance = self.children[0].compute(zero_lag, *child_params)
+        return xp.all(lags == 0, 0) * nugget * variance + (
+            1 - nugget
+        ) * self.children[0].compute(lags, *child_params)
 
 
-class AnisotropicModel(CompoundModel):
+class AnisotropicModel(CovarianceModel):
     """
     Allows to define an anisotropic model based on a base isotropic model via a scaling + rotation transform.
     Dimension 2.
@@ -300,14 +235,12 @@ class AnisotropicModel(CompoundModel):
     eta = ModelParameter(default=1, bounds=(0, xp.inf))
     phi = ModelParameter(default=0, bounds=(-xp.pi / 2, xp.pi / 2))
 
-    def __init__(self, base_model: CovarianceModel, *args, **kwargs):
-        super().__init__(
-            [
-                base_model,
-            ],
-            *args,
-            **kwargs,
-        )
+    def __init__(self, base_model, eta=None, phi=None, name=None):
+        super().__init__((base_model,), eta, phi, name=name)
+
+    @property
+    def base_model(self):
+        return self.children[0]
 
     @property
     def scaling_matrix(self):
@@ -322,11 +255,12 @@ class AnisotropicModel(CompoundModel):
             ]
         )
 
-    def _compute(self, lags: xp.ndarray):
+    def compute(self, lags: xp.ndarray, eta: xp.ndarray, phi: xp.ndarray, *params) -> xp.ndarray:
+        child_params = params
         lags = xp.swapaxes(lags, 0, -1)
         lags = xp.expand_dims(lags, -1)
         lags = xp.matmul(self.rotation_matrix, lags)
         lags = xp.matmul(self.scaling_matrix, lags)
         lags = xp.squeeze(lags, -1)
         lags = xp.swapaxes(lags, 0, -1)
-        return self.children[0]._compute(lags)
+        return self.children[0].compute(lags, *child_params)
