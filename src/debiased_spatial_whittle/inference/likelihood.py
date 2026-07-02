@@ -86,7 +86,7 @@ class MultivariateDebiasedWhittle:
             term2 = xp.sum(xp.diagonal(ratio, dim1=-1, dim2=-2), -1)
         whittle = xp.mean(term1 + term2, tuple(range(n_spatial_dim)))
         whittle = xp.real(whittle)
-        if BackendManager.backend_name == "torch":
+        if BackendManager.backend_name == "torch" and not whittle.shape:
             whittle = whittle.item()
         if not params_for_gradient:
             return whittle
@@ -102,30 +102,62 @@ class MultivariateDebiasedWhittle:
         d_whittle = xp.mean(d_log_det + d_quad_term, axis=(0, 1))
         return whittle, d_whittle
 
-    def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
+    def gradient(self, sample, model, param_names=None):
+        """
+        Compute the gradient of MultivariateDebiasedWhittle with respect to model parameters.
+        """
+        p = self.periodogram([sample[..., 0], sample[..., 1]])
+        ep = self.expected_periodogram(model)
+        d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
+        grad_dbw = dict()
+        for param_name, d_ep_i in d_ep.items():
+            ep_inv = inv(ep)
+            # the derivative of the log determinant
+            if BackendManager.backend_name in ("numpy", "cupy"):
+                d_log_det = xp.trace(xp.matmul(ep_inv, d_ep_i), axis1=-2, axis2=-1)
+            elif BackendManager.backend_name == "torch":
+                d_log_det = xp.sum(xp.diagonal(xp.matmul(ep_inv, d_ep_i), dim1=-1, dim2=-2), -1)
+            # the derivative the second term
+            d_ep_inv = -xp.matmul(ep_inv, xp.matmul(d_ep_i, ep_inv))
+            if BackendManager.backend_name in ("numpy", "cupy"):
+                d_quad_term = xp.trace(xp.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
+            elif BackendManager.backend_name == "torch":
+                d_quad_term = xp.sum(xp.diagonal(xp.matmul(d_ep_inv, p), dim1=-1, dim2=-2), -1)
+            # derivative
+            d_whittle = xp.mean(d_log_det + d_quad_term, axis=tuple(range(p.ndim - 2)))
+            # Ensure scalar value for compatibility
+            if BackendManager.backend_name == "torch":
+                d_whittle = xp.real(d_whittle).item()
+            else:
+                d_whittle = xp.real(d_whittle)
+            grad_dbw[param_name] = d_whittle
+        return grad_dbw
+
+    def fisher(self, model: CovarianceModel, param_names: list[str] = None):
         """Provides the expectation of the hessian matrix"""
-        n_params = len(params_for_gradient)
+        if param_names is None:
+            param_names = model.parameter_names
+        n_params = len(param_names)
         ep = self.expected_periodogram(model)
         ep_inv = inv(ep)
-        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
         h = zeros((n_params, n_params))
         for i1 in range(n_params):
             for i2 in range(n_params):
-                d_ep1 = d_ep[..., i1]
-                d_ep2 = d_ep[..., i2]
-                h[i1, i2] = xp.mean(
-                    xp.trace(
-                        xp.matmul(ep_inv, xp.matmul(d_ep1, xp.matmul(ep_inv, d_ep2))),
-                        axis1=-2,
-                        axis2=-1,
-                    )
-                )
+                d_ep1 = d_ep[param_names[i1]]
+                d_ep2 = d_ep[param_names[i2]]
+                inner = xp.matmul(ep_inv, xp.matmul(d_ep1, xp.matmul(ep_inv, d_ep2)))
+                if BackendManager.backend_name in ("numpy", "cupy"):
+                    trace_val = xp.trace(inner, axis1=-2, axis2=-1)
+                elif BackendManager.backend_name == "torch":
+                    trace_val = xp.sum(xp.diagonal(inner, dim1=-1, dim2=-2), -1)
+                h[i1, i2] = xp.mean(trace_val)
         return h
 
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        params_for_gradient: list[ModelParameter],
+        param_names: list[str] = None,
         n_sims: int = 400,
         block_size: int = 100,
     ) -> xp.ndarray:
@@ -137,8 +169,8 @@ class MultivariateDebiasedWhittle:
         ----------
         model
             Covariance model to sample from
-        params_for_gradient
-            Parameters with respect to which we take the gradient
+        param_names
+            Parameter names with respect to which we take the gradient
         n_sims
             Number of samples used for the estimate covariance matrix
         block_size
@@ -151,12 +183,15 @@ class MultivariateDebiasedWhittle:
         np.ndarray
             Sample covariance matrix of the gradient of the likelihood
         """
+        if param_names is None:
+            param_names = model.parameter_names
         sampler = SamplerBUCOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
-            _, grad = self(z, model, params_for_gradient)
+            grad_dict = self.gradient(z, model, param_names=param_names)
+            grad = [grad_dict[pn] for pn in param_names]
             gradients.append(grad)
         gradients = xp.array(gradients)
         # enforce real values
@@ -213,7 +248,7 @@ class DebiasedWhittle:
     @property
     def frequency_mask(self):
         if self._frequency_mask is None:
-            return 1
+            return xp.array(1)
         else:
             return self._frequency_mask
 
@@ -310,6 +345,19 @@ class DebiasedWhittle:
             d_whittle = d_whittle.detach().cpu().numpy()
         return whittle, d_whittle
 
+    def gradient(self, sample, model, param_names = None):
+        """
+        Compute the gradient of Debiased Whittle with respect to model parameters.
+        """
+        p = self.periodogram(sample)
+        ep = self.expected_periodogram(model)
+        d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
+        grad_dbw = dict()
+        for param_name, d_ep_i in d_ep.items():
+            d_whittle = whittle_prime(p, ep, d_ep_i)
+            grad_dbw[param_name] = d_whittle
+        return grad_dbw
+
     def expected(self, true_model: CovarianceModel, eval_model: CovarianceModel):
         """
         Evaluate the expectation of the Debiased Whittle likelihood estimator for a given
@@ -332,7 +380,7 @@ class DebiasedWhittle:
         ep_eval = self.expected_periodogram(eval_model)
         return xp.sum(xp.log(ep_eval) + ep_true / ep_eval)
 
-    def fisher(self, model: CovarianceModel, params_for_gradient: list[ModelParameter]):
+    def fisher(self, model: CovarianceModel, param_names: list[str] = None):
         """
         Provides the Fisher Information Matrix.
 
@@ -341,8 +389,9 @@ class DebiasedWhittle:
         model: CovarianceModel
             True covariance model
 
-        params_for_gradient
-            Parameters with respect to which the Fisher is obtained
+        param_names: list[str], optional
+            Parameter names with respect to which the Fisher is obtained.
+            If None, uses all model parameters.
 
         Returns
         -------
@@ -352,24 +401,26 @@ class DebiasedWhittle:
         Examples
         --------
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
-        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
-        >>> model = ExponentialModel(rho=30, sigma=1.41)
+        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+        >>> model = SquaredExponentialModel(name="model", rho=12)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> dbw.fisher(model, [model.param.rho, model.param.sigma])
+        >>> dbw.fisher(model)
         array([[ 1.03736229e-03, -4.49238561e-02],
                [-4.49238561e-02,  2.01197123e+00]])
         """
-        n_params = len(params_for_gradient)
+        if param_names is None:
+            param_names = model.parameter_names
+        n_params = len(param_names)
         ep = self.expected_periodogram(model)
-        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
         h = zeros((n_params, n_params))
         for i1 in range(n_params):
             for i2 in range(n_params):
-                d_ep1 = d_ep[..., i1]
-                d_ep2 = d_ep[..., i2]
+                d_ep1 = d_ep[param_names[i1]]
+                d_ep2 = d_ep[param_names[i2]]
                 h[i1, i2] = xp.sum(d_ep1 * d_ep2 / ep ** 2)
         return h / self.expected_periodogram.grid.n_points
 
@@ -427,22 +478,22 @@ class DebiasedWhittle:
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        params_for_gradient: list[ModelParameter],
+        param_names: list[str] = None,
         n_sims: int = 1000,
         block_size: int = 100,
     ) -> xp.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
         simulated realisations. Specifically, this simulates n_sims samples from model, computes
-        the gradient for each sample using the __call__ method, and computes the sample covariance of those
+        the gradient for each sample using the gradient method, and computes the sample covariance of those
         gradients.
 
         Parameters
         ----------
         model
             Covariance model to sample from
-        params_for_gradient
-            Parameters with respect to which we take the gradient
+        param_names
+            Parameter names with respect to which we take the gradient
         n_sims
             Number of samples used for the estimate covariance matrix
         block_size
@@ -457,25 +508,27 @@ class DebiasedWhittle:
 
         Examples
         --------
-        >>> import numpy.random as nrrandom
-        >>> nrrandom.seed(1712)
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
-        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
-        >>> model = ExponentialModel(rho=12, sigma=1.41)
+        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
+        >>> base_model = SquaredExponentialModel(name="model", rho=12)
+        >>> model = NuggetModel("model2", base_model, nugget=0.1)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> dbw.jmatrix_sample(model, [model.param.rho, model.param.sigma], n_sims=20)
+        >>> dbw.jmatrix_sample(model, n_sims=20)
         array([[ 1.79844275e-06, -3.36165062e-05],
                [-3.36165062e-05,  8.20809861e-04]])
         """
+        if param_names is None:
+            param_names = model.parameter_names
         sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
-            _, grad = self(z, model, params_for_gradient)
+            grad_dict = self.gradient(z, model, param_names=param_names)
+            grad = [grad_dict[pn] for pn in param_names]
             gradients.append(grad)
         gradients = xp.array(gradients)
         # enforce real values
@@ -484,7 +537,7 @@ class DebiasedWhittle:
     def variance_of_estimates(
         self,
         model: CovarianceModel,
-        params: list[ModelParameter],
+        params: list[ModelParameter] = None,
         jmat: xp.ndarray = None,
     ):
         """
@@ -508,17 +561,16 @@ class DebiasedWhittle:
 
         Examples
         --------
-        >>> import numpy.random as nrrandom
-        >>> nrrandom.seed(1712)
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
-        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
-        >>> model = ExponentialModel(rho=12., sigma=4.)
+        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
+        >>> base_model = SquaredExponentialModel(name="model", rho=12)
+        >>> model = NuggetModel("model2", base_model, nugget=0.1)
         >>> periodogram = Periodogram()
-        >>> grid = RectangularGrid((67, 192))
+        >>> grid = RectangularGrid((512, 256))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> jmat = dbw.jmatrix_sample(model, [model.param.rho, model.param.sigma], n_sims=20)
-        >>> dbw.variance_of_estimates(model, [model.param.rho, model.param.sigma], jmat)
+        >>> jmat = dbw.jmatrix_sample(model, n_sims=200)
+        >>> dbw.variance_of_estimates(model, jmat=jmat)
         array([[8.27761908, 1.34780351],
                [1.34780351, 0.22064392]])
         """

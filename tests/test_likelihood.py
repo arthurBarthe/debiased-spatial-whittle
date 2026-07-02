@@ -1,4 +1,6 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from numpy.testing import assert_allclose
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
@@ -88,11 +90,17 @@ def test_whittle_grad():
     model.sigma = 1
     model.rho = 4
     sampler = SamplerOnRectangularGrid(model, g)
-    p = [
-        model.param.rho,
-    ]
     z = sampler()
-    lkh, grad = d(z, model, params_for_gradient=p)
+    
+    # Get parameter name for rho
+    param_names = [model.parameter_names[0]]
+    
+    # Compute likelihood and gradient using the gradient method
+    lkh = d(z, model)
+    grad_dict = d.gradient(z, model, param_names=param_names)
+    grad = grad_dict[param_names[0]]
+    
+    # Compute numerical gradient
     epsilon = 1e-6
     model.rho = model.rho + epsilon
     lkh2 = d(z, model)
@@ -115,19 +123,24 @@ def test_whittle_grad_multi():
     z = sampler()
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     epsilon = 1e-8
-    params_for_grad = [
-        bvm.param.r,
-    ]
-    lkh, grad = dbw(z, bvm, params_for_grad)
-    for i, p in enumerate(params_for_grad):
-        print(p.name)
-        old_value = getattr(bvm, p.name)
-        new_value = old_value + epsilon
-        setattr(bvm, p.name, new_value)
-        lkh2 = dbw(z, bvm)
-        grad_num = (lkh2 - lkh) / epsilon
-        assert_allclose(grad[..., i], grad_num, rtol=0.001)
-        setattr(bvm, p.name, old_value)
+    
+    # Get parameter name for r (first parameter of BivariateUniformCorrelation)
+    param_name = bvm.parameter_names[0]
+    param_names = [param_name]
+    
+    # Compute likelihood and gradient using the gradient method
+    lkh = dbw(z, bvm)
+    grad_dict = dbw.gradient(z, bvm, param_names=param_names)
+    grad = grad_dict[param_name]
+    
+    # Compute numerical gradient
+    old_value = getattr(bvm, 'r')
+    new_value = old_value + epsilon
+    setattr(bvm, 'r', new_value)
+    lkh2 = dbw(z, bvm)
+    grad_num = (lkh2 - lkh) / epsilon
+    assert_allclose(grad, grad_num, rtol=0.001)
+    setattr(bvm, 'r', old_value)
 
 
 def test_hessian_diagonal():
@@ -143,14 +156,9 @@ def test_hessian_diagonal():
     model = ExponentialModel()
     model.sigma = 1
     model.rho = rho
-    h = d.fisher(
-        model,
-        [
-            model.param.rho,
-        ],
-    )
+    param_names = [model.parameter_names[0]]
+    h = d.fisher(model, param_names=param_names)
     print(h)
-    # assert h.shape == (2, 2)
     assert np.all(np.diag(h) >= 0)
 
 
@@ -170,7 +178,11 @@ def test_fisher_multivariate():
     bvm.f = 1.5
     sampler = SamplerBUCOnRectangularGrid(bvm, g)
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    h = dbw.fisher(bvm, [bvm.param.r, bvm.param.f])
+    
+    # Get parameter names for r and f
+    param_names = [bvm.parameter_names[0], bvm.parameter_names[1]]
+    
+    h = dbw.fisher(bvm, param_names=param_names)
     assert np.all(np.diag(h) > 0)
 
 
@@ -229,7 +241,8 @@ def test_jmatrix_sample():
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=2, sigma=1)
-    jmat = d.jmatrix_sample(model, [model.param.rho, model.param.sigma])
+    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    jmat = d.jmatrix_sample(model, param_names=param_names)
     print(jmat)
 
 
@@ -245,6 +258,7 @@ def test_jmatrix_sample_multivariate():
     bvm.r = 0.3
     bvm.f = 1.5
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    jmat = dbw.jmatrix_sample(bvm, [bvm.param.r, bvm.param.f])
+    param_names = [bvm.parameter_names[0], bvm.parameter_names[1]]
+    jmat = dbw.jmatrix_sample(bvm, param_names=param_names)
     assert jmat.shape == (2, 2)
     assert np.all(np.diag(jmat) > 0)
