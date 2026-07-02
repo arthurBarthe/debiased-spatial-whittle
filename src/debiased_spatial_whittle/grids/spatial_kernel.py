@@ -3,9 +3,7 @@ from debiased_spatial_whittle.backend import BackendManager
 xp = BackendManager.get_backend()
 from typing import Tuple
 
-fftn = xp.fft.fftn
-ifftn = xp.fft.ifftn
-
+fftn, ifftn = BackendManager.get_fft_methods()
 
 def spatial_kernel(
     g: xp.ndarray, m: Tuple[int, int] = (0, 0), n_spatial_dim: int = None

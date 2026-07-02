@@ -252,7 +252,7 @@ class RectangularGrid:
         grid = xp.meshgrid(*xs, indexing="ij")
         grid_vec = [g.reshape((-1, 1)) for g in grid]
         lags = [g - g.T for g in grid_vec]
-        return xp.array(lags)
+        return xp.stack(lags)
 
     @lru_cache(maxsize=5)
     def spatial_kernel(self, taper_values: xp.ndarray = None):

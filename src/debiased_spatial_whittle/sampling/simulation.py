@@ -1,13 +1,7 @@
 import sys, warnings
 from typing import Tuple
 from scipy.stats import multivariate_normal
-from debiased_spatial_whittle.models.base import (
-    CovarianceModel,
-    TMultivariateModel,
-    SquaredModel,
-    ChiSquaredModel,
-    SeparableModel,
-)
+from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.backend import BackendManager
@@ -165,7 +159,6 @@ class SamplerOnRectangularGrid:
         return result
 
 
-from numpy.linalg import eigh
 
 
 class MultivariateSamplerOnRectangularGrid:
@@ -215,7 +208,7 @@ class MultivariateSamplerOnRectangularGrid:
         # cov shape (2 * n1 - 1, 2 * n2 - 1, p, p)
         cov = self.sampling_grid.autocov(self.model)
         f = prod_list(self.sampling_grid.n) * ifftn(cov, axes=self.spatial_axes)
-        return eigh(f)
+        return xp.linalg.eigh(f)
 
     def _sample(self):
         # lambdas shape (p, ), r_matrix shape (p, p)

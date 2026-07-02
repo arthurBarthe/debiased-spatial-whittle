@@ -52,7 +52,7 @@ def ravel_multi_index(coords, shape):
 
 
 class BackendManager:
-    backend_name = "numpy"
+    backend_name = "torch"
     device = "cpu"
     block = False
 
@@ -122,6 +122,7 @@ class BackendManager:
             torch.digitize = torch.bucketize
             torch.ravel_multi_index = ravel_multi_index
             torch.Tensor.astype = lambda self, type: self.to(dtype=type)
+            torch.transpose = torch.permute
             return torch
 
     @classmethod
@@ -163,6 +164,19 @@ class BackendManager:
             return cupy.random.randn
         elif cls.backend_name == "torch":
             return lambda *args, **kargs: torch.randn(
+                *args, **kargs, dtype=torch.float64, device=cls.device
+            )
+        else:
+            raise Exception("No backend set")
+
+    @classmethod
+    def get_rand(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return numpy.random.rand
+        elif cls.backend_name == "cupy":
+            return cupy.random.rand
+        elif cls.backend_name == "torch":
+            return lambda *args, **kargs: torch.rand(
                 *args, **kargs, dtype=torch.float64, device=cls.device
             )
         else:

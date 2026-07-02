@@ -1,4 +1,7 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+
+np = BackendManager.get_backend()
+
 from numpy.testing import assert_allclose
 from debiased_spatial_whittle.models.old import exp_cov
 from debiased_spatial_whittle.sampling.old import sim_circ_embedding
@@ -36,7 +39,7 @@ def test_autocov_1():
     cov_func = lambda x: x
     shape = (3,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0.0, 1.0, 2.0, -2.0, -1.0])
+    assert np.all(acv == np.array([0.0, 1.0, 2.0, -2.0, -1.0]))
 
 
 def test_autocov_2():
@@ -47,7 +50,7 @@ def test_autocov_2():
     cov_func = lambda x: x
     shape = (4,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0])
+    assert np.all(acv == np.array([0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0]))
 
 
 def test_compare_to_mean():
@@ -249,12 +252,8 @@ def test_gradient_expected_periodogram():
     ep1 = ep_op(model)
     model.rho = model.rho + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(
-        model,
-        [
-            model.param.rho,
-        ],
-    )[:, :, 0]
+    jac = ep_op.jacobian(model)
+    g = jac[f'{model.name}_rho']
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-3)
 
@@ -273,21 +272,18 @@ def test_gradient_expected_periodogram_bivariate():
     bvm = BivariateUniformCorrelation(model)
     bvm.r = 0.1
     bvm.f = 1.2
-    params_for_grad = [
-        bvm.param.r,
-    ]
-    ep_grad = ep_op.gradient(bvm, params_for_grad)
+    param_name = f'{bvm.name}_r'
+    jac = ep_op.jacobian(bvm)
     ep = ep_op(bvm)
     epsilon = 1e-6
-    for i, p in enumerate(params_for_grad):
-        print(p.name)
-        old_value = getattr(bvm, p.name)
-        new_value = old_value + epsilon
-        setattr(bvm, p.name, new_value)
-        ep2 = ep_op(bvm)
-        grad_num = (ep2 - ep) / epsilon
-        assert_allclose(ep_grad[..., i, :, :], grad_num, rtol=0.001)
-        setattr(bvm, p.name, old_value)
+    print(param_name)
+    old_value = getattr(bvm, 'r')
+    new_value = old_value + epsilon
+    setattr(bvm, 'r', new_value)
+    ep2 = ep_op(bvm)
+    grad_num = (ep2 - ep) / epsilon
+    assert_allclose(jac[param_name], grad_num, rtol=0.001)
+    setattr(bvm, 'r', old_value)
 
 
 def test_gradient_expected_periodogram_sqExpCov():
@@ -306,12 +302,8 @@ def test_gradient_expected_periodogram_sqExpCov():
     ep1 = ep_op(model)
     model.rho = model.rho + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(
-        model,
-        [
-            model.param.rho,
-        ],
-    )[:, :, 0]
+    jac = ep_op.jacobian(model)
+    g = jac[f'{model.name}_rho']
     g2 = (ep2 - ep1) / epsilon
     assert_allclose(g, g2, rtol=1e-2)
 

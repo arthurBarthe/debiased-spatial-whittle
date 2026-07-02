@@ -4,7 +4,7 @@
 # ##Imports
 
 from debiased_spatial_whittle.backend import BackendManager
-BackendManager.set_backend("numpy")
+BackendManager.set_backend("torch")
 xp = BackendManager.get_backend()
 
 import matplotlib.pyplot as plt
@@ -14,13 +14,14 @@ from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGri
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
 
+import torch
 # ##Model Specification
-model = NuggetModel(SquaredExponentialModel(rho=10., sigma=0.9),
-                    nugget=0.1)
+model = NuggetModel(SquaredExponentialModel(rho=torch.tensor([10., ]), sigma=torch.tensor([0.9, ])),
+                    nugget=torch.tensor([0.1, ]))
 
 # ##Grid specification
 
-m = 128
+m = 32
 shape = (m * 1, m * 1)
 x_0, y_0, diameter = m // 2, m // 2, m
 x, y = xp.meshgrid(xp.arange(shape[0]), xp.arange(shape[1]), indexing="ij")

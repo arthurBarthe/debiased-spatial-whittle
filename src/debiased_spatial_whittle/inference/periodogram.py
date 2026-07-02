@@ -7,10 +7,10 @@ from typing import Tuple
 from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.utils import prod_list
 
-fft = xp.fft.fft
-fftn = xp.fft.fftn
-ifftshift = xp.fft.ifftshift
+fftn, ifftn = BackendManager.get_fft_methods()
+fftshift, ifftshift = BackendManager.get_fftshift_methods()
 ndarray = xp.ndarray
+arange = BackendManager.get_arange()
 
 
 def autocov(cov_func, shape):
@@ -18,10 +18,8 @@ def autocov(cov_func, shape):
     In d=1 the lags would be -(n-1)...n-1, but then a iffshit is applied so that the lags are
     0 ... n-1 -n+1 ... -1. This may look weird but it makes it easier to do the folding operation
     when computing the expecting periodogram"""
-    xs = xp.meshgrid(*(xp.arange(-n + 1, n) for n in shape), indexing="ij")
-    if BackendManager.backend_name == "torch":
-        # TODO this is a temporary solution, not ideal though
-        xs = xs.to(device=BackendManager.device)
+    xs = xp.meshgrid(*(arange(-n + 1, n) for n in shape), indexing="ij")
+    xs = xp.stack(xs)
     return ifftshift(cov_func(xs))
 
 
@@ -136,7 +134,7 @@ def compute_ep_old(cov_func, grid, fold=True):
 
 ####NEW OOP VERSION
 from typing import Union
-from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelInterface
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
 
@@ -374,6 +372,8 @@ class ExpectedPeriodogram:
             Whether to apply folding of the expected periodogram
         d
             Offset that identifies a hyper-diagonal of the covariance matrix of the DFT.
+        apply_cg
+            Whether to multiply acv if the grid's kernel.
 
         Returns
         -------
@@ -388,18 +388,13 @@ class ExpectedPeriodogram:
         grid = self.grid
         shape = grid.n
         n_dim = grid.ndim
-        p = grid.nvars
         # In the case of a complete grid, cg takes a closed form given by the triangle kernel
         if d == (0, 0):
             cg = grid.spatial_kernel(self.taper)
         else:
             cg = spatial_kernel(self.grid.mask, d)
-        if p == 1:
-            # scalar field. We might have acv.ndim - n_dim > 0 for vectorized models or for gradients
-            cg = xp.reshape(cg, cg.shape + (1,) * (acv.ndim - n_dim))
-        else:
-            # multivariate field.
-            for i in range(acv.ndim - n_dim - 2):
+        if acv.ndim > cg.ndim:
+            for i in range(acv.ndim - cg.ndim):
                 cg = xp.expand_dims(cg, n_dim)
         cbar = acv
         if apply_cg:
@@ -480,33 +475,30 @@ class ExpectedPeriodogram:
             out = xp.reshape(out, grid.n)
         return out
 
-    def gradient(self, model: CovarianceModel, params: list[ModelParameter]) -> ndarray:
+    def jacobian(self, model: ModelInterface, param_names = None):
         """
-        Provides the gradient of the expected periodogram with respect to the parameters of the model
-        at all frequencies of the Fourier grid. The last dimension of the returned array indexes the parameters.
+        Evaluate the jacobian of the expected periodogram with respect to the model's parameters.
 
-        Parameters
-        ----------
-        model: CovarianceModel
-            Covariance model. It should implement the gradient method.
-
-        params: Parameters
-            Parameters with which to take the gradient.
-
-        Returns
-        -------
-        gradient: ndarray
-            Array providing the gradient of the expected periodogram at all Fourier frequencies with respect
-            to the requested parameters. The last dimension of the returned array indexes the parameters.
-
-        Notes
-        -----
-        This requires that the model's _gradient method be implemented.
+        Examples
+        --------
+        >>> import torch
+        >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+        >>> model = SquaredExponentialModel(name="model", rho=torch.tensor(12.))
+        >>> periodogram = Periodogram()
+        >>> grid = RectangularGrid((256, 512))
+        >>> ep = ExpectedPeriodogram(grid, periodogram)
+        >>> ep.jacobian(model)[model.parameter_names[0]].shape
+        torch.Size([256, 512])
         """
         lags = self.grid.lags_unique
-        d_acv = model.gradient(lags, params)
-        aux = ifftshift(d_acv, list(range(lags.shape[0])))
-        return self.compute_ep(aux, self.periodogram.fold)
+        ndim = lags.shape[0]
+        d_acv = model.jacobian(lags, param_names=param_names)
+        d_acv_values = xp.stack(tuple(d_acv.values()), ndim)
+        aux = ifftshift(d_acv_values, list(range(lags.shape[0])))
+        d_ep = self.compute_ep(aux, self.periodogram.fold)
+        d_ep = xp.swapdims(d_ep, ndim, -1)
+        return dict(zip(d_acv.keys(), [d_ep[..., i] for i in range(d_ep.shape[-1])]))
 
     def cov_dft_matrix(self, model: CovarianceModel):
         r"""
@@ -544,7 +536,7 @@ class ExpectedPeriodogram:
             return mat_t
 
         c_x = self.grid.covariance_matrix(model).reshape((-1, n[0], n[1]))
-        # applies the multi-dimensional DFT on the rows
+        # applies the multidimensional DFT on the rows
         temp = fftn(c_x, axes=(1, 2))
         # flattens out the rows again, transposes, and again reshapes
         temp_T = transpose(temp)
@@ -577,8 +569,8 @@ class ExpectedPeriodogram:
 
         c_x = self.grid.covariance_matrix(model).reshape((-1, n[0], n[1]))
         temp = fftn(c_x, axes=(1, 2))
-        temp_T = transpose(temp)
-        temp2 = fftn(temp_T, axes=(1, 2))
+        temp_t = transpose(temp)
+        temp2 = fftn(temp_t, axes=(1, 2))
         temp2 = transpose(temp2)
         return temp2 / n[0] / n[1]
 

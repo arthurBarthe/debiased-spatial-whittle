@@ -6,7 +6,7 @@ from torch.autograd.functional import jacobian
 
 class ModelParameter:
     def __init__(self, default, bounds=(None, None), doc=""):
-        self.default = default
+        self.default = xp.asarray(default).astype(xp.float64)
         self.bounds = bounds
         self.doc = doc
 
@@ -58,6 +58,7 @@ class ModelInterface:
     def n_free_parameters(self):
         return len(self.free_parameters)
 
+    @property
     def free_parameter_bounds(self):
         raise NotImplementedError()
 
@@ -82,6 +83,9 @@ class ModelInterface:
         for param_name, param_value in name_values.items():
             self.set_parameter(param_name, param_value)
 
+    def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
+        raise NotImplementedError()
+
     # methods useful for optimizers --------------------
 
     def update_free_parameters(self, values):
@@ -104,9 +108,18 @@ class ModelInterface:
         raise NotImplementedError()
 
     def __call__(self, lags: xp.ndarray) -> xp.ndarray:
-        lags = xp.asarray(lags)
+        ndim = lags.ndim
+        lags = xp.expand_dims(lags, -1)
         params = self.parameters
-        return self.compute(lags, *params)
+        out = self.compute(lags, *params)
+        if out.shape[ndim - 1] == 1:
+            out = xp.squeeze(out, ndim - 1)
+        return out
+
+    def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None):
+        """
+        Evaluate the covariance matrix between two sets of locations.
+        """
 
     def jacobian(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
         """Obtain the jacobian of covariance values at lags with respect to the passed parameters"""
@@ -157,6 +170,7 @@ class CovarianceModel(ModelInterface):
             out.extend(child.parameters)
         return tuple(out)
 
+    @property
     def free_parameter_bounds(self):
         out = []
         for param_name in self._parameters:
@@ -164,10 +178,11 @@ class CovarianceModel(ModelInterface):
                 out.append(getattr(self.__class__, param_name).bounds)
         for child in self.children:
             out.extend(child.free_parameter_bounds())
+        return out
 
     # old method name
     def free_parameter_bounds_to_list_deep(self):
-        return self.free_parameter_bounds()
+        return self.free_parameter_bounds
 
     @property
     def parameter_names(self) -> tuple:
@@ -211,6 +226,10 @@ class CovarianceModel(ModelInterface):
                     return True
             return False
 
+    def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
+        # TODO
+        pass
+
     def freeze_parameter(self, name):
         model_name, param_name = name.split("_")
         if model_name == self.name:
@@ -223,11 +242,44 @@ class CovarianceModel(ModelInterface):
                     return True
             return False
 
+    def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None):
+        """
+        Compute the covariance matrix between between points in x1 and points in x2.
+
+        Parameters
+        ----------
+        x1
+            shape (n1, d), first set of locations
+        x2
+            shape (n2, d), second set of locations
+
+        Returns
+        -------
+        covmat
+            shape (n1, n2), covariance matrix
+        """
+        if x2 is None:
+            x2 = x1
+        x1 = xp.expand_dims(x1, axis=1)
+        x2 = xp.expand_dims(x2, axis=0)
+        lags = x1 - x2
+        lags = xp.transpose(lags, (2, 0, 1))
+        return self(lags)
+
+
     def jacobian(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
         if param_names is None:
             param_names = self.parameter_names
         param_values = self.get_parameters(param_names)
-        out = jacobian(lambda *args: self.compute(lags, *args), param_values, strategy="forward-mode", vectorize=True)
+        def func(*args):
+            full_args = []
+            for param_name in self.parameter_names:
+                if param_name in param_names:
+                    full_args.append(args[param_names.index(param_name)])
+                else:
+                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
+            return self.compute(lags, *full_args)
+        out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
         return dict(zip(param_names, out))
 
     def _split_children_params(self, *params):
@@ -294,7 +346,15 @@ class CovarianceModel(ModelInterface):
         html.append('</div>')
         return '\n'.join(html)
 
+    # ------------ backward compatibility ---------
+    def fix_parameter(self, param_name: str):
+        self.freeze_parameter(f'{self.name}_{param_name}')
+
 
 class BaseCovarianceModel(CovarianceModel):
     def __init__(self, *params, name=None):
         super().__init__((), *params, name=name)
+
+
+class SeparableModel:
+    pass
