@@ -427,8 +427,7 @@ class DebiasedWhittle:
     def jmatrix(
         self,
         model: CovarianceModel,
-        params_for_gradient: list[ModelParameter],
-        mcmc_mode: bool = False,
+        param_names: list[str] = None,
     ):
         """
         Provides the variance matrix of the score (gradient of likelihood) under the specified model.
@@ -437,39 +436,32 @@ class DebiasedWhittle:
         ----------
         model
             Covariance model
-        params_for_gradient
-            Parameters with respect to which we take the derivative
-        mcmc_mode
-            Whether we use mcmc approximation
+        param_names
+            Parameter names with respect to which we take the derivative
         Returns
         -------
         np.ndarray
-            The predicted covariance matrix of the score, with parameters ordered according to params_for_gradient
+            The predicted covariance matrix of the score, with parameters ordered according to param_names
         """
-        n_params = len(params_for_gradient)
+        if param_names is None:
+            param_names = model.parameter_names
+        n_params = len(param_names)
         jmat = xp.zeros((n_params, n_params))
         grid = self.expected_periodogram.grid
         n1, n2 = grid.n
         covariance_fft = CovarianceFFT(grid)
-        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
+        d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
         ep = self.expected_periodogram(model)
 
         for i in range(n_params):
             for j in range(n_params):
-                # TODO get rid of repeated computations for efficiency
-                d_epi = xp.take(d_ep, i, -1)
-                d_epj = xp.take(d_ep, j, -1)
-                if not mcmc_mode:
-                    s1 = covariance_fft.exact_summation1(
-                        model, self.expected_periodogram, d_epi / ep**2, d_epj / ep**2
-                    )
-                else:
-                    mcmc = McmcDiags(
-                        model, self.expected_periodogram, d_epi / ep, d_epj / ep
-                    )
-                    mcmc.run(500)
-                    s1 = mcmc.estimate()
-                # s2 = covariance_fft.exact_summation2(model, self.expected_periodogram, d_epi/ expected_periodogram**2, d_epj / expected_periodogram**2)
+                # Get derivatives for each parameter from the dict
+                d_epi = d_ep[param_names[i]]
+                d_epj = d_ep[param_names[j]]
+                s1 = covariance_fft.exact_summation1(
+                    model, self.expected_periodogram, d_epi / ep**2, d_epj / ep**2
+                )
+                # s2 = covariance_fft.exact_summation2(model, self.expected_periodogram, d_epi/ ep**2, d_epj / ep**2)
                 s2 = s1
                 print(f"{s1=}, {s2=}")
                 jmat[i, j] = 1 / (n1 * n2) ** 2 * (s1 + s2)
