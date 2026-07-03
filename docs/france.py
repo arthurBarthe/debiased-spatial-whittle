@@ -15,7 +15,7 @@ from debiased_spatial_whittle.grids.old import ImgGrid
 
 # ##Model specification
 
-model = SpectralMatern(rho=15, nu=2.0)
+model = SpectralMatern(rho=15, nu=1.5)
 
 # ##Grid specification
 
@@ -40,6 +40,7 @@ debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
 model_est = SpectralMatern()
-model_est.set_param_bounds(dict(rho=(3, 50), nu=(0.5, 5)))
+model_est.set_parameter_bounds("SpectralMatern_rho", (1., 100.))
+model_est.set_parameter_bounds("SpectralMatern_nu", (.1, 10.))
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
 print(estimate.rho)

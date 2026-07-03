@@ -1,5 +1,5 @@
 from debiased_spatial_whittle.backend import BackendManager
-from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
+from debiased_spatial_whittle.models.base import BaseCovarianceModel, ModelParameter
 from abc import ABCMeta, abstractmethod
 
 xp = BackendManager.get_backend()
@@ -8,7 +8,7 @@ arange = BackendManager.get_arange()
 gamma = BackendManager.get_gamma()
 
 
-class SpectralModel(CovarianceModel):
+class SpectralModel(BaseCovarianceModel):
     """
     Base class to define a covariance model from a spectral density function.
     """
@@ -29,25 +29,59 @@ class SpectralModel(CovarianceModel):
         """
         raise NotImplementedError()
 
-    def __call__(self, lags: xp.ndarray):
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
         """
-        Compute an approximation to the covariance function evaluated at the passed lags based on the spectral
-        density function.
-
-        Currently, not implemented: we only provide an implementation in the case where the lags are those
-        of a grid, cf method call_on_rectangular_grid.
-
+        Compute covariance from spectral density by creating an embedding grid.
+        
         Parameters
         ----------
-        lags
-            shape (d, n1, n2, ..., nk)
-
+        lags : xp.ndarray
+            Array of lag vectors, shape (d, n1, n2, ..., nk) where d is the dimension
+        *params : tuple
+            Model parameters
+            
         Returns
         -------
-        cov
-            shape (n1, ..., nk). Approximate values of the covariance function
+        xp.ndarray
+            Covariance values at the lags, shape (n1, n2, ..., nk)
         """
-        raise NotImplementedError()
+        from debiased_spatial_whittle.grids.base import RectangularGrid
+        
+        # lags shape: (d, n1, n2, ..., nk)
+        # We need to create a grid that covers all lags
+        
+        # Get the dimension and the number of lag points
+        d = lags.shape[0]  # spatial dimension
+        lag_shape = lags.shape[1:]  # shape of lag points (n1, n2, ..., nk)
+        
+        # Flatten lags to find min and max along each dimension
+        # Reshape lags to (d, -1) to process all lag points together
+        lags_flat = lags.reshape(d, -1)  # shape (d, N)
+        
+        # For each dimension, find the min and max lag
+        min_lags = xp.min(xp.abs(lags_flat[:, xp.all(lags_flat > 0, 0)]), axis=1)  # shape (d,)
+        max_lags = xp.max(lags_flat, axis=1)  # shape (d,)
+
+        grid_delta = min_lags / 2
+        grid_n = (max_lags / grid_delta).astype(int)
+        
+        # Create the embedding grid
+        grid = RectangularGrid(tuple(grid_n), delta=tuple(grid_delta))
+        
+        # Evaluate the model on the grid
+        cov_on_grid = self.call_on_rectangular_grid(grid)
+        
+        # Map lags to grid indices
+        indices = []
+        for dim in range(d):
+            lags_dim = lags[dim]
+            indices_dim = xp.round(lags_dim / grid_delta[dim]).astype(int)
+            indices.append(indices_dim)
+        
+        # Extract values from cov_on_grid
+        result = cov_on_grid[tuple(indices)]
+        
+        return result
 
     def call_on_rectangular_grid(self, grid):
         fftfreq = xp.fft.fftfreq
@@ -85,8 +119,8 @@ class SpectralMatern(SpectralModel):
     rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="range parameter")
     nu = ModelParameter(default=0.5, bounds=(0.5, xp.inf), doc="slope parameter")
 
-    def __init__(self, *args, **kwargs):
-        super(SpectralMatern, self).__init__(*args, **kwargs)
+    def __init__(self, rho=None, nu=None, name=None):
+        super().__init__(rho, nu, name=name)
 
     def spectral_density(self, frequencies: xp.ndarray) -> xp.ndarray:
         """
