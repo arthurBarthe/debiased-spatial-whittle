@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from debiased_spatial_whittle.backend import BackendManager
 xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
@@ -34,21 +35,20 @@ class ModelParameter:
 
 
 
-class ModelInterface:
+class ModelInterface(ABC):
     @property
+    @abstractmethod
     def name(self):
         raise NotImplementedError()
 
     @name.setter
+    @abstractmethod
     def name(self, value):
-        raise NotImplementedError()
-
-    def _build_name(self, name):
         raise NotImplementedError()
 
     @property
     def parameters(self) -> tuple:
-        raise NotImplementedError()
+        return self.get_parameters(self.parameter_names)
 
     @property
     def n_parameters(self):
@@ -56,27 +56,32 @@ class ModelInterface:
 
     @property
     def free_parameters(self) -> tuple:
-        raise NotImplementedError()
+        return self.get_parameters(self.free_parameter_names)
 
     @property
     def n_free_parameters(self):
         return len(self.free_parameters)
 
     @property
+    @abstractmethod
     def free_parameter_bounds(self):
         raise NotImplementedError()
 
     @property
+    @abstractmethod
     def parameter_names(self) -> tuple:
         raise NotImplementedError()
 
     @property
+    @abstractmethod
     def free_parameter_names(self) -> tuple:
         raise NotImplementedError()
 
+    @abstractmethod
     def get_parameter(self, name: str):
         raise NotImplementedError()
 
+    @abstractmethod
     def set_parameter(self, name, value) -> bool:
         raise NotImplementedError()
 
@@ -87,6 +92,7 @@ class ModelInterface:
         for param_name, param_value in name_values.items():
             self.set_parameter(param_name, param_value)
 
+    @abstractmethod
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
         raise NotImplementedError()
 
@@ -101,9 +107,11 @@ class ModelInterface:
 
     # --------------------------------------------------
 
+    @abstractmethod
     def freeze_parameter(self, name, value) -> bool:
         raise NotImplementedError()
 
+    @abstractmethod
     def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
         """
         Here we expect the model parameters to be passed via param_args.
@@ -122,16 +130,50 @@ class ModelInterface:
 
     def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None):
         """
-        Evaluate the covariance matrix between two sets of locations.
+        Compute the covariance matrix between between points in x1 and points in x2.
+
+        Parameters
+        ----------
+        x1
+            shape (n1, d), first set of locations
+        x2
+            shape (n2, d), second set of locations
+
+        Returns
+        -------
+        covmat
+            shape (n1, n2), covariance matrix
         """
+        if x2 is None:
+            x2 = x1
+        x1 = xp.expand_dims(x1, axis=1)
+        x2 = xp.expand_dims(x2, axis=0)
+        lags = x1 - x2
+        lags = xp.transpose(lags, (2, 0, 1))
+        return self(lags)
 
     def jacobian(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
-        """Obtain the jacobian of covariance values at lags with respect to the passed parameters"""
-        raise NotImplementedError()
+        if param_names is None:
+            param_names = self.parameter_names
+        param_values = self.get_parameters(param_names)
 
+        def func(*args):
+            full_args = []
+            for param_name in self.parameter_names:
+                if param_name in param_names:
+                    full_args.append(args[param_names.index(param_name)])
+                else:
+                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
+            return self.compute(lags, *full_args)
+
+        out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
+        return dict(zip(param_names, out))
+
+    @abstractmethod
     def __add__(self, other):
         raise NotImplementedError()
 
+    @abstractmethod
     def __mul__(self, other):
         raise NotImplementedError()
 
@@ -141,7 +183,7 @@ class ModelInterface:
 class CovarianceModel(ModelInterface):
 
     def __init__(self, children: tuple[ModelInterface], *params, name: str = None):
-        self.name = self._build_name(name)
+        self.name = name
         self._frozen_parameters = []
         self.children = children
         self.assign_params(*params)
@@ -156,29 +198,7 @@ class CovarianceModel(ModelInterface):
 
     @name.setter
     def name(self, value):
-        self._name = value
-
-    def _build_name(self, name):
-        return name if name else self.__class__.__name__
-
-    @property
-    def parameters(self) -> tuple:
-        out = []
-        for param_name in self._parameters:
-            out.append(getattr(self, param_name))
-        for child in self.children:
-            out.extend(child.parameters)
-        return tuple(out)
-
-    @property
-    def free_parameters(self) -> tuple:
-        out = []
-        for param_name in self._parameters:
-            if not param_name in self._frozen_parameters:
-                out.append(getattr(self, param_name))
-        for child in self.children:
-            out.extend(child.parameters)
-        return tuple(out)
+        self._name = value if value else self.__class__.__name__
 
     @property
     def free_parameter_bounds(self):
@@ -260,46 +280,6 @@ class CovarianceModel(ModelInterface):
                 if value:
                     return True
             return False
-
-    def cov_mat_x1_x2(self, x1: xp.ndarray, x2: xp.ndarray = None):
-        """
-        Compute the covariance matrix between between points in x1 and points in x2.
-
-        Parameters
-        ----------
-        x1
-            shape (n1, d), first set of locations
-        x2
-            shape (n2, d), second set of locations
-
-        Returns
-        -------
-        covmat
-            shape (n1, n2), covariance matrix
-        """
-        if x2 is None:
-            x2 = x1
-        x1 = xp.expand_dims(x1, axis=1)
-        x2 = xp.expand_dims(x2, axis=0)
-        lags = x1 - x2
-        lags = xp.transpose(lags, (2, 0, 1))
-        return self(lags)
-
-
-    def jacobian(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
-        if param_names is None:
-            param_names = self.parameter_names
-        param_values = self.get_parameters(param_names)
-        def func(*args):
-            full_args = []
-            for param_name in self.parameter_names:
-                if param_name in param_names:
-                    full_args.append(args[param_names.index(param_name)])
-                else:
-                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
-            return self.compute(lags, *full_args)
-        out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
-        return dict(zip(param_names, out))
 
     def __add__(self, other):
         return SumModel(self, other)
@@ -485,5 +465,117 @@ class ProductModel(CovarianceModel):
         return result
 
 
+class ReparameterizedModel(ModelInterface, ABC):
+    """
+    Class that allows to use an alternative parameterization of a base model.
+    """
+    def __init__(self, base_model: ModelInterface, name: str = None):
+        self.base_model = base_model
+        self._parameter_bounds = []
+        self._frozen_parameters = []
+        self.name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        name = name if name else self.__class__.__name__
+        self._name = name
+
+    def map_parameters(self, *params):
+        raise NotImplementedError()
+
+    def imap_parameters(self, *base_model_params):
+        raise NotImplementedError()
+
+    @property
+    def parameters(self):
+        return self.imap_parameters(*self.base_model.parameters)
+
+    @property
+    def n_parameters(self):
+        return len(self.parameters)
+
+    def get_parameter(self, name: str) -> xp.ndarray:
+        return self.parameters[self.base_model.parameter_names.index(name)]
+
+    def set_parameter(self, name: str, value: xp.ndarray):
+        current_parameters = self.parameters
+        new_parameters = [current_parameters[i] if name != pname else value for i, pname in enumerate(self.free_parameter_names)]
+        self.base_model.set_parameters(dict(zip(self.base_model.parameter_names, self.map_parameters(new_parameters))))
+
+    def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
+        self._parameter_bounds.append(bounds)
+
+    @property
+    def free_parameter_bounds(self):
+        return [self._parameter_bounds[pname] for pname in self.free_parameter_names]
+
+    @property
+    def n_free_parameters(self):
+        return len(self.free_parameters)
+
+    @property
+    def parameter_names(self):
+        raise NotImplementedError()
+
+    @property
+    def free_parameter_names(self) -> tuple:
+        return tuple(filter(lambda pname: pname not in self._frozen_parameters, self.parameter_names))
+
+    def freeze_parameter(self, name: str):
+        self._frozen_parameters.append(name)
+
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
+        base_model_params = self.map_parameters(*params)
+        return self.base_model.compute(lags, *base_model_params)
+
+    def __add__(self, other):
+        return SumModel(self, other)
+
+    def __mul__(self, other):
+        return ProductModel(self, other)
+
+
+class LogScaleReparameterizedModel(ReparameterizedModel):
+    """
+    Class that allows to use a log scale parameterization of a base model.
+    """
+    def __init__(self, base_model: ModelInterface):
+        super().__init__(base_model)
+
+    def map_parameters(self, *params):
+        params_array = xp.stack(params)
+        mapped_params = xp.exp(params_array)
+        return xp.split(mapped_params, 1)
+
+    def imap_parameters(self, *params):
+        params_array = xp.stack(params)
+        mapped_params = xp.log(params_array)
+        return xp.split(mapped_params, 1)
+
+    @property
+    def parameter_names(self):
+        return self.base_model.parameter_names
+
+    @property
+    def free_parameter_names(self):
+        return self.base_model.free_parameter_names
+
+
 class SeparableModel:
     pass
+
+
+if __name__ == "__main__":
+    from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+    model = SquaredExponentialModel(rho=32)
+    mm = LogScaleReparameterizedModel(model)
+    print(mm.parameters)
+    lags = xp.array([[0., 0., 0.], [0., 1., 2.]])
+    print(model(lags))
+    print(mm(lags))
+    print(model.jacobian(lags))
+    print(mm.jacobian(lags))
