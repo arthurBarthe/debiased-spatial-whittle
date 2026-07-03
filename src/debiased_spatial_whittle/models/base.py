@@ -1,5 +1,6 @@
 from debiased_spatial_whittle.backend import BackendManager
 xp = BackendManager.get_backend()
+inv = BackendManager.get_inv()
 
 from torch.autograd.functional import jacobian
 
@@ -128,6 +129,12 @@ class ModelInterface:
         """Obtain the jacobian of covariance values at lags with respect to the passed parameters"""
         raise NotImplementedError()
 
+    def __add__(self, other):
+        raise NotImplementedError()
+
+    def __mul__(self, other):
+        raise NotImplementedError()
+
 
 
 
@@ -242,10 +249,6 @@ class CovarianceModel(ModelInterface):
                     return True
             return False
 
-    def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
-        # TODO
-        pass
-
     def freeze_parameter(self, name):
         model_name, param_name = name.split("_")
         if model_name == self.name:
@@ -298,12 +301,19 @@ class CovarianceModel(ModelInterface):
         out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
         return dict(zip(param_names, out))
 
+    def __add__(self, other):
+        return SumModel(self, other)
+
+    def __mul__(self, other):
+        return ProductModel(self, other)
+
     def _split_children_params(self, *params):
         out = []
         for child in self.children:
             n_params = child.n_parameters
             temp, params = params[:n_params], params[n_params:]
             out.append(temp)
+        return out
 
     def __repr__(self):
         """Text representation of the model showing tree structure, parameter names, values, and fixed status."""
@@ -362,6 +372,53 @@ class CovarianceModel(ModelInterface):
         html.append('</div>')
         return '\n'.join(html)
 
+    def predict(
+            self,
+            x_obs: xp.ndarray,
+            y_obs: xp.ndarray,
+            x_pred: xp.ndarray,
+            return_variance: bool = False,
+    ):
+        """
+        Compute conditional mean at a set of locations x_pred given values y_obs observed at x_obs.
+
+        Parameters
+        ----------
+        x_obs
+            shape (n_obs, d), array of locations where observations are made
+        y_obs
+            shape (n_obs, 1), observed values
+        x_pred
+            shape (n_pred, d), array of locations where predicted values are requested
+
+        Returns
+        -------
+        y_pred
+            shape (n_pred, 1), array of predicted values
+        """
+        x_obs = xp.expand_dims(x_obs, 1)
+        # x_obs (n_obs, 1, d)
+        lags_xx = x_obs - xp.transpose(x_obs, (1, 0, 2))
+        # lags_xx (n_obs, n_obs, d)
+
+        cov_mat_xx = self(xp.transpose(lags_xx, (2, 0, 1)))
+        # cov_mat_xx (n_obs, n_obs)
+        cov_mat_xx_inv = inv(cov_mat_xx)
+
+        x_pred = xp.expand_dims(x_pred, 1)
+        # x_pred (n_pred, 1, d)
+
+        lags_yx = x_pred - xp.transpose(x_obs, (1, 0, 2))
+        # lags_yx (n_pred, n_obs, d)
+
+        sigma_yx = self(xp.transpose(lags_yx, (2, 0, 1)))
+        # sigma_yx (n_pred, n_obs)
+
+        weights = xp.dot(sigma_yx, cov_mat_xx_inv)
+        # weights (n_pred, n_obs)
+        y_pred = xp.matmul(weights, y_obs)
+        return y_pred
+
     # ------------ backward compatibility ---------
     def fix_parameter(self, param_name: str):
         self.freeze_parameter(f'{self.name}_{param_name}')
@@ -370,6 +427,62 @@ class CovarianceModel(ModelInterface):
 class BaseCovarianceModel(CovarianceModel):
     def __init__(self, *params, name=None):
         super().__init__((), *params, name=name)
+
+
+class SumModel(CovarianceModel):
+    """
+    A covariance model that represents the sum of multiple covariance models.
+    The compute method returns the sum of the covariances of the children.
+    """
+    _parameters = []
+    
+    def __init__(self, *models, name: str = None):
+        # SumModel itself has no parameters, only children
+        children = []
+        for child in models:
+            if isinstance(child, SumModel):
+                children.extend(child.children)
+            else:
+                children.append(child)
+        super().__init__(children, name=name)
+
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
+        """
+        Compute the sum of covariances from all child models.
+        """
+        child_params = self._split_children_params(*params)
+        result = self.children[0].compute(lags, *child_params[0])
+        for child, child_param in zip(self.children[1:], child_params[1:]):
+            result += child.compute(lags, *child_param)
+        return result
+
+
+class ProductModel(CovarianceModel):
+    """
+    A covariance model that represents the product of multiple covariance models.
+    The compute method returns the product of the covariances of the children.
+    """
+    _parameters = []
+    
+    def __init__(self, *models, name: str = None):
+        # ProductModel itself has no parameters, only children
+        children = []
+        for child in models:
+            if isinstance(child, ProductModel):
+                children.extend(child.children)
+            else:
+                children.append(child)
+        super().__init__(children, name=name)
+
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
+        """
+        Compute the product of covariances from all child models.
+        """
+        child_params = self._split_children_params(*params)
+        result = self.children[0].compute(lags, *child_params[0])
+        for child, child_param in zip(self.children[1:], child_params[1:]):
+            result *= child.compute(lags, *child_param)
+        return result
 
 
 class SeparableModel:
