@@ -264,3 +264,35 @@ class AnisotropicModel(CovarianceModel):
         lags = xp.squeeze(lags, -1)
         lags = xp.swapaxes(lags, 0, -1)
         return self.children[0].compute(lags, *child_params)
+
+
+class AmplitudeModel(CovarianceModel):
+    """
+    A model that applies an amplitude scaling to a base covariance model.
+    The covariance is scaled by sigma^2.
+    
+    Attributes
+    ----------
+    sigma : ModelParameter
+        Amplitude scaling parameter
+    
+    base_model : CovarianceModel
+        The base covariance model to scale
+    
+    Examples
+    --------
+    >>> base_model = ExponentialModel(rho=5)
+    >>> model = AmplitudeModel(base_model, sigma=2.0)
+    """
+    
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter")
+    
+    def __init__(self, base_model, sigma=None, name=None):
+        super().__init__((base_model,), sigma, name=name)
+    
+    @property
+    def base_model(self):
+        return self.children[0]
+    
+    def compute(self, lags: xp.ndarray, sigma: xp.ndarray, *params) -> xp.ndarray:
+        return sigma**2 * self.children[0].compute(lags, *params)
