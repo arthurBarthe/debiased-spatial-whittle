@@ -12,7 +12,7 @@ def test_jmat():
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=10, sigma=1)
-    jmat = d.jmatrix(model, [model.param.rho, model.param.sigma])
+    jmat = d.jmatrix(model, model.parameter_names)
     print(jmat)
     assert np.all(np.diag(jmat) >= 0)
 

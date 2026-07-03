@@ -86,7 +86,7 @@ class CovarianceFFT:
                 s.append(xp.sum(seq * f_seq / seq_ep))
         if return_terms:
             return xp.sum(s), xp.array(s)
-        return xp.sum(s)
+        return sum(s)
 
     def exact_summation2(
         self,

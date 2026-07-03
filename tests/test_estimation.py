@@ -1,4 +1,6 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from numpy.testing import assert_almost_equal
 from debiased_spatial_whittle.models.old import exp_cov
 from debiased_spatial_whittle.grids.base import RectangularGrid
@@ -145,6 +147,7 @@ def test_estimation_1d():
         z = sampler()
         e(model_est, z)
         estimates.append(model_est.rho)
+    estimates = np.asarray(estimates)
     assert np.abs(np.mean(estimates) - model.rho) <= 2
 
 

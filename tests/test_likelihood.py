@@ -197,23 +197,15 @@ def test_jmat():
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=2, sigma=1)
     sampler = SamplerOnRectangularGrid(model, g)
-    params = [model.param.rho, model.param.sigma]
-    print(params)
-    jmat = d.jmatrix(model, params)
-    n_samples = 1000
-    estimates = []
-    for i in range(n_samples):
-        z = sampler()
-        lkh, grad = d(z, model, params_for_gradient=params)
-        estimates.append(grad)
-    estimates = np.array(estimates)
-    sample_cov_mat = np.cov(estimates.T)
-    # sample_cov_mat = 1 / n_samples * np.dot(estimates.T, estimates)
+    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    print(param_names)
+    jmat = d.jmatrix(model, param_names=param_names)
+    jmat_sample = d.jmatrix_sample(model, param_names=param_names, n_sims=1000)
     print(jmat)
-    print(sample_cov_mat)
+    print(jmat_sample)
     assert_allclose(
         jmat,
-        sample_cov_mat,
+        jmat_sample,
         0.15,
     )
 
@@ -230,7 +222,8 @@ def test_covmat():
     model = ExponentialModel()
     model.sigma = 1
     model.rho = 2
-    covmat = e.covmat(model, [model.param.rho, model.param.sigma])
+    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    covmat = e.covmat(model, param_names=param_names)
     print(covmat)
     assert np.all(np.diag(covmat) >= 0)
 

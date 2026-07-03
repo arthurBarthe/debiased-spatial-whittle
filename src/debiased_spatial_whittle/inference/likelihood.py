@@ -751,7 +751,7 @@ class Estimator:
 
         return func
 
-    def covmat(self, model: CovarianceModel, params: list[ModelParameter] = None):
+    def covmat(self, model: CovarianceModel, param_names: str = None):
         """
         Compute an approximate covariance matrix of the parameter estimates under the specified covariance model.
 
@@ -760,7 +760,7 @@ class Estimator:
         model
             True covariance model
 
-        params
+        param_names
             estimated parameters
 
         Returns
@@ -768,6 +768,6 @@ class Estimator:
         covmat: ndarray
             Covariance matrix.
         """
-        jmat = self.likelihood.jmatrix(model, params)
-        hmat = self.likelihood.fisher(model, params)
+        jmat = self.likelihood.jmatrix_sample(model, param_names)
+        hmat = self.likelihood.fisher(model, param_names)
         return xp.dot(inv(hmat), xp.dot(jmat, inv(hmat)))

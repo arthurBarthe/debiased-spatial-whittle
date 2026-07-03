@@ -1,6 +1,7 @@
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
+randn = BackendManager.get_randn()
 
 from numpy.testing import assert_allclose
 from debiased_spatial_whittle.models.old import exp_cov
@@ -348,8 +349,8 @@ def test_cov_dft_quad():
     g = RectangularGrid(n)
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
-    f = np.random.randn(*n)
-    f2 = np.random.randn(*n)
+    f = randn(*n)
+    f2 = randn(*n)
     cov_mat = ep.cov_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
     cov_mat = np.abs(cov_mat) ** 2
     s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
@@ -399,8 +400,8 @@ def test_rel_dft_quad():
     g = RectangularGrid(n)
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
-    f = np.random.randn(*n)
-    f2 = np.random.randn(*n)
+    f = randn(*n)
+    f2 = randn(*n)
     cov_mat = ep.rel_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
     cov_mat = np.abs(cov_mat) ** 2
     s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
