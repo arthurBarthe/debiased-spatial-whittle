@@ -9,7 +9,7 @@ homepage = "http://arthurpgb.pythonanywhere.com/sdw"
 keywords = ["random fields", "statistics", "whittle", "spatial", "matern", "kriging", "interpolation"]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <4.0"
+python = ">=3.10, <4.0"
 numpy = "^1.21.5"
 matplotlib = "^3.7.0"
 scipy = "^1.7.3"
@@ -23,6 +23,8 @@ cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
 pytest-cov = "^6.2.1"
+notebook = "^7.6.0"
+rich = "^15.0.0"
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]
