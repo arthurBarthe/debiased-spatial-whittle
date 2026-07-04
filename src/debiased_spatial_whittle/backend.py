@@ -52,7 +52,7 @@ def ravel_multi_index(coords, shape):
 
 
 class BackendManager:
-    backend_name = "numpy"
+    backend_name = "torch"
     device = "cpu"
     block = False
 
@@ -108,7 +108,7 @@ class BackendManager:
         elif cls.backend_name == "torch":
             torch.to_cpu = lambda x: x.cpu()
             torch.item = lambda x: x.item()
-            torch.set_default_tensor_type(torch.DoubleTensor)
+            torch.set_default_dtype(torch.float64)
             torch.array = lambda x: torch.tensor(
                 x, dtype=torch.float64, device=cls.device
             )

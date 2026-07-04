@@ -70,18 +70,19 @@ class MultivariateDebiasedWhittle:
         model: CovarianceModel,
         params_for_gradient: list[ModelParameter] = None,
     ):
-        """
+        r"""
         Computes the Debiased Whittle likelihood for multivariate data.
         
-        The Whittle likelihood is given by:
+        The Whittle likelihood is given by
+
+        $$
+            \mathcal{L}(\theta) = \frac{1}{|D|} \sum_{k \in D} \left[ \log \det(f(k; \theta)) + \text{tr}\left(f(k; \theta)^{-1} I(k)\right) \right]
+        $$
+
+        where
         
-        .. math::
-            \\mathcal{L}(\\theta) = \\frac{1}{|D|} \\sum_{k \\in D} \\left[ \\log \\det(f(k; \\theta)) + \\text{tr}\\left(f(k; \\theta)^{-1} I(k)\\right) \\right]
-        
-        where:
-        
-        - :math:`\\theta` are the model parameters
-        - :math:`f(k; \\theta)` is the expected periodogram (spectral density) at frequency k
+        - :math:`\theta` are the model parameters
+        - :math:`f(k; \theta)` is the expected periodogram (spectral density) at frequency k
         - :math:`I(k)` is the observed periodogram at frequency k
         - :math:`D` is the set of frequencies
         
@@ -121,19 +122,20 @@ class MultivariateDebiasedWhittle:
         return whittle
 
     def gradient(self, sample, model, param_names=None):
-        """
+        r"""
         Compute the gradient of the Whittle likelihood with respect to model parameters.
         
-        The gradient of the Whittle likelihood with respect to a parameter :math:`\\theta_j` is:
+        The gradient of the Whittle likelihood with respect to a parameter :math:`\theta_j` is
+
+        $$
+            \frac{\partial \mathcal{L}}{\partial \theta_j} = \frac{1}{|D|} \sum_{k \in D} \left[ \text{tr}\left(f(k; \theta)^{-1} \frac{\partial f(k; \theta)}{\partial \theta_j}\right) - \text{tr}\left(f(k; \theta)^{-1} \frac{\partial f(k; \theta)}{\partial \theta_j} f(k; \theta)^{-1} I(k)\right) \right]
+        $$
+
+        where
         
-        .. math::
-            \\frac{\\partial \\mathcal{L}}{\\partial \\theta_j} = \\frac{1}{|D|} \\sum_{k \\in D} \\left[ \\text{tr}\\left(f(k; \\theta)^{-1} \\frac{\\partial f(k; \\theta)}{\\partial \\theta_j}\\right) - \\text{tr}\\left(f(k; \\theta)^{-1} \\frac{\\partial f(k; \\theta)}{\\partial \\theta_j} f(k; \\theta)^{-1} I(k)\\right) \\right]
-        
-        where:
-        
-        - :math:`f(k; \\theta)` is the expected periodogram
+        - :math:`f(k; \theta)` is the expected periodogram
         - :math:`I(k)` is the observed periodogram
-        - :math:`\\frac{\\partial f(k; \\theta)}{\\partial \\theta_j}` is the Jacobian of the expected periodogram
+        - :math:`\frac{\partial f(k; \theta)}{\partial \theta_j}` is the Jacobian of the expected periodogram
         
         Parameters
         ----------
