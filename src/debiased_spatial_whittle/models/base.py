@@ -18,7 +18,7 @@ except ImportError:
 
 class ModelParameter:
     def __init__(self, default, bounds=(None, None), doc=""):
-        self.default = xp.asarray(default).astype(xp.float64)
+        self.default = xp.squeeze(xp.asarray(default)).astype(xp.float64)
         self.bounds = bounds
         self.doc = doc
 
@@ -41,7 +41,7 @@ class ModelParameter:
         if hasattr(obj, '_frozen_parameters') and self.name in obj._frozen_parameters:
             raise ValueError(f"Parameter {self.name} is frozen and cannot be set.")
         if value is not None:
-            obj.__dict__[f"_{self.name}"] = xp.asarray(value).astype(xp.float64)
+            obj.__dict__[f"_{self.name}"] = xp.squeeze(xp.asarray(value)).astype(xp.float64)
 
 
 
@@ -612,6 +612,10 @@ class SeparableModel:
 
 
 if __name__ == "__main__":
+    from rich import print
+    import sys
+
+    sys.stdout.isatty = lambda: True
     from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
     model = SquaredExponentialModel(rho=32)
     print(model)
