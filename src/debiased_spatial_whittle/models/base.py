@@ -5,6 +5,16 @@ inv = BackendManager.get_inv()
 
 from torch.autograd.functional import jacobian
 
+try:
+    from rich import print
+    from rich.panel import Panel
+    from rich.tree import Tree
+    from rich.text import Text
+    from rich.style import Style
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+
 
 class ModelParameter:
     def __init__(self, default, bounds=(None, None), doc=""):
@@ -299,6 +309,36 @@ class CovarianceModel(ModelInterface):
         """Text representation of the model showing tree structure, parameter names, values, and fixed status."""
         return self._repr_tree()
     
+    def __rich__(self):
+        """Rich terminal representation for use with rich library."""
+        if RICH_AVAILABLE:
+            from rich.tree import Tree
+            class_name = self.__class__.__name__
+            tree = Tree(f"[bold blue]{self.name}[/bold blue] ([dim]{class_name}[/dim])")
+            self._build_rich_tree(tree)
+            return tree
+        return self._repr_tree()
+    
+    def _build_rich_tree(self, parent_tree):
+        """Recursively build rich tree structure."""
+        if not RICH_AVAILABLE:
+            return
+        
+        # Add parameters
+        if self._parameters:
+            params_tree = parent_tree.add("[bold]Parameters[/bold]")
+            for param_name in self._parameters:
+                param_value = getattr(self, param_name)
+                is_fixed = param_name in self._frozen_parameters
+                fixed_text = " [red](frozen)[/red]" if is_fixed else ""
+                params_tree.add(f"{param_name}: {param_value}{fixed_text}")
+        
+        # Add children recursively
+        for child in self.children:
+            child_class_name = child.__class__.__name__
+            child_tree = parent_tree.add(f"[bold cyan]{child.name}[/bold cyan] ([dim]{child_class_name}[/dim])")
+            child._build_rich_tree(child_tree)
+    
     def _repr_tree(self, prefix="", is_last=True):
         """Recursive helper for text representation."""
         lines = []
@@ -484,9 +524,11 @@ class ReparameterizedModel(ModelInterface, ABC):
         name = name if name else self.__class__.__name__
         self._name = name
 
+    @abstractmethod
     def map_parameters(self, *params):
         raise NotImplementedError()
 
+    @abstractmethod
     def imap_parameters(self, *base_model_params):
         raise NotImplementedError()
 
@@ -572,10 +614,7 @@ class SeparableModel:
 if __name__ == "__main__":
     from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
     model = SquaredExponentialModel(rho=32)
-    mm = LogScaleReparameterizedModel(model)
-    print(mm.parameters)
+    print(model)
     lags = xp.array([[0., 0., 0.], [0., 1., 2.]])
     print(model(lags))
-    print(mm(lags))
     print(model.jacobian(lags))
-    print(mm.jacobian(lags))

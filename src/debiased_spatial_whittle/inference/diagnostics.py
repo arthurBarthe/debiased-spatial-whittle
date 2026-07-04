@@ -1,5 +1,7 @@
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from functools import cached_property
-import numpy as np
 from scipy.stats import chisquare
 from matplotlib import pyplot as plt
 from debiased_spatial_whittle.models.base import CovarianceModel

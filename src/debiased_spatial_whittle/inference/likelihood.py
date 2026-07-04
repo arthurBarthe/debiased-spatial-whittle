@@ -77,30 +77,20 @@ class MultivariateDebiasedWhittle:
         if p.ndim == ep.ndim - 1:
             # multiple model parameter vectors
             p = xp.expand_dims(p, -3)
-        ep_inv = inv(ep)
+        try:
+            ep_inv = inv(ep)
+        except ValueError as e:
+            print(model)
+            raise e
         term1 = slogdet(ep)[1]
         ratio = xp.matmul(ep_inv, p)
-        if BackendManager.backend_name in ("numpy", "cupy"):
-            term2 = xp.trace(ratio, axis1=-2, axis2=-1)
-        elif BackendManager.backend_name == "torch":
-            term2 = xp.sum(xp.diagonal(ratio, dim1=-1, dim2=-2), -1)
+        # obtain the traces
+        term2 = xp.sum(xp.diagonal(ratio, 0, -1, -2), -1)
         whittle = xp.mean(term1 + term2, tuple(range(n_spatial_dim)))
         whittle = xp.real(whittle)
-        if BackendManager.backend_name == "torch" and not whittle.shape:
+        if not whittle.shape:
             whittle = whittle.item()
-        if not params_for_gradient:
-            return whittle
-        d_ep = self.expected_periodogram.gradient(model, params_for_gradient)
-        ep_inv = xp.expand_dims(ep_inv, -3)
-        p = xp.expand_dims(p, -3)
-        # the derivative of the log determinant
-        d_log_det = xp.trace(xp.matmul(ep_inv, d_ep), axis1=-2, axis2=-1)
-        # the derivative the second term
-        d_ep_inv = -xp.matmul(ep_inv, xp.matmul(d_ep, ep_inv))
-        d_quad_term = xp.trace(xp.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
-        # derivative
-        d_whittle = xp.mean(d_log_det + d_quad_term, axis=(0, 1))
-        return whittle, d_whittle
+        return whittle
 
     def gradient(self, sample, model, param_names=None):
         """
@@ -113,23 +103,14 @@ class MultivariateDebiasedWhittle:
         for param_name, d_ep_i in d_ep.items():
             ep_inv = inv(ep)
             # the derivative of the log determinant
-            if BackendManager.backend_name in ("numpy", "cupy"):
-                d_log_det = xp.trace(xp.matmul(ep_inv, d_ep_i), axis1=-2, axis2=-1)
-            elif BackendManager.backend_name == "torch":
-                d_log_det = xp.sum(xp.diagonal(xp.matmul(ep_inv, d_ep_i), dim1=-1, dim2=-2), -1)
+            d_log_det = xp.sum(xp.diagonal(xp.matmul(ep_inv, d_ep_i), dim1=-1, dim2=-2), -1)
             # the derivative the second term
             d_ep_inv = -xp.matmul(ep_inv, xp.matmul(d_ep_i, ep_inv))
-            if BackendManager.backend_name in ("numpy", "cupy"):
-                d_quad_term = xp.trace(xp.matmul(d_ep_inv, p), axis1=-2, axis2=-1)
-            elif BackendManager.backend_name == "torch":
-                d_quad_term = xp.sum(xp.diagonal(xp.matmul(d_ep_inv, p), dim1=-1, dim2=-2), -1)
+            d_quad_term = xp.sum(xp.diagonal(xp.matmul(d_ep_inv, p), dim1=-1, dim2=-2), -1)
             # derivative
             d_whittle = xp.mean(d_log_det + d_quad_term, axis=tuple(range(p.ndim - 2)))
             # Ensure scalar value for compatibility
-            if BackendManager.backend_name == "torch":
-                d_whittle = xp.real(d_whittle).item()
-            else:
-                d_whittle = xp.real(d_whittle)
+            d_whittle = xp.real(d_whittle).item()
             grad_dbw[param_name] = d_whittle
         return grad_dbw
 
@@ -402,7 +383,7 @@ class DebiasedWhittle:
         --------
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
         >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
-        >>> model = SquaredExponentialModel(name="model", rho=12)
+        >>> model = SquaredExponentialModel(name="model", rho=30, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
@@ -501,9 +482,8 @@ class DebiasedWhittle:
         Examples
         --------
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
-        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
-        >>> base_model = SquaredExponentialModel(name="model", rho=12)
-        >>> model = NuggetModel("model2", base_model, nugget=0.1)
+        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel, NuggetModel
+        >>> model = ExponentialModel(rho=12, sigma=1.41)
         >>> periodogram = Periodogram()
         >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
@@ -553,15 +533,16 @@ class DebiasedWhittle:
 
         Examples
         --------
+        >>> import torch
         >>> from debiased_spatial_whittle.grids.base import RectangularGrid
-        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel, NuggetModel
-        >>> base_model = SquaredExponentialModel(name="model", rho=12)
-        >>> model = NuggetModel("model2", base_model, nugget=0.1)
+        >>> from debiased_spatial_whittle.models.univariate import ExponentialModel, NuggetModel
+        >>> model = ExponentialModel(rho=torch.tensor([12., ]), sigma=torch.tensor([4., ]))
+        >>> model = NuggetModel(model, nugget=torch.tensor([0.1, ]))
         >>> periodogram = Periodogram()
-        >>> grid = RectangularGrid((512, 256))
+        >>> grid = RectangularGrid((67, 192))
         >>> ep = ExpectedPeriodogram(grid, periodogram)
         >>> dbw = DebiasedWhittle(periodogram, ep)
-        >>> jmat = dbw.jmatrix_sample(model, n_sims=200)
+        >>> jmat = dbw.jmatrix_sample(model, n_sims=20)
         >>> dbw.variance_of_estimates(model, jmat=jmat)
         array([[8.27761908, 1.34780351],
                [1.34780351, 0.22064392]])

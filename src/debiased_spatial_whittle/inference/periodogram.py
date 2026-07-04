@@ -447,7 +447,7 @@ class ExpectedPeriodogram:
         ndim = self.grid.ndim
         d_acv = model.jacobian(lags, param_names=param_names)
         d_acv_values = xp.stack(tuple(d_acv.values()), ndim)
-        aux = ifftshift(d_acv_values, list(range(lags.shape[0])))
+        aux = ifftshift(d_acv_values, list(range(ndim)))
         d_ep = self.compute_ep(aux, self.periodogram.fold)
         d_ep = xp.swapdims(d_ep, ndim, -1)
         return dict(zip(d_acv.keys(), [d_ep[..., i] for i in range(d_ep.shape[-1])]))

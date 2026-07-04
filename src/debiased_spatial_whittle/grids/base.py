@@ -312,8 +312,8 @@ class RectangularGrid:
         For instance, in dimension 1, the covariance model is evaluated at lags
             0, 1, ..., n - 1, - n + 1, ..., -1.
         """
-        if hasattr(model, "call_on_rectangular_grid"):
-            return model.call_on_rectangular_grid(self)
+        # if hasattr(model, "call_on_rectangular_grid"):
+        #     return model.call_on_rectangular_grid(self)
         return ifftshift(model(self.lags_unique), list(range(self.ndim)))
 
     def autocov_separable(self, model):
