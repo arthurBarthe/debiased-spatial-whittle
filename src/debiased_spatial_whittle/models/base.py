@@ -591,12 +591,12 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
     def map_parameters(self, *params):
         params_array = xp.stack(params)
         mapped_params = xp.exp(params_array)
-        return xp.split(mapped_params, 1)
+        return [_.squeeze() for _ in xp.split(mapped_params, 1)]
 
     def imap_parameters(self, *params):
         params_array = xp.stack(params)
         mapped_params = xp.log(params_array)
-        return xp.split(mapped_params, 1)
+        return [_.squeeze() for _ in xp.split(mapped_params, 1)]
 
     @property
     def parameter_names(self):
