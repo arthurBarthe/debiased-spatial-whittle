@@ -70,7 +70,35 @@ class MultivariateDebiasedWhittle:
         model: CovarianceModel,
         params_for_gradient: list[ModelParameter] = None,
     ):
-        """Computes the likelihood for these data"""
+        """
+        Computes the Debiased Whittle likelihood for multivariate data.
+        
+        The Whittle likelihood is given by:
+        
+        .. math::
+            \\mathcal{L}(\\theta) = \\frac{1}{|D|} \\sum_{k \\in D} \\left[ \\log \\det(f(k; \\theta)) + \\text{tr}\\left(f(k; \\theta)^{-1} I(k)\\right) \\right]
+        
+        where:
+        
+        - :math:`\\theta` are the model parameters
+        - :math:`f(k; \\theta)` is the expected periodogram (spectral density) at frequency k
+        - :math:`I(k)` is the observed periodogram at frequency k
+        - :math:`D` is the set of frequencies
+        
+        Parameters
+        ----------
+        z : xp.ndarray
+            Input data array
+        model : CovarianceModel
+            Covariance model to evaluate
+        params_for_gradient : list[ModelParameter], optional
+            Parameters with respect to which to compute gradients
+            
+        Returns
+        -------
+        xp.ndarray
+            The Whittle likelihood value
+        """
         p = self.periodogram([z[..., 0], z[..., 1]])
         ep = self.expected_periodogram(model)
         n_spatial_dim = p.ndim - 2
@@ -94,7 +122,32 @@ class MultivariateDebiasedWhittle:
 
     def gradient(self, sample, model, param_names=None):
         """
-        Compute the gradient of MultivariateDebiasedWhittle with respect to model parameters.
+        Compute the gradient of the Whittle likelihood with respect to model parameters.
+        
+        The gradient of the Whittle likelihood with respect to a parameter :math:`\\theta_j` is:
+        
+        .. math::
+            \\frac{\\partial \\mathcal{L}}{\\partial \\theta_j} = \\frac{1}{|D|} \\sum_{k \\in D} \\left[ \\text{tr}\\left(f(k; \\theta)^{-1} \\frac{\\partial f(k; \\theta)}{\\partial \\theta_j}\\right) - \\text{tr}\\left(f(k; \\theta)^{-1} \\frac{\\partial f(k; \\theta)}{\\partial \\theta_j} f(k; \\theta)^{-1} I(k)\\right) \\right]
+        
+        where:
+        
+        - :math:`f(k; \\theta)` is the expected periodogram
+        - :math:`I(k)` is the observed periodogram
+        - :math:`\\frac{\\partial f(k; \\theta)}{\\partial \\theta_j}` is the Jacobian of the expected periodogram
+        
+        Parameters
+        ----------
+        sample : xp.ndarray
+            Input data sample
+        model : CovarianceModel
+            Covariance model
+        param_names : list[str], optional
+            Names of parameters with respect to which the gradient is computed
+            
+        Returns
+        -------
+        dict
+            Dictionary mapping parameter names to their gradient values
         """
         p = self.periodogram([sample[..., 0], sample[..., 1]])
         ep = self.expected_periodogram(model)
