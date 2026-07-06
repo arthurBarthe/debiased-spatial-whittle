@@ -3,7 +3,9 @@
 
 # ##Imports
 
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+xp = BackendManager.get_backend()
+
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
 from debiased_spatial_whittle.grids.base import RectangularGrid
@@ -20,7 +22,7 @@ model = SquaredExponentialModel(rho=10, sigma=0.9)
 m = 256
 shape = (m * 1, m * 1)
 x_0, y_0, diameter = m // 2, m // 2, m
-x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
+x, y = xp.meshgrid(xp.arange(shape[0]), xp.arange(shape[1]), indexing="ij")
 circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
 circle = circle * 1.0
 grid_circle = RectangularGrid(shape)

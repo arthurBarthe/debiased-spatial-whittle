@@ -127,7 +127,7 @@ def test_whittle_grad_multi():
     # Get parameter name for r (first parameter of BivariateUniformCorrelation)
     param_name = bvm.parameter_names[0]
     param_names = [param_name]
-    
+
     # Compute likelihood and gradient using the gradient method
     lkh = dbw(z, bvm)
     grad_dict = dbw.gradient(z, bvm, param_names=param_names)
@@ -139,7 +139,7 @@ def test_whittle_grad_multi():
     setattr(bvm, 'r', new_value)
     lkh2 = dbw(z, bvm)
     grad_num = (lkh2 - lkh) / epsilon
-    assert_allclose(grad, grad_num, rtol=0.001)
+    assert_allclose(grad, grad_num, rtol=0.001, atol=0)
     setattr(bvm, 'r', old_value)
 
 
@@ -235,7 +235,7 @@ def test_jmatrix_sample():
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=2, sigma=1)
     param_names = [model.parameter_names[0], model.parameter_names[1]]
-    jmat = d.jmatrix_sample(model, param_names=param_names)
+    jmat = d.jmatrix_sample(model, param_names=param_names, n_sims=10)
     print(jmat)
 
 

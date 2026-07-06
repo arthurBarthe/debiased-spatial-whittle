@@ -1,5 +1,7 @@
 import sys, warnings
 from typing import Tuple
+
+from charset_normalizer.md import lru_cache
 from scipy.stats import multivariate_normal
 from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
@@ -204,6 +206,7 @@ class MultivariateSamplerOnRectangularGrid:
     def spatial_axes(self):
         return tuple(range(self.grid.ndim))
 
+    @lru_cache
     def compute_spectral_decomposition(self):
         # cov shape (2 * n1 - 1, 2 * n2 - 1, p, p)
         cov = self.sampling_grid.autocov(self.model)

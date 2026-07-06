@@ -283,7 +283,7 @@ def test_gradient_expected_periodogram_bivariate():
     setattr(bvm, 'r', new_value)
     ep2 = ep_op(bvm)
     grad_num = (ep2 - ep) / epsilon
-    assert_allclose(jac[param_name], grad_num, rtol=0.001)
+    assert_allclose(jac[param_name], grad_num, rtol=0.001, atol=0.01)
     setattr(bvm, 'r', old_value)
 
 

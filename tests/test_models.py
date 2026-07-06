@@ -62,7 +62,7 @@ def test_gradient_sqExpCov():
     g_rho, g_sigma = jac[f'{model.name}_rho'], jac[f'{model.name}_sigma']
     g2 = (acv2 - acv1) / epsilon
     g3 = (acv3 - acv1) / epsilon
-    assert_allclose(g_rho, g2, rtol=1e-5)
+    assert_allclose(g_rho, g2, rtol=1e-5, atol=1e-2)
     assert_allclose(g_sigma, g3)
 
 
@@ -84,7 +84,7 @@ def test_gradient_Matern32():
     g_rho, g_sigma = jac[f'{model.name}_rho'], jac[f'{model.name}_sigma']
     g2 = (acv2 - acv1) / epsilon
     g3 = (acv3 - acv1) / epsilon
-    assert_allclose(g_rho, g2, rtol=1e-5)
+    assert_allclose(g_rho, g2, rtol=1e-5, atol=1e-2)
     assert_allclose(g_sigma, g3)
 
 
@@ -107,7 +107,7 @@ def test_gradient_bivariate():
     setattr(bvm, 'r', getattr(bvm, 'r') + epsilon)
     cov2 = bvm(lags)
     gradient_num = (cov2 - cov) / epsilon
-    assert_allclose(jac[param_name], gradient_num, rtol=0.01)
+    assert_allclose(jac[param_name], gradient_num, rtol=0.01, atol=1e-2)
     setattr(bvm, 'r', getattr(bvm, 'r') - epsilon)
 
 

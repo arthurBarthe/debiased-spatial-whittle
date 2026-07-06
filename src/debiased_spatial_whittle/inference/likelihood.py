@@ -125,7 +125,7 @@ class MultivariateDebiasedWhittle:
         r"""
         Compute the gradient of the Whittle likelihood with respect to model parameters.
         
-        The gradient of the Whittle likelihood with respect to a parameter :math:`\theta_j` is
+        The gradient of the Whittle likelihood with respect to a parameter $\theta_j$ is
 
         $$
             \frac{\partial \mathcal{L}}{\partial \theta_j} = \frac{1}{|D|} \sum_{k \in D} \left[ \text{tr}\left(f(k; \theta)^{-1} \frac{\partial f(k; \theta)}{\partial \theta_j}\right) - \text{tr}\left(f(k; \theta)^{-1} \frac{\partial f(k; \theta)}{\partial \theta_j} f(k; \theta)^{-1} I(k)\right) \right]
@@ -158,10 +158,10 @@ class MultivariateDebiasedWhittle:
         for param_name, d_ep_i in d_ep.items():
             ep_inv = inv(ep)
             # the derivative of the log determinant
-            d_log_det = xp.sum(xp.diagonal(xp.matmul(ep_inv, d_ep_i), dim1=-1, dim2=-2), -1)
+            d_log_det = xp.sum(xp.diagonal(xp.matmul(ep_inv, d_ep_i), 0, -1, -2), -1)
             # the derivative the second term
             d_ep_inv = -xp.matmul(ep_inv, xp.matmul(d_ep_i, ep_inv))
-            d_quad_term = xp.sum(xp.diagonal(xp.matmul(d_ep_inv, p), dim1=-1, dim2=-2), -1)
+            d_quad_term = xp.sum(xp.diagonal(xp.matmul(d_ep_inv, p), 0, -1, -2), -1)
             # derivative
             d_whittle = xp.mean(d_log_det + d_quad_term, axis=tuple(range(p.ndim - 2)))
             # Ensure scalar value for compatibility

@@ -34,7 +34,8 @@ class TestShapesUnivariate:
         assert self.expected_periodogram(self.vectorized_model).shape == (64, 32, 3)
 
     def test_shape_whittle(self):
-        assert self.dbw(randn(*self.grid.n), self.model).shape == ()
+        result = self.dbw(randn(*self.grid.n), self.model)
+        assert not hasattr(result, 'shape') and not hasattr(result, '__len__')
         assert self.dbw(randn(*self.grid.n), self.vectorized_model).shape == (
             3,
         )

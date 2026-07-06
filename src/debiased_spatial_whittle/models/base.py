@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+
+import numpy as np
+
 from debiased_spatial_whittle.backend import BackendManager
 xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
@@ -163,6 +166,8 @@ class ModelInterface(ABC):
         return self(lags)
 
     def jacobian(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
+        if BackendManager.backend_name != "torch":
+            return self.jacobian_scipy(lags, param_names)
         if param_names is None:
             param_names = self.parameter_names
         param_values = self.get_parameters(param_names)
@@ -178,6 +183,38 @@ class ModelInterface(ABC):
 
         out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
         return dict(zip(param_names, out))
+
+    def jacobian_scipy(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
+        """
+        Examples
+        --------
+        >>> from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+        >>> model = SquaredExponentialModel(rho=32, name="model")
+        >>> import numpy as np
+        >>> lags = np.array([[0., 0.], [0., 1.]])
+        >>> model.jacobian_scipy(lags)
+        """
+        from scipy.differentiate import jacobian
+        if param_names is None:
+            param_names = self.parameter_names
+        param_values = self.get_parameters(param_names)
+
+        def func(x):
+            full_args = []
+            for param_name in self.parameter_names:
+                if param_name in param_names:
+                    full_args.append(x[param_names.index(param_name)])
+                else:
+                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
+            return self.compute(np.expand_dims(lags, -1), *full_args)
+
+        def func2(x):
+            shape = x.shape[1:]
+            return np.apply_along_axis(func, axis=0, arr=x).reshape((-1, ) + shape)
+
+        out = jacobian(func2, param_values)
+        acv_shape = self.compute(lags, *self.parameters).shape
+        return dict(zip(param_names, out.df.T.reshape((len(param_names),) + acv_shape)))
 
     @abstractmethod
     def __add__(self, other):

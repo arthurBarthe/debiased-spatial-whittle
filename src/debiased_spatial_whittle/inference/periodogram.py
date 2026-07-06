@@ -449,7 +449,7 @@ class ExpectedPeriodogram:
         d_acv_values = xp.stack(tuple(d_acv.values()), ndim)
         aux = ifftshift(d_acv_values, list(range(ndim)))
         d_ep = self.compute_ep(aux, self.periodogram.fold)
-        d_ep = xp.swapdims(d_ep, ndim, -1)
+        d_ep = xp.swapaxes(d_ep, ndim, -1)
         return dict(zip(d_acv.keys(), [d_ep[..., i] for i in range(d_ep.shape[-1])]))
 
     def cov_dft_matrix(self, model: CovarianceModel):
