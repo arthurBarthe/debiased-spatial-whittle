@@ -23,8 +23,8 @@ cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
 pytest-cov = "^6.2.1"
-notebook = "^7.6.0"
 rich = "^15.0.0"
+plotly = "^6.8.0"
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]

@@ -17,6 +17,8 @@ plugins:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
     'anisotropic.py', 'france_interpolation.py']
     execute: true
+    cache: false
+    no-prompt: true
 - mkdocstrings:
     handlers:
       python:

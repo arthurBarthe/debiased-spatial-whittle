@@ -255,3 +255,36 @@ def test_jmatrix_sample_multivariate():
     jmat = dbw.jmatrix_sample(bvm, param_names=param_names)
     assert jmat.shape == (2, 2)
     assert np.all(np.diag(jmat) > 0)
+
+
+def test_variance_of_estimates_sum_model():
+    """
+    Test that variance_of_estimates works with a sum of two SquaredExponentialModel instances.
+    """
+    from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+    
+    # Create two SquaredExponentialModel instances with distinct names
+    model1 = SquaredExponentialModel(rho=10, sigma=0.8, name="se1")
+    model2 = SquaredExponentialModel(rho=5, sigma=0.5, name="se2")
+    
+    # Sum the two models
+    model = model1 + model2
+    print(model)
+    
+    grid = RectangularGrid((256, 256))
+    
+    # Create DebiasedWhittle
+    periodogram = Periodogram()
+    ep = ExpectedPeriodogram(grid, periodogram)
+    dbw = DebiasedWhittle(periodogram, ep)
+    
+    # Get covariance matrix of estimates
+    cov_mat = dbw.variance_of_estimates(model)
+    print(cov_mat)
+    
+    # Check that the covariance matrix has the correct shape
+    assert cov_mat.shape[0] == model.n_parameters
+    assert cov_mat.shape[1] == model.n_parameters
+    
+    # Check that the covariance matrix is symmetric (within numerical tolerance)
+    assert_allclose(cov_mat, cov_mat.T, rtol=1e-10)

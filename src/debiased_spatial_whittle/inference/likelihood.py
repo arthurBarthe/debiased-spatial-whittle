@@ -1,7 +1,8 @@
 from typing import Callable, Union
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid, \
+    MultivariateSamplerOnRectangularGrid
 from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
 from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as MultPeriodogram,
@@ -221,7 +222,7 @@ class MultivariateDebiasedWhittle:
         """
         if param_names is None:
             param_names = model.free_parameter_names
-        sampler = SamplerBUCOnRectangularGrid(model, self.expected_periodogram.grid)
+        sampler = MultivariateSamplerOnRectangularGrid(model, self.expected_periodogram.grid, p=2)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):

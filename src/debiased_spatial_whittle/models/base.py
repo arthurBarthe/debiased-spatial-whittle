@@ -20,10 +20,11 @@ except ImportError:
 
 
 class ModelParameter:
-    def __init__(self, default, bounds=(None, None), doc=""):
+    def __init__(self, default, bounds=(None, None), doc="", latex_display: str = None):
         self.default = xp.squeeze(xp.asarray(default)).astype(xp.float64)
         self.bounds = bounds
         self.doc = doc
+        self.latex_display = latex_display
 
     def __set_name__(self, owner, name):
         self.name = name
@@ -88,6 +89,16 @@ class ModelInterface(ABC):
     @property
     @abstractmethod
     def free_parameter_names(self) -> tuple:
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def parameters_repr(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def free_parameters_repr(self):
         raise NotImplementedError()
 
     @abstractmethod
@@ -290,7 +301,26 @@ class CovarianceModel(ModelInterface):
             if not param_name in self._frozen_parameters:
                 out.append(f'{self.name}_{param_name}')
         for child in self.children:
-            out.extend(child.parameter_names)
+            out.extend(child.free_parameter_names)
+        return out
+
+    @property
+    def parameters_repr(self) -> tuple[str]:
+        out = []
+        for pname in self._parameters:
+            out.append(getattr(self.__class__, pname).latex_display)
+        for child in self.children:
+            out.extend(child.parameters_repr)
+        return out
+
+    @property
+    def free_parameters_repr(self) -> tuple[str]:
+        out = []
+        for pname in self._parameters:
+            if not pname in self._frozen_parameters:
+                out.append(getattr(self.__class__, pname).latex_display)
+        for child in self.children:
+            out.extend(child.parameters_repr)
         return out
 
     def get_parameter(self, name: str):

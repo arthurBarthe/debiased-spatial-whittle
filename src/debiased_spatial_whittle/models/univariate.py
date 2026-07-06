@@ -32,9 +32,9 @@ class ExponentialModel(BaseCovarianceModel):
     ('ExponentialModel_rho', 'ExponentialModel_sigma')
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, numpy.inf), doc="Range parameter", latex_display=r"\rho")
     sigma = ModelParameter(
-        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter"
+        default=1.0, bounds=(0, numpy.inf), doc="Amplitude parameter", latex_display=r"\sigma"
     )
 
     def __init__(self, rho=None, sigma=None, name=None):
@@ -64,8 +64,8 @@ class SquaredExponentialModel(BaseCovarianceModel):
     array([1.9881    , 1.94873298])
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter")
-    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter")
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter", latex_display=r"\rho")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter", latex_display=r"\sigma")
 
     def __init__(self, rho=None, sigma=None, name=None):
         super().__init__(rho, sigma, name=name)
@@ -191,7 +191,7 @@ class NuggetModel(CovarianceModel):
     array([1.        , 0.89688042, 0.88758641])
     """
 
-    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude")
+    nugget = ModelParameter(default=0.0, bounds=(0, 1), doc="Nugget amplitude", latex_display=r"\delta")
 
     def __init__(self, base_model, nugget=None, name=None):
         super().__init__((base_model,), nugget, name=name)

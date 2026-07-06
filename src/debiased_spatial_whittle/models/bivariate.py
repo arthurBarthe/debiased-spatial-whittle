@@ -29,8 +29,8 @@ class BivariateUniformCorrelation(CovarianceModel):
     >>> bivariate_model = BivariateUniformCorrelation(base_model, r=0.3, f=2.)
     """
 
-    r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation")
-    f = ModelParameter(default=1.0, bounds=(1e-2, 1e2), doc="Amplitude ratio")
+    r = ModelParameter(default=0.0, bounds=(-0.99, 0.99), doc="Correlation", latex_display="r")
+    f = ModelParameter(default=1.0, bounds=(1e-2, 1e2), doc="Amplitude ratio", latex_display="f")
 
     def __init__(self, base_model: CovarianceModel, r=None, f=None, name=None):
         super().__init__((base_model,), r, f, name=name)
