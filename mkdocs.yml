@@ -15,7 +15,7 @@ plugins:
 - search
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py', 'france_interpolation.py', 'corner_plot_example.py']
+    'anisotropic.py', 'france_interpolation.py', 'dual_remote_sensing.py', 'corner_plot_example.py']
     execute: true
     cache: false
     no_prompt: true
@@ -68,6 +68,7 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
+          - 'Dual remote sensing': dual_remote_sensing.py
       - Interpolation: france_interpolation.py
       - Predicted distributions of estimates: corner_plot_example.py
   - Reference:
