@@ -1,4 +1,5 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+xp = BackendManager.get_backend()
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import ExponentialModel
@@ -14,22 +15,4 @@ def test_jmat():
     model = ExponentialModel(rho=10, sigma=1)
     jmat = d.jmatrix(model, model.parameter_names)
     print(jmat)
-    assert np.all(np.diag(jmat) >= 0)
-
-
-"""def test_mcmc_jmat():
-    g = RectangularGrid((16, 16))
-    p = Periodogram()
-    ep = ExpectedPeriodogram(g, p)
-    model = ExponentialModel(rho=5, sigma=1)
-    f = np.ones((16, 16))
-    mcmc = McmcDiags(model, ep, f, f)
-    cov_fft = CovarianceFFT(g)
-    s1 = cov_fft.exact_summation1(model, ep, f, f, normalize=True)
-    mcmc.run(10000)
-    print(mcmc.partition_function(), mcmc.estimate())
-    print(s1)
-    import matplotlib.pyplot as plt
-
-    plt.plot(mcmc.partition_function_trace())
-    plt.show()"""
+    assert xp.all(xp.diag(jmat) >= 0)

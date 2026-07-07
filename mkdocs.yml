@@ -15,10 +15,10 @@ plugins:
 - search
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py', 'france_interpolation.py']
+    'anisotropic.py', 'france_interpolation.py', 'corner_plot_example.py']
     execute: true
     cache: false
-    no-prompt: true
+    no_prompt: true
 - mkdocstrings:
     handlers:
       python:
@@ -69,6 +69,7 @@ nav:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
       - Interpolation: france_interpolation.py
+      - Predicted distributions of estimates: corner_plot_example.py
   - Reference:
       - grids: grids.md
       - models: models.md

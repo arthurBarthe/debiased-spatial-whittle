@@ -2,7 +2,9 @@ from debiased_spatial_whittle.backend import BackendManager
 
 xp = BackendManager.get_backend()
 
-fftn = xp.fft.fftn
+
+fftn, ifftn = BackendManager.get_fft_methods()
+ones = BackendManager.get_ones()
 
 from typing import List
 
@@ -15,7 +17,7 @@ class Periodogram:
     def __init__(self):
         # TODO allow for tapering in multivariate case
         self.fold = True
-        self.taper = lambda shape: xp.ones(shape)
+        self.taper = lambda shape: ones(shape)
 
     def __call__(self, z: List[xp.ndarray], return_fft: bool = False) -> xp.ndarray:
         """

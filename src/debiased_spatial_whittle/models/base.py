@@ -1,3 +1,4 @@
+import copy
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -7,6 +8,7 @@ xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
 
 from torch.autograd.functional import jacobian
+from copy import deepcopy
 
 try:
     from rich import print
@@ -21,7 +23,7 @@ except ImportError:
 
 class ModelParameter:
     def __init__(self, default, bounds=(None, None), doc="", latex_display: str = None):
-        self.default = xp.squeeze(xp.asarray(default)).astype(xp.float64)
+        self.default = BackendManager.to_device(xp.squeeze(xp.asarray(default)).astype(xp.float64))
         self.bounds = bounds
         self.doc = doc
         self.latex_display = latex_display
@@ -45,7 +47,7 @@ class ModelParameter:
         if hasattr(obj, '_frozen_parameters') and self.name in obj._frozen_parameters:
             raise ValueError(f"Parameter {self.name} is frozen and cannot be set.")
         if value is not None:
-            obj.__dict__[f"_{self.name}"] = xp.squeeze(xp.asarray(value)).astype(xp.float64)
+            obj.__dict__[f"_{self.name}"] = BackendManager.to_device(xp.squeeze(xp.asarray(value)).astype(xp.float64))
 
 
 
@@ -58,6 +60,14 @@ class ModelInterface(ABC):
     @name.setter
     @abstractmethod
     def name(self, value):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def copy(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def frozen_copy(self):
         raise NotImplementedError()
 
     @property
@@ -249,6 +259,9 @@ class CovarianceModel(ModelInterface):
     def assign_params(self, *params):
         for param_name, param_value in zip(self._parameters, params):
             setattr(self, param_name, param_value)
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     @property
     def name(self):
@@ -590,6 +603,9 @@ class ReparameterizedModel(ModelInterface, ABC):
     def name(self, name):
         name = name if name else self.__class__.__name__
         self._name = name
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     @abstractmethod
     def map_parameters(self, *params):

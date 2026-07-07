@@ -6,6 +6,8 @@ for a BivariateUniformCorrelation model applied to a SquaredExponentialModel.
 """
 from debiased_spatial_whittle.backend import BackendManager
 BackendManager.set_backend("torch")
+BackendManager.device = "cpu"
+xp = BackendManager().get_backend()
 
 from debiased_spatial_whittle.models.univariate import ExponentialModel, SquaredExponentialModel
 from debiased_spatial_whittle.models.base import SumModel
@@ -26,4 +28,4 @@ grid = RectangularGrid((128, 128), nvars=2)
 fig = corner_plot_variance_of_estimates(bivariate_model, grid, width=1200, height=1200, n_sims=10)
 
 # Display the figure
-fig.show()
+fig.show(renderer="notebook_connected")

@@ -106,6 +106,7 @@ class BackendManager:
 
             return autograd.numpy
         elif cls.backend_name == "torch":
+            torch.set_default_device(cls.device)
             torch.to_cpu = lambda x: x.cpu()
             torch.item = lambda x: x.item()
             torch.set_default_dtype(torch.float64)
@@ -153,6 +154,17 @@ class BackendManager:
             return cupy.ones
         elif cls.backend_name == "torch":
             return lambda *args, **kargs: torch.ones(
+                *args, **kargs, device=BackendManager.device
+            )
+
+    @classmethod
+    def get_ones_like(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return numpy.ones_like
+        if cls.backend_name == "cupy":
+            return cupy.ones_like
+        elif cls.backend_name == "torch":
+            return lambda *args, **kargs: torch.ones_like(
                 *args, **kargs, device=BackendManager.device
             )
 
@@ -293,3 +305,28 @@ class BackendManager:
             return a.get()
         if cls.backend_name == "numpy":
             return a.cpu()
+
+    @classmethod
+    def to_device(cls, a):
+        if cls.backend_name == "torch":
+            return a.to(device=cls.device)
+        else:
+            return a
+
+    @classmethod
+    def get_assert_allclose(cls):
+        if cls.backend_name == "numpy":
+            return numpy.testing.assert_allclose
+        if cls.backend_name == "cupy":
+            return cupy.testing.assert_allclose
+        if cls.backend_name == "torch":
+            return torch.testing.assert_allclose
+
+    @classmethod
+    def get_hanning(cls):
+        if cls.backend_name == "numpy":
+            return numpy.hanning
+        if cls.backend_name == "cupy":
+            return cupy.hanning
+        if cls.backend_name == "torch":
+            return torch.hann_window

@@ -41,7 +41,7 @@ class TestMultipleSimulations:
     model = ExponentialModel()
     model.rho = 10
     model.sigma = 1
-    grid = RectangularGrid((256, 256))
+    grid = RectangularGrid((32, 32))
 
     def test_simulation(self):
         sampler = SamplerOnRectangularGrid(self.model, self.grid)

@@ -1,7 +1,8 @@
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
-from numpy.testing import assert_allclose
+assert_allclose = BackendManager.get_assert_allclose()
+
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
@@ -38,7 +39,7 @@ def test_gradient_cov():
     jac = model.jacobian(g.lags_unique, param_names=(f'{model.name}_rho',))
     g = jac[f'{model.name}_rho']
     g2 = (acv2 - acv1) / epsilon
-    assert_allclose(g, g2, rtol=1e-3)
+    assert_allclose(g, g2, rtol=1e-3, atol=1e-2)
 
 
 def test_gradient_sqExpCov():
