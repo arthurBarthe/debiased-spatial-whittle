@@ -1,8 +1,7 @@
 from typing import Callable, Union
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid, \
-    MultivariateSamplerOnRectangularGrid
+from debiased_spatial_whittle.sampling.simulation import MultivariateSamplerOnRectangularGrid
 from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
 from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as MultPeriodogram,
@@ -594,14 +593,16 @@ class DebiasedWhittle:
         array([[ 1.79844275e-06, -3.36165062e-05],
                [-3.36165062e-05,  8.20809861e-04]])
         """
+        # we use a frozen version of the model. This allows to use cached quantities, e.g. the expected periodogram.
+        frozen_model = model.frozen_copy()
         if param_names is None:
             param_names = model.free_parameter_names
-        sampler = SamplerOnRectangularGrid(model, self.expected_periodogram.grid)
+        sampler = SamplerOnRectangularGrid(frozen_model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
             z = sampler()
-            grad_dict = self.gradient(z, model, param_names=param_names)
+            grad_dict = self.gradient(z, frozen_model, param_names=param_names)
             grad = [grad_dict[pn] for pn in param_names]
             gradients.append(grad)
         gradients = xp.array(gradients)
@@ -848,4 +849,5 @@ class Estimator:
         """
         jmat = self.likelihood.jmatrix_sample(model, param_names)
         hmat = self.likelihood.fisher(model, param_names)
+        # TODO avoid matrix inversion
         return xp.dot(inv(hmat), xp.dot(jmat, inv(hmat)))

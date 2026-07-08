@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen
+
 xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
 
@@ -46,12 +48,17 @@ class ModelParameter:
     def __set__(self, obj, value):
         if hasattr(obj, '_frozen_parameters') and self.name in obj._frozen_parameters:
             raise ValueError(f"Parameter {self.name} is frozen and cannot be set.")
+        if hasattr(obj, 'frozen') and obj.frozen:
+            raise ValueError(f"Parameter {self.name} cannot be set at the model is frozen.")
         if value is not None:
             obj.__dict__[f"_{self.name}"] = BackendManager.to_device(xp.squeeze(xp.asarray(value)).astype(xp.float64))
 
 
 
 class ModelInterface(ABC):
+    def __init__(self):
+        super().__init__()
+    
     @property
     @abstractmethod
     def name(self):
@@ -248,13 +255,14 @@ class ModelInterface(ABC):
 
 
 
-class CovarianceModel(ModelInterface):
+class CovarianceModel(ModelInterface, Freezable):
 
     def __init__(self, children: tuple[ModelInterface], *params, name: str = None):
         self.name = name
         self._frozen_parameters = []
         self.children = children
         self.assign_params(*params)
+        super().__init__()
 
     def assign_params(self, *params):
         for param_name, param_value in zip(self._parameters, params):
@@ -263,11 +271,17 @@ class CovarianceModel(ModelInterface):
     def copy(self):
         return copy.deepcopy(self)
 
+    def frozen_copy(self):
+        copy = self.copy()
+        copy.freeze()
+        return copy
+
     @property
     def name(self):
         return self._name
 
     @name.setter
+    @ban_if_frozen
     def name(self, value):
         self._name = value if value else self.__class__.__name__
 
@@ -285,6 +299,7 @@ class CovarianceModel(ModelInterface):
     def free_parameter_bounds_to_list_deep(self):
         return self.free_parameter_bounds
 
+    @ban_if_frozen
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
         model_name, param_name = name.split("_")
         if model_name == self.name:
@@ -347,6 +362,7 @@ class CovarianceModel(ModelInterface):
                     return value
             return None
 
+    @ban_if_frozen
     def set_parameter(self, name, value) -> bool:
         model_name, param_name = name.split("_")
         if model_name == self.name:
@@ -359,6 +375,7 @@ class CovarianceModel(ModelInterface):
                     return True
             return False
 
+    @ban_if_frozen
     def freeze_parameter(self, name):
         model_name, param_name = name.split("_")
         if model_name == self.name:

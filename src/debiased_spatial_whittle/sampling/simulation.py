@@ -7,7 +7,7 @@ from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.backend import BackendManager
-
+from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
 
 xp = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
@@ -158,7 +158,7 @@ class SamplerOnRectangularGrid:
             self._z = z_inv * xp.expand_dims(self.grid.mask, -1)
         result = self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
-        return result
+        return SampleOnRectangularGrid(self.grid, result)
 
 
 
@@ -242,120 +242,5 @@ class MultivariateSamplerOnRectangularGrid:
         sample
             Simulated sample.
         """
-        return self._sample()
-
-
-class SamplerSeparable:
-    """
-    Class for approximate sampling of Separable models.
-    """
-
-    def __init__(self, model: SeparableModel, grid: RectangularGrid, n_sim: int = 100):
-        assert isinstance(model, SeparableModel)
-        self.model = model
-        self.grid = grid
-        self.n_sim = n_sim
-        self.samplers = self._setup_samplers()
-
-    def _setup_samplers(self):
-        samplers = []
-        for model, dims in zip(self.model.models, self.model.dims):
-            sampler = SamplerOnRectangularGrid(model, self.grid.separate(dims))
-            samplers.append(sampler)
-        return samplers
-
-    def _unit_sample(self):
-        zs = []
-        for sampler in self.samplers:
-            zs.append(sampler())
-        return xp.prod(zs)
-
-    def __call__(self):
-        z = xp.zeros(self.grid.n)
-        for i in range(self.n_sim):
-            z_i = self._unit_sample()
-            z = i / (i + 1) * z + 1 / (i + 1) * z_i
-        return z * xp.sqrt(self.n_sim)
-
-
-class SamplerBUCOnRectangularGrid:
-    """
-    Class to sample from the BivariateUniformCorrelation model on a rectangular grid with nvars=2.
-
-    Attributes
-    ----------
-    grid: RectangularGrid
-        Sampling grid. Should have attribute nvars=2.
-
-    model: BivariateUniformCorrelation
-        Bivariate covariance model
-
-    f: ndarray
-        Spectral amplitudes
-    """
-
-    def __init__(self, model: BivariateUniformCorrelation, grid: RectangularGrid):
-        assert isinstance(model, BivariateUniformCorrelation)
-        self.model = model
-        self.grid = grid
-        self.e_dist = multivariate_normal([0, 0], [[1, model.r], [model.r, 1]])
-        self._f = None
-
-    @property
-    def f(self):
-        if self._f is None:
-            cov = self.grid.autocov(self.model.base_model)
-            f = prod_list(self.grid.n) * ifftn(cov)
-            f = xp.real(f)
-            min_ = xp.min(f)
-            if min_ <= -1e-5:
-                sys.exit(0)
-                warnings.warn(f"Embedding is not positive definite, min value {min_}.")
-            self._f = xp.maximum(f, xp.zeros_like(f))
-        return self._f
-
-    def __call__(
-        self, periodic: bool = False, return_spectral: bool = False
-    ) -> xp.ndarray:
-        """
-        Sample a realization.
-
-        Parameters
-        ----------
-        periodic
-            if true, returns a periodic sample on an embedding grid
-
-        return_spectral
-            if true, returns the spectral amplitudes as well
-
-        Returns
-        -------
-        sample: ndarray
-            shape (n1, ..., nd, 2) where the last dimension indexes the two variates.
-        """
-        f = self.f
-        e = self.e_dist.rvs(size=f.shape + (2,))
-        e = BackendManager.convert(e)
-        e[..., -1] *= self.model.f
-        e = e[..., 0, :] + 1j * e[..., 1, :]
-        f = xp.expand_dims(self.f, -1)
-        z = xp.sqrt(f) * e
-        if return_spectral:
-            return z
-        z_inv = (
-                1
-                / xp.sqrt(
-                xp.array(
-                    [
-                        self.grid.n_points,
-                    ]
-                )
-            )
-                * xp.real(fftn(z, None, list(range(z.ndim - 1))))
-        )
-        if periodic:
-            return z_inv
-        for i, n in enumerate(self.grid.n):
-            z_inv = xp.take(z_inv, xp.arange(n), i)
-        z_inv = xp.reshape(z_inv, self.grid.n + (2,))
-        return z_inv * self.grid.mask
+        sample = self._sample()
+        return SampleOnRectangularGrid(self.grid, sample)

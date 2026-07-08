@@ -16,7 +16,7 @@ from debiased_spatial_whittle.inference.multivariate_periodogram import Periodog
 from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram
 from debiased_spatial_whittle.inference.likelihood import MultivariateDebiasedWhittle
 from debiased_spatial_whittle.grids.base import RectangularGrid
-from debiased_spatial_whittle.sampling.simulation import SamplerBUCOnRectangularGrid
+from debiased_spatial_whittle.sampling.simulation import MultivariateSamplerOnRectangularGrid
 
 # ##Grid specification
 
@@ -34,7 +34,7 @@ bvm
 
 # ##Sample generation
 
-s = SamplerBUCOnRectangularGrid(bvm, g)
+s = MultivariateSamplerOnRectangularGrid(bvm, g, p=2)
 data = s()
 
 fig = plt.figure()

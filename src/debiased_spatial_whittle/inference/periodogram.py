@@ -139,17 +139,19 @@ from typing import Union
 from debiased_spatial_whittle.models.base import CovarianceModel, ModelInterface
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
+from debiased_spatial_whittle.inference.tapers import Taper, ConstantTaper
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen, lru_cache_frozen
 
 ones = BackendManager.get_ones()
 
 
-class Periodogram:
+class Periodogram(Freezable):
     """
     Provides the capability to compute the periodogram of the data.
 
     Attributes
     ----------
-    taper: function handle
+    taper: Taper
         tapering function
 
     fold: boolean
@@ -157,13 +159,22 @@ class Periodogram:
     """
 
     def __init__(self, taper=None):
-        if taper is None:
-            self.taper = lambda shape: ones(shape)
+        self.taper = taper if taper is not None else ConstantTaper()
         self.fold = True
         self._version = 0
+        super().__init__()
 
     def __hash__(self):
         return id(self) + self._version
+
+    @property
+    def taper(self):
+        return self._taper
+
+    @taper.setter
+    @ban_if_frozen
+    def taper(self, value):
+        self._taper = value
 
     @property
     def fold(self):
@@ -171,16 +182,18 @@ class Periodogram:
         return self._fold
 
     @fold.setter
+    @ban_if_frozen
     def fold(self, value: bool):
         self._fold = value
 
-    def __call__(self, sample: Union[xp.ndarray, SampleOnRectangularGrid]):
+    @lru_cache_frozen
+    def __call__(self, sample: SampleOnRectangularGrid):
         """
         Computes the periodogram of the data.
 
         Parameters
         ----------
-        sample: ndarray | SampleOnRectangularGrid
+        sample: SampleOnRectangularGrid
             Sampled data on the grid. Can either be an ndarray, or an instance of SampleOnRectangularGrid.
             In the latter case, repeated calls to this method will access cached values of the periodogram
             rather than carrying out the same computation again.
@@ -192,47 +205,14 @@ class Periodogram:
             - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
             - shape (n1, ..., nk) if the fold attribute is True
         """
-        if isinstance(sample, SampleOnRectangularGrid):
-            if self in sample.periodograms:
-                return sample.periodograms[self]
-            else:
-                z_values = sample.values * self.taper(sample.grid.n)
-        else:
-            z_values = sample * self.taper(sample.shape)
-        f = 1 / prod_list(z_values.shape) * xp.abs(fftn(z_values)) ** 2
-        if isinstance(sample, SampleOnRectangularGrid):
-            sample.periodograms[self] = f
-        return f
-
-    def __setattr__(self, key, value):
-        """
-        Sets attribute and update version of the object, which will update its hash, so that stored periodogram
-        values are not used if properties of the periodogram are changed.
-
-        Parameters
-        ----------
-        key
-            name of the attribute
-        value
-            value of the attribute
-        """
-        if "_version" in self.__dict__:
-            self.__dict__["_version"] += 1
-        super(Periodogram, self).__setattr__(key, value)
+        # freeze on first call
+        self.freeze()
+        values = sample.values * self.taper(sample.grid.n)
+        periodogram_values = 1 / prod_list(values.shape) * xp.abs(fftn(values)) ** 2
+        return periodogram_values
 
 
-class HashableArray:
-    def __init__(self, values: xp.array):
-        self.values = values
-
-    def __hash__(self):
-        return id(self)
-
-    def __eq__(self, other):
-        return self.values == other.values
-
-
-class ExpectedPeriodogram:
+class ExpectedPeriodogram(Freezable):
     r"""
     Provides the capability to compute the expected periodogram on a fixed grid for
     any covariance model.
@@ -278,6 +258,8 @@ class ExpectedPeriodogram:
     def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
         self.grid = grid
         self.periodogram = periodogram
+        super().__init__()
+        self.freeze()
 
     @property
     def grid(self) -> RectangularGrid:
@@ -285,6 +267,7 @@ class ExpectedPeriodogram:
         return self._grid
 
     @grid.setter
+    @ban_if_frozen
     def grid(self, value: RectangularGrid):
         self._grid = value
 
@@ -294,17 +277,15 @@ class ExpectedPeriodogram:
         return self._periodogram
 
     @periodogram.setter
+    @ban_if_frozen
     def periodogram(self, value: Periodogram):
         self._periodogram = value
-        if self.grid.nvars == 1:
-            self._taper = HashableArray(value.taper(self.grid.n))
-        else:
-            self._taper = HashableArray(value.taper(self.grid.n + (self.grid.nvars,)))
 
     @property
     def taper(self):
-        return self._taper
+        return self.periodogram.taper(self.grid.n)
 
+    @lru_cache_frozen
     def __call__(self, model: CovarianceModel) -> xp.ndarray:
         """
         Compute the expected periodogram for this covariance model.
@@ -427,6 +408,7 @@ class ExpectedPeriodogram:
             out = xp.reshape(out, spatial_shape)
         return out
 
+    @lru_cache_frozen
     def jacobian(self, model: ModelInterface, param_names = None):
         """
         Evaluate the jacobian of the expected periodogram with respect to the model's parameters.
@@ -593,76 +575,3 @@ class ExpectedPeriodogram:
         m
         """
         return xp.abs(self.cov_dft_antidiagonals(model, m)) ** 2
-
-
-class SeparableExpectedPeriodogram(ExpectedPeriodogram):
-    """Class to obtain the expected periodogram on a rectangular grid for a separable covariance model,
-    in which case separability offers computational gains since the full expected periodogram can
-    be computed as the outer product of the expected periodograms in the lower dimensions."""
-
-    # TODO we should ensure the grid is full (or separable for later)
-
-    def __init__(self, grid: RectangularGrid, periodogram: Periodogram):
-        super().__init__(grid, periodogram)
-
-    def __call__(self, model):
-        model1, model2 = model.models
-        n1, n2 = self.grid.n
-        tau1, tau2 = xp.arange(n1), xp.arange(n2)
-        cov_seq1 = model1(
-            [
-                tau1,
-            ]
-        ) * (1 - tau1 / n1)
-        cov_seq2 = model2(
-            [
-                tau2,
-            ]
-        ) * (1 - tau2 / n2)
-        ep1 = 2 * xp.real(fft(cov_seq1)).reshape((-1, 1)) - cov_seq1[0]
-        ep2 = 2 * xp.real(fft(cov_seq2)).reshape((1, -1)) - cov_seq2[0]
-        return ep1 * ep2
-
-    def gradient(self, model):
-        """Provides the derivatives of the expected periodogram with respect to the parameters of the model
-        at all frequencies of the Fourier grid. The last dimension is used for different parameters."""
-        model1, model2 = model.models
-        n1, n2 = self.grid.n
-        tau1, tau2 = xp.arange(n1), xp.arange(n2)
-        gradient_seq1 = model1.gradient(
-            [
-                tau1,
-            ]
-        ) * (1 - tau1 / n1)
-        gradient_seq2 = model2.gradient(
-            [
-                tau2,
-            ]
-        ) * (1 - tau2 / n2)
-        d_ep1 = (
-                2 * xp.real(fft(gradient_seq1, axis=0)).reshape((-1, 1))
-                - gradient_seq1[0, :]
-        )
-        d_ep2 = (
-                2 * xp.real(fft(gradient_seq2, axis=0)).reshape((1, -1))
-                - gradient_seq2[0, :]
-        )
-        return d_ep1 * d_ep2
-
-    def compute_ep(
-        self, acv: xp.ndarray, fold: bool = True, d: Tuple[int, int] = (0, 0)
-    ) -> xp.ndarray:
-        """
-        Computes the expected periodogram for the passed finite autocovariance function, in the case where...
-
-        Parameters
-        ----------
-        acv
-        fold
-        d
-
-        Returns
-        -------
-
-        """
-        raise NotImplementedError("This has not been implemented yet.")

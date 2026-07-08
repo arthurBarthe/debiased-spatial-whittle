@@ -2,6 +2,7 @@ from functools import cached_property, lru_cache
 from debiased_spatial_whittle.models.base import CovarianceModel
 from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen, lru_cache_frozen
 
 xp = BackendManager.get_backend()
 
@@ -16,7 +17,7 @@ fftfreq = xp.fft.fftfreq
 
 
 
-class RectangularGrid:
+class RectangularGrid(Freezable):
     """
     Generic class for hypercubic grids.
 
@@ -95,6 +96,11 @@ class RectangularGrid:
         self.delta = delta
         self.nvars = nvars
         self.mask = mask
+        super().__init__()
+        self.freeze()
+
+    def __repr__(self):
+        return f"RectangularGrid(shape={self.n}, delta={self.delta}, nvars={self.nvars})"
 
     @property
     def n(self) -> tuple[int, ...]:
@@ -102,6 +108,7 @@ class RectangularGrid:
         return self._n
 
     @n.setter
+    @ban_if_frozen
     def n(self, value: tuple[int, ...]):
         self._n = value
 
@@ -116,6 +123,7 @@ class RectangularGrid:
         return self._delta
 
     @delta.setter
+    @ban_if_frozen
     def delta(self, value):
         if value is None:
             value = [
@@ -133,6 +141,7 @@ class RectangularGrid:
         return self._nvars
 
     @nvars.setter
+    @ban_if_frozen
     def nvars(self, value: int):
         assert isinstance(
             value, int
@@ -151,6 +160,7 @@ class RectangularGrid:
         return self._mask
 
     @mask.setter
+    @ban_if_frozen
     def mask(self, value: xp.ndarray):
         if value is None:
             value = ones(self.n)
@@ -254,7 +264,7 @@ class RectangularGrid:
         lags = [g - g.T for g in grid_vec]
         return xp.stack(lags)
 
-    @lru_cache(maxsize=5)
+    @lru_cache_frozen
     def spatial_kernel(self, taper_values: xp.ndarray = None):
         """
         Compute the spatial kernel from the grid's mask and the taper values.
@@ -269,9 +279,9 @@ class RectangularGrid:
         spatial_kernel
             Shape (2 * n1 - 1, ..., 2 * nd - 1)
         """
-        if taper_values is None:
-            return spatial_kernel(self.mask, n_spatial_dim=self.ndim)
-        return spatial_kernel(self.mask * taper_values.values, n_spatial_dim=self.ndim)
+        if self.nvars > 1:
+            taper_values = xp.expand_dims(taper_values, -1)
+        return spatial_kernel(self.mask * taper_values, n_spatial_dim=self.ndim)
 
     def covariance_matrix(self, model: CovarianceModel):
         """

@@ -25,7 +25,7 @@ class TestEpFullGrid:
         periodograms = []
         for i in range(10000):
             sample_i = sampler()
-            p_value = p_computer([sample_i[..., 0], sample_i[..., 1]])
+            p_value = p_computer(sample_i)
             periodograms.append(xp.to_cpu(p_value))
         avg_per = np.mean(periodograms, axis=0)
         ep_computer = ExpectedPeriodogram(self.grid, p_computer)

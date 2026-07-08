@@ -1,25 +1,24 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
 from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen
+
+xp = BackendManager.get_backend()
 
 
-class Sample:
+class Sample(Freezable):
     """
     General class for the definition of a sampled random field. Allows to store computed quantities such as
     periodograms etc.
     """
 
-    def __init__(self, grid: RectangularGrid, values: np.ndarray):
+    def __init__(self, grid: RectangularGrid, values: xp.ndarray):
         self.grid = grid
         self.values = values
-        self.periodograms = dict()
+        super().__init__()
+        self.freeze()
 
-    def __hash__(self):
-        return id(self)
-
-    def __eq__(self, other):
-        eq_grid = self.grid == other.grid
-        eq_values = np.all(self.values == other.values)
-        return eq_grid and eq_values
+    def __array__(self, *args, **kwargs):
+        return self.values
 
 
 class SampleOnRectangularGrid(Sample):
@@ -28,9 +27,10 @@ class SampleOnRectangularGrid(Sample):
     missing locations are not used.
     """
 
-    def __init__(self, grid: RectangularGrid, values: np.ndarray):
+    def __init__(self, grid: RectangularGrid, values: xp.ndarray):
+        super(SampleOnRectangularGrid, self).__init__(grid, values)
         assert isinstance(
             grid, RectangularGrid
         ), "The grid should be an instance of RectangularGrid"
-        assert values.shape == grid.n, "The shape of the values does not match the grid"
-        super(SampleOnRectangularGrid, self).__init__(grid, values)
+        if self.grid.nvars == 1:
+            assert values.shape == grid.n, "The shape of the values does not match the grid"

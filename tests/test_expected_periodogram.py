@@ -1,4 +1,5 @@
 from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.inference.tapers import HanningTaper
 
 np = BackendManager.get_backend()
 randn = BackendManager.get_randn()
@@ -81,17 +82,14 @@ def test_compare_to_mean_taper():
     """
     Same as above but with the use of a taper.
     """
-    hanning = BackendManager.get_hanning()
+    hanning_taper = HanningTaper()
 
     shape = (32, 32)
     grid = RectangularGrid(shape)
     model = ExponentialModel(rho=5, sigma=1)
     sampler = SamplerOnRectangularGrid(model, grid)
     n_samples = 10000
-    periodogram = Periodogram()
-    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(
-        shape[1]
-    ).reshape(1, -1)
+    periodogram = Periodogram(taper=hanning_taper)
     expected_periodogram = ExpectedPeriodogram(grid, periodogram)
     mean_per = zeros(shape)
     for i in range(n_samples):
@@ -162,10 +160,9 @@ def test_compare_to_average_masked_grid():
     to the expected periodogram, in the case of a grid with missing observations.
     """
     shape = (32, 32)
-    grid = RectangularGrid(shape)
     mask = np.ones(shape)
     mask[:10, :40] = 0
-    grid.mask = mask
+    grid = RectangularGrid(shape, mask=mask)
     model = ExponentialModel(rho=5, sigma=1)
     sampler = SamplerOnRectangularGrid(model, grid)
     n_samples = 10000

@@ -1,3 +1,2 @@
 from .bivariate import BivariateUniformCorrelation
-from .dual_remote_sensing import DualRemoteSensing
 from .univariate import SquaredExponentialModel, ExponentialModel
