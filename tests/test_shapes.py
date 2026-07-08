@@ -1,4 +1,6 @@
 from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
+
 np = BackendManager.get_backend()
 
 randn = BackendManager.get_randn()
@@ -34,9 +36,10 @@ class TestShapesUnivariate:
         assert self.expected_periodogram(self.vectorized_model).shape == (64, 32, 3)
 
     def test_shape_whittle(self):
-        result = self.dbw(randn(*self.grid.n), self.model)
+        sample = SampleOnRectangularGrid(self.grid, randn(*self.grid.n))
+        result = self.dbw(sample, self.model)
         assert not hasattr(result, 'shape') and not hasattr(result, '__len__')
-        assert self.dbw(randn(*self.grid.n), self.vectorized_model).shape == (
+        assert self.dbw(sample, self.vectorized_model).shape == (
             3,
         )
 
@@ -52,10 +55,11 @@ class TestShapesUnivariate:
         assert jac[param_name].shape == (64, 32)
 
     def test_shape_whittle_gradient(self):
+        sample = SampleOnRectangularGrid(self.grid, randn(*self.grid.n))
         # Test gradient shape using the gradient method
         param_names = [f'{self.model.name}_rho']
         grad_dict = self.dbw.gradient(
-            randn(*self.grid.n),
+            sample,
             self.model,
             param_names=param_names,
         )
@@ -64,7 +68,7 @@ class TestShapesUnivariate:
         
         param_names = [f'{self.model.name}_rho', f'{self.model.name}_sigma']
         grad_dict = self.dbw.gradient(
-            randn(*self.grid.n),
+            sample,
             self.model,
             param_names=param_names,
         )
@@ -99,11 +103,12 @@ class TestShapesMultivariate:
 
     def test_shape_whittle(self):
         # __call__ returns a scalar (float), not a tensor
-        result = self.dbw(randn(*self.grid.n, 2), self.model)
+        sample = SampleOnRectangularGrid(self.grid, randn(*self.grid.n, 2))
+        result = self.dbw(sample, self.model)
         # Just verify it returns a number (scalar) - check it's not an array/tensor
         assert not hasattr(result, 'shape') and not hasattr(result, '__len__')
         result_vec = self.dbw(
-            randn(*self.grid.n, 2), self.vectorized_model
+            sample, self.vectorized_model
         )
         # For vectorized model, should return array of shape (3,)
         assert hasattr(result_vec, 'shape') and result_vec.shape == (3,)
@@ -130,9 +135,10 @@ class TestShapesMultivariate:
     def test_shape_whittle_gradient(self):
         # Test gradient shape using the gradient method
         # Use both bivariate parameters (r and f)
-        param_names = [self.model.parameter_names[0], self.model.parameter_names[1]]
+        sample = SampleOnRectangularGrid(self.grid, randn(*self.grid.n, 2))
+        param_names = (self.model.parameter_names[0], self.model.parameter_names[1])
         grad_dict = self.dbw.gradient(
-            randn(*self.grid.n, 2),
+            sample,
             self.model,
             param_names=param_names,
         )
@@ -142,7 +148,7 @@ class TestShapesMultivariate:
         # Also test with just one parameter using parameter_names directly
         param_names_single = [self.model.parameter_names[0]]
         grad_dict_single = self.dbw.gradient(
-            randn(*self.grid.n, 2),
+            sample,
             self.model,
             param_names=param_names_single,
         )

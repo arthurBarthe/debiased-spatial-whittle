@@ -212,7 +212,7 @@ def test_periodogram_oop():
     sampler = SamplerOnRectangularGrid(model, g)
     z = sampler()
     p = p_op(z)
-    p2 = periodogram(z, np.ones_like(z))
+    p2 = periodogram(z.values, np.ones_like(z.values))
     assert_allclose(p, p2)
 
 

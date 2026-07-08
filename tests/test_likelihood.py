@@ -51,7 +51,7 @@ def test_oop():
     g = np.ones((256, 256))
     cov_func = lambda x: exp_cov(x, rho_lkh)
     e_per = compute_ep_old(cov_func, g)
-    lkh_old = whittle(periodogram(z, g), e_per).item()
+    lkh_old = whittle(periodogram(z.values, g), e_per).item()
     assert lkh_old == lkh_oop
 
 
@@ -115,7 +115,7 @@ def test_whittle_grad_multi():
     g = RectangularGrid((32, 32), nvars=2)
     p = PeriodogramMulti()
     ep_op = ExpectedPeriodogram(g, p)
-    model = SquaredExponentialModel(rho=3, sigma=1)
+    model = ExponentialModel(rho=3, sigma=1)
     bvm = BivariateUniformCorrelation(model)
     bvm.r = 0.3
     bvm.f = 1.5
@@ -126,7 +126,7 @@ def test_whittle_grad_multi():
     
     # Get parameter name for r (first parameter of BivariateUniformCorrelation)
     param_name = bvm.parameter_names[0]
-    param_names = [param_name]
+    param_names = (param_name, )
 
     # Compute likelihood and gradient using the gradient method
     lkh = dbw(z, bvm)
@@ -179,7 +179,7 @@ def test_fisher_multivariate():
     dbw = MultivariateDebiasedWhittle(p, ep_op)
     
     # Get parameter names for r and f
-    param_names = [bvm.parameter_names[0], bvm.parameter_names[1]]
+    param_names = (bvm.parameter_names[0], bvm.parameter_names[1])
     
     h = dbw.fisher(bvm, param_names=param_names)
     assert np.all(np.diag(h) > 0)
@@ -195,8 +195,7 @@ def test_jmat():
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=2, sigma=1)
-    sampler = SamplerOnRectangularGrid(model, g)
-    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    param_names = (model.parameter_names[0], model.parameter_names[1])
     print(param_names)
     jmat = d.jmatrix(model, param_names=param_names)
     jmat_sample = d.jmatrix_sample(model, param_names=param_names, n_sims=1000)
@@ -222,7 +221,7 @@ def test_covmat():
     model = ExponentialModel()
     model.sigma = 1
     model.rho = 2
-    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    param_names = (model.parameter_names[0], model.parameter_names[1])
     covmat = e.covmat(model, param_names=param_names)
     print(covmat)
     assert np.all(np.diag(covmat) >= 0)
@@ -234,7 +233,7 @@ def test_jmatrix_sample():
     ep = ExpectedPeriodogram(g, p)
     d = DebiasedWhittle(p, ep)
     model = ExponentialModel(rho=2, sigma=1)
-    param_names = [model.parameter_names[0], model.parameter_names[1]]
+    param_names = (model.parameter_names[0], model.parameter_names[1])
     jmat = d.jmatrix_sample(model, param_names=param_names, n_sims=10)
     print(jmat)
 
@@ -251,7 +250,7 @@ def test_jmatrix_sample_multivariate():
     bvm.r = 0.3
     bvm.f = 1.5
     dbw = MultivariateDebiasedWhittle(p, ep_op)
-    param_names = [bvm.parameter_names[0], bvm.parameter_names[1]]
+    param_names = (bvm.parameter_names[0], bvm.parameter_names[1])
     jmat = dbw.jmatrix_sample(bvm, param_names=param_names)
     assert jmat.shape == (2, 2)
     assert np.all(np.diag(jmat) > 0)

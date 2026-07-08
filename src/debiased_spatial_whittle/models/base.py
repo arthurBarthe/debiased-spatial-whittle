@@ -312,9 +312,8 @@ class CovarianceModel(ModelInterface, Freezable):
                     return True
             return False
 
-
     @property
-    def parameter_names(self) -> tuple:
+    def parameter_names(self) -> tuple[str]:
         out = []
         for param_name in self._parameters:
             out.append(f'{self.name}_{param_name}')
@@ -323,14 +322,14 @@ class CovarianceModel(ModelInterface, Freezable):
         return out
 
     @property
-    def free_parameter_names(self) -> tuple:
+    def free_parameter_names(self) -> tuple[str]:
         out = []
         for param_name in self._parameters:
             if not param_name in self._frozen_parameters:
                 out.append(f'{self.name}_{param_name}')
         for child in self.children:
             out.extend(child.free_parameter_names)
-        return out
+        return tuple(out)
 
     @property
     def parameters_repr(self) -> tuple[str]:
@@ -681,21 +680,22 @@ class ReparameterizedModel(ModelInterface, ABC):
         return ProductModel(self, other)
 
 
-class LogScaleReparameterizedModel(ReparameterizedModel):
+class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     """
     Class that allows to use a log scale parameterization of a base model.
     """
-    def __init__(self, base_model: ModelInterface):
+    def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
+        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(xp.bool)
 
     def map_parameters(self, *params):
         params_array = xp.stack(params)
-        mapped_params = xp.exp(params_array)
+        mapped_params = xp.where(self.sel, xp.exp(params_array), params_array)
         return [_.squeeze() for _ in xp.split(mapped_params, 1)]
 
     def imap_parameters(self, *params):
         params_array = xp.stack(params)
-        mapped_params = xp.log(params_array)
+        mapped_params = xp.where(self.sel, xp.log(params_array), params_array)
         return [_.squeeze() for _ in xp.split(mapped_params, 1)]
 
     @property
@@ -705,6 +705,22 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
     @property
     def free_parameter_names(self):
         return self.base_model.free_parameter_names
+
+    @property
+    def free_parameters_repr(self):
+        repr_base_params = self.base_model.free_parameters_repr
+        return tuple([f"log {p_repr}" for p_repr in repr_base_params])
+
+    @property
+    def parameters_repr(self):
+        repr_base_params = self.base_model.parameters_repr
+        return tuple([f"log {p_repr}" for p_repr in repr_base_params])
+
+    def frozen_copy(self):
+        copy = self.copy()
+        copy.freeze()
+        return copy
+
 
 
 class SeparableModel:
@@ -721,4 +737,5 @@ if __name__ == "__main__":
     print(model)
     lags = xp.array([[0., 0., 0.], [0., 1., 2.]])
     print(model(lags))
+
     print(model.jacobian(lags))

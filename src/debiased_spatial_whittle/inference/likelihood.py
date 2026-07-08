@@ -2,7 +2,7 @@ from typing import Callable, Union
 from scipy.optimize import minimize, fmin_l_bfgs_b
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.sampling.simulation import MultivariateSamplerOnRectangularGrid
-from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelParameter, ModelInterface
 from debiased_spatial_whittle.inference.multivariate_periodogram import (
     Periodogram as MultPeriodogram,
 )
@@ -32,7 +32,7 @@ def shape_two(shape):
     return tuple(new_shape)
 
 
-def whittle_prime(per, e_per, e_per_prime):
+def whittle_prime(per, e_per, e_per_prime, freq_mask):
     n = prod_list(per.shape)
     if e_per.ndim != e_per_prime.ndim:
         out = []
@@ -66,7 +66,7 @@ class MultivariateDebiasedWhittle:
 
     def __call__(
         self,
-        z: xp.ndarray,
+        sample : SampleOnRectangularGrid,
         model: CovarianceModel,
         params_for_gradient: list[ModelParameter] = None,
     ):
@@ -100,7 +100,7 @@ class MultivariateDebiasedWhittle:
         xp.ndarray
             The Whittle likelihood value
         """
-        p = self.periodogram([z[..., 0], z[..., 1]])
+        p = self.periodogram(sample)
         ep = self.expected_periodogram(model)
         n_spatial_dim = p.ndim - 2
         if p.ndim == ep.ndim - 1:
@@ -121,7 +121,7 @@ class MultivariateDebiasedWhittle:
             whittle = whittle.item()
         return whittle
 
-    def gradient(self, sample, model, param_names=None):
+    def gradient(self, sample: SampleOnRectangularGrid, model: ModelInterface, param_names: tuple[str] = None):
         r"""
         Compute the gradient of the Whittle likelihood with respect to model parameters.
         
@@ -139,11 +139,11 @@ class MultivariateDebiasedWhittle:
         
         Parameters
         ----------
-        sample : xp.ndarray
+        sample : SampleOnRectangularGrid
             Input data sample
         model : CovarianceModel
             Covariance model
-        param_names : list[str], optional
+        param_names : tuple[str], optional
             Names of parameters with respect to which the gradient is computed
             
         Returns
@@ -151,7 +151,7 @@ class MultivariateDebiasedWhittle:
         dict
             Dictionary mapping parameter names to their gradient values
         """
-        p = self.periodogram([sample[..., 0], sample[..., 1]])
+        p = self.periodogram(sample)
         ep = self.expected_periodogram(model)
         d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
         grad_dbw = dict()
@@ -169,7 +169,7 @@ class MultivariateDebiasedWhittle:
             grad_dbw[param_name] = d_whittle
         return grad_dbw
 
-    def fisher(self, model: CovarianceModel, param_names: list[str] = None):
+    def fisher(self, model: CovarianceModel, param_names: tuple[str] = None):
         """Provides the expectation of the hessian matrix"""
         if param_names is None:
             param_names = model.free_parameter_names
@@ -193,7 +193,7 @@ class MultivariateDebiasedWhittle:
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        param_names: list[str] = None,
+        param_names: tuple[str] = None,
         n_sims: int = 400,
         block_size: int = 100,
     ) -> xp.ndarray:
@@ -236,7 +236,6 @@ class MultivariateDebiasedWhittle:
     def variance_of_estimates(
         self,
         model: CovarianceModel,
-        params: list[ModelParameter] = None,
         jmat: xp.ndarray = None,
     ):
         """
@@ -247,8 +246,6 @@ class MultivariateDebiasedWhittle:
         ----------
         model
             Covariance model
-        params
-            Estimated parameters. The method returns the covariance matrix of estimates of those parameters
         jmat
             The variance of the score, if it has already been pre-computed. If not provided, it is computed
             exactly which can be computationally expensive.
@@ -394,22 +391,22 @@ class DebiasedWhittle:
 
     def __call__(
         self,
-        sample: xp.ndarray,
+        sample: SampleOnRectangularGrid,
         model: CovarianceModel,
-        params_for_gradient: list[ModelParameter] = None,
+        params_for_gradient: tuple[str] = None,
     ) -> xp.float64:
         """
         Computes the Debiased Whittle likelihood for these data
 
         Parameters
         ----------
-        sample: ndarray | SampleOnRectangularGrid
+        sample: SampleOnRectangularGrid
             sample data
 
         model: CovarianceModel
             covariance model used to compute the likelihood of the data
 
-        params_for_gradient: Parameters, optional
+        params_for_gradient: tuple[str]
             parameters with respect to which we require the derivative of the likelihood. Default, None
 
         Returns
@@ -426,7 +423,7 @@ class DebiasedWhittle:
         whittle = self.whittle(p, ep)
         return whittle if whittle.shape else whittle.item()
 
-    def gradient(self, sample, model, param_names = None):
+    def gradient(self, sample: SampleOnRectangularGrid, model: ModelInterface, param_names: tuple[str] = None):
         """
         Compute the gradient of Debiased Whittle with respect to model parameters.
         """
@@ -435,7 +432,7 @@ class DebiasedWhittle:
         d_ep = self.expected_periodogram.jacobian(model, param_names=param_names)
         grad_dbw = dict()
         for param_name, d_ep_i in d_ep.items():
-            d_whittle = whittle_prime(p, ep, d_ep_i)
+            d_whittle = whittle_prime(p, ep, d_ep_i, self.frequency_mask)
             grad_dbw[param_name] = d_whittle
         return grad_dbw
 
@@ -461,7 +458,7 @@ class DebiasedWhittle:
         ep_eval = self.expected_periodogram(eval_model)
         return xp.sum(xp.log(ep_eval) + ep_true / ep_eval)
 
-    def fisher(self, model: CovarianceModel, param_names: list[str] = None):
+    def fisher(self, model: CovarianceModel, param_names: tuple[str] = None):
         """
         Provides the Fisher Information Matrix.
 
@@ -470,7 +467,7 @@ class DebiasedWhittle:
         model: CovarianceModel
             True covariance model
 
-        param_names: list[str], optional
+        param_names: tuple[str], optional
             Parameter names with respect to which the Fisher is obtained.
             If None, uses all model parameters.
 
@@ -509,7 +506,7 @@ class DebiasedWhittle:
     def jmatrix(
         self,
         model: CovarianceModel,
-        param_names: list[str] = None,
+        param_names: tuple[str] = None,
     ):
         """
         Provides the variance matrix of the score (gradient of likelihood) under the specified model.
@@ -552,7 +549,7 @@ class DebiasedWhittle:
     def jmatrix_sample(
         self,
         model: CovarianceModel,
-        param_names: list[str] = None,
+        param_names: tuple[str] = None,
         n_sims: int = 1000,
         block_size: int = 100,
     ) -> xp.ndarray:
