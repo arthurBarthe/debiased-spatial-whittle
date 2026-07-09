@@ -32,7 +32,6 @@ class ModelParameter:
 
     def __set_name__(self, owner, name):
         self.name = name
-        self.long_name = f'{owner.__name__}_{name}'
         if not hasattr(owner, '_parameters'):
             owner._parameters = []
         if not hasattr(owner, '_parameter_bounds'):
@@ -347,7 +346,7 @@ class CovarianceModel(ModelInterface, Freezable):
             if not pname in self._frozen_parameters:
                 out.append(getattr(self.__class__, pname).latex_display)
         for child in self.children:
-            out.extend(child.parameters_repr)
+            out.extend(child.free_parameters_repr)
         return out
 
     def get_parameter(self, name: str):
@@ -427,7 +426,12 @@ class CovarianceModel(ModelInterface, Freezable):
                 param_value = getattr(self, param_name)
                 is_fixed = param_name in self._frozen_parameters
                 fixed_text = " [red](frozen)[/red]" if is_fixed else ""
-                params_tree.add(f"{param_name}: {param_value}{fixed_text}")
+                # Add bounds if not frozen
+                bounds_text = ""
+                if not is_fixed and param_name in self._parameter_bounds:
+                    bounds = self._parameter_bounds[param_name]
+                    bounds_text = f" [dim](bounds: [{bounds[0]}, {bounds[1]}])[/dim]"
+                params_tree.add(f"{param_name}: {param_value}{fixed_text}{bounds_text}")
         
         # Add children recursively
         for child in self.children:
@@ -450,9 +454,14 @@ class CovarianceModel(ModelInterface, Freezable):
                 param_value = getattr(self, param_name)
                 is_fixed = param_name in self._frozen_parameters
                 fixed_marker = " (frozen)" if is_fixed else ""
+                # Add bounds if not frozen
+                bounds_info = ""
+                if not is_fixed and param_name in self._parameter_bounds:
+                    bounds = self._parameter_bounds[param_name]
+                    bounds_info = f" [{bounds[0]}, {bounds[1]}]"
                 is_last_param = (idx == len(self._parameters) - 1) and (not self.children)
                 param_connector = "└── " if is_last_param else "├── "
-                lines.append(f"{new_prefix}{param_connector}{param_name}: {param_value}{fixed_marker}")
+                lines.append(f"{new_prefix}{param_connector}{param_name}: {param_value}{fixed_marker}{bounds_info}")
         
         # Children
         for idx, child in enumerate(self.children):
@@ -471,14 +480,16 @@ class CovarianceModel(ModelInterface, Freezable):
         # Parameters table
         if self._parameters:
             html.append('<table style="margin-left:15px;">')
-            html.append('<tr><th style="text-align:left;">Parameter</th><th style="text-align:left;">Value</th><th>Fixed</th></tr>')
+            html.append('<tr><th style="text-align:left;">Parameter</th><th style="text-align:left;">Value</th><th>Fixed</th><th style="text-align:left;">Bounds</th></tr>')
             for param_name in self._parameters:
                 param_obj = getattr(self.__class__, param_name)
                 param_value = getattr(self, param_name)
                 is_fixed = param_name in self._frozen_parameters
                 fixed_str = 'Yes' if is_fixed else 'No'
                 fixed_style = 'color:orange;' if is_fixed else ''
-                html.append(f'<tr><td>{param_name}</td><td>{param_value}</td><td style="{fixed_style}">{fixed_str}</td></tr>')
+                # Add bounds column
+                bounds_str = '-' if is_fixed else f'[{self._parameter_bounds[param_name][0]}, {self._parameter_bounds[param_name][1]}]'
+                html.append(f'<tr><td>{param_name}</td><td>{param_value}</td><td style="{fixed_style}">{fixed_str}</td><td>{bounds_str}</td></tr>')
             html.append('</table>')
         
         # Children
@@ -666,9 +677,6 @@ class ReparameterizedModel(ModelInterface, ABC):
     def free_parameter_names(self) -> tuple:
         return tuple(filter(lambda pname: pname not in self._frozen_parameters, self.parameter_names))
 
-    def freeze_parameter(self, name: str):
-        self._frozen_parameters.append(name)
-
     def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
         base_model_params = self.map_parameters(*params)
         return self.base_model.compute(lags, *base_model_params)
@@ -691,12 +699,12 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     def map_parameters(self, *params):
         params_array = xp.stack(params)
         mapped_params = xp.where(self.sel, xp.exp(params_array), params_array)
-        return [_.squeeze() for _ in xp.split(mapped_params, 1)]
+        return tuple([_.squeeze() for _ in xp.split(mapped_params, 1)])
 
     def imap_parameters(self, *params):
         params_array = xp.stack(params)
         mapped_params = xp.where(self.sel, xp.log(params_array), params_array)
-        return [_.squeeze() for _ in xp.split(mapped_params, 1)]
+        return tuple([_.squeeze() for _ in xp.split(mapped_params, 1)])
 
     @property
     def parameter_names(self):
@@ -706,10 +714,13 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     def free_parameter_names(self):
         return self.base_model.free_parameter_names
 
+    def freeze_parameter(self, name):
+        self.base_model.freeze_parameter(name)
+
     @property
     def free_parameters_repr(self):
-        repr_base_params = self.base_model.free_parameters_repr
-        return tuple([f"log {p_repr}" for p_repr in repr_base_params])
+        return tuple([f"log {p_repr}" if self.sel[self.parameter_names.index(p_name)] else f"{p_repr}"
+                      for (p_repr, p_name) in zip(self.base_model.free_parameters_repr, self.free_parameter_names)])
 
     @property
     def parameters_repr(self):
