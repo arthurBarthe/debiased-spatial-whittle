@@ -1,4 +1,6 @@
 from functools import cached_property, lru_cache
+
+from debiased_spatial_whittle.inference.tapers import Taper
 from debiased_spatial_whittle.models.base import CovarianceModel
 from debiased_spatial_whittle.grids.spatial_kernel import spatial_kernel
 from debiased_spatial_whittle.backend import BackendManager
@@ -265,20 +267,21 @@ class RectangularGrid(Freezable):
         return xp.stack(lags)
 
     @lru_cache_frozen
-    def spatial_kernel(self, taper_values: xp.ndarray = None):
+    def spatial_kernel(self, taper: Taper):
         """
         Compute the spatial kernel from the grid's mask and the taper values.
 
         Parameters
         ----------
-        taper_values
-            Taper values applied to data on the grid
+        taper
+            Taper applied to observations
 
         Returns
         -------
         spatial_kernel
             Shape (2 * n1 - 1, ..., 2 * nd - 1)
         """
+        taper_values = taper(self.n)
         if self.nvars > 1:
             taper_values = xp.expand_dims(taper_values, -1)
         return spatial_kernel(self.mask * taper_values, n_spatial_dim=self.ndim)

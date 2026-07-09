@@ -283,7 +283,7 @@ class ExpectedPeriodogram(Freezable):
 
     @property
     def taper(self):
-        return self.periodogram.taper(self.grid.n)
+        return self.periodogram.taper
 
     @lru_cache_frozen
     def __call__(self, model: CovarianceModel) -> xp.ndarray:

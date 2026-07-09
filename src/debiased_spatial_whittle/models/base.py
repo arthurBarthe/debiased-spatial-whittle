@@ -34,10 +34,7 @@ class ModelParameter:
         self.name = name
         if not hasattr(owner, '_parameters'):
             owner._parameters = []
-        if not hasattr(owner, '_parameter_bounds'):
-            owner._parameter_bounds = dict()
         owner._parameters.append(name)
-        owner._parameter_bounds[self.name] = self.bounds
 
     def __get__(self, obj, objtype=None):
         if obj is None:
@@ -262,6 +259,18 @@ class CovarianceModel(ModelInterface, Freezable):
         self.children = children
         self.assign_params(*params)
         super().__init__()
+        self._parameter_bounds = self._init_parameter_bounds()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not hasattr(cls, "_parameters") and cls.__name__ != "BaseCovarianceModel":
+            cls._parameters = []
+
+    def _init_parameter_bounds(self):
+        bounds = dict()
+        for pname in self._parameters:
+            bounds[pname] = getattr(self.__class__, pname).bounds
+        return bounds
 
     def assign_params(self, *params):
         for param_name, param_value in zip(self._parameters, params):
@@ -300,7 +309,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     @ban_if_frozen
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
-        model_name, param_name = name.split("_")
+        model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             self._parameter_bounds[param_name] = bounds
             return True
@@ -350,7 +359,7 @@ class CovarianceModel(ModelInterface, Freezable):
         return out
 
     def get_parameter(self, name: str):
-        model_name, param_name = name.split("_")
+        model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             return getattr(self, param_name)
         else:
@@ -362,7 +371,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     @ban_if_frozen
     def set_parameter(self, name, value) -> bool:
-        model_name, param_name = name.split("_")
+        model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             setattr(self, param_name, value)
             return True
@@ -375,7 +384,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     @ban_if_frozen
     def freeze_parameter(self, name):
-        model_name, param_name = name.split("_")
+        model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             self._frozen_parameters.append(param_name)
             return True
@@ -659,7 +668,7 @@ class ReparameterizedModel(ModelInterface, ABC):
         self.base_model.set_parameters(dict(zip(self.base_model.parameter_names, self.map_parameters(new_parameters))))
 
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
-        self._parameter_bounds.append(bounds)
+        self._parameter_bounds[name] = bounds
 
     @property
     def free_parameter_bounds(self):
@@ -694,17 +703,25 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     """
     def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
-        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(xp.bool)
+        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
 
     def map_parameters(self, *params):
-        params_array = xp.stack(params)
-        mapped_params = xp.where(self.sel, xp.exp(params_array), params_array)
-        return tuple([_.squeeze() for _ in xp.split(mapped_params, 1)])
+        mapped_params = []
+        for log, param in zip(self.sel, params):
+            if log:
+                mapped_params.append(xp.exp(param))
+            else:
+                mapped_params.append(param)
+        return tuple(mapped_params)
 
     def imap_parameters(self, *params):
-        params_array = xp.stack(params)
-        mapped_params = xp.where(self.sel, xp.log(params_array), params_array)
-        return tuple([_.squeeze() for _ in xp.split(mapped_params, 1)])
+        mapped_params = []
+        for log, param in zip(self.sel, params):
+            if log:
+                mapped_params.append(xp.log(param))
+            else:
+                mapped_params.append(param)
+        return tuple(mapped_params)
 
     @property
     def parameter_names(self):
@@ -732,6 +749,115 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
         copy.freeze()
         return copy
 
+    @property
+    def free_parameter_bounds(self):
+        base_bounds = self.base_model.free_parameter_bounds
+        mapped_bounds = []
+        for i, (lower, upper) in enumerate(base_bounds):
+            if self.sel[i]:
+                # Log scale: transform bounds using log
+                # Convert to backend type, apply log, then convert back to Python float
+                lower_t = xp.log(xp.asarray(lower))
+                upper_t = xp.log(xp.asarray(upper))
+                mapped_bounds.append((lower_t.item() if hasattr(lower_t, 'item') else float(lower_t),
+                                      upper_t.item() if hasattr(upper_t, 'item') else float(upper_t)))
+            else:
+                # No transformation
+                mapped_bounds.append((lower, upper))
+        return mapped_bounds
+
+
+class SigmoidReparameterizedModel(ReparameterizedModel, Freezable):
+    """
+    Class that applies a sigmoid transformation to map unbounded parameters to bounded ones.
+    
+    The transformation maps from (-inf, inf) to the bounds of each parameter in the base model.
+    For a parameter with bounds (a, b), the mapping is:
+        x -> a + (b - a) * sigmoid(x)
+    where sigmoid(x) = 1 / (1 + exp(-x))
+    
+    The inverse mapping is:
+        y -> logit((y - a) / (b - a))
+    where logit(p) = log(p / (1 - p))
+    """
+    def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
+        super().__init__(base_model)
+        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
+        # Store the bounds for mapping
+        self._param_bounds = self.base_model.free_parameter_bounds
+    
+    def map_parameters(self, *params):
+        """Map from unbounded space to bounded space using sigmoid."""
+        mapped_params = []
+        for i, (param, use_sigmoid) in enumerate(zip(params, self.sel)):
+            if use_sigmoid:
+                lower, upper = self._param_bounds[i]
+                # Convert to backend array and apply sigmoid
+                param_t = xp.asarray(param)
+                sigmoid_val = 1.0 / (1.0 + xp.exp(-param_t))
+                mapped_param = lower + (upper - lower) * sigmoid_val
+                mapped_params.append(mapped_param)
+            else:
+                mapped_params.append(param)
+        return tuple(mapped_params)
+    
+    def imap_parameters(self, *params):
+        """Map from bounded space to unbounded space using logit."""
+        mapped_params = []
+        for i, (param, use_sigmoid) in enumerate(zip(params, self.sel)):
+            if use_sigmoid:
+                lower, upper = self._param_bounds[i]
+                # Convert to backend array
+                param_t = xp.asarray(param)
+                # Logit: log((y - a) / (b - a) / (1 - (y - a) / (b - a)))
+                # Simplified: logit((y - a) / (b - a))
+                normalized = (param_t - lower) / (upper - lower)
+                # Clip to avoid log(0) or log(inf)
+                normalized = xp.clip(normalized, 1e-10, 1 - 1e-10)
+                logit_val = xp.log(normalized / (1.0 - normalized))
+                mapped_params.append(logit_val)
+            else:
+                mapped_params.append(param)
+        return tuple(mapped_params)
+    
+    @property
+    def parameter_names(self):
+        return self.base_model.parameter_names
+    
+    @property
+    def free_parameter_names(self):
+        return self.base_model.free_parameter_names
+    
+    def freeze_parameter(self, name):
+        self.base_model.freeze_parameter(name)
+    
+    @property
+    def free_parameters_repr(self):
+        return tuple([f"sigmoid {p_repr}" if self.sel[self.parameter_names.index(p_name)] else f"{p_repr}"
+                      for (p_repr, p_name) in zip(self.base_model.free_parameters_repr, self.free_parameter_names)])
+    
+    @property
+    def parameters_repr(self):
+        repr_base_params = self.base_model.parameters_repr
+        return tuple([f"sigmoid {p_repr}" for p_repr in repr_base_params])
+    
+    @property
+    def free_parameter_bounds(self):
+        # For transformed parameters (sigmoid), bounds are (-inf, inf)
+        # For non-transformed parameters, use the base model bounds
+        base_bounds = self.base_model.free_parameter_bounds
+        mapped_bounds = []
+        for i, use_sigmoid in enumerate(self.sel):
+            if use_sigmoid:
+                mapped_bounds.append((-float('inf'), float('inf')))
+            else:
+                mapped_bounds.append(base_bounds[i])
+        return mapped_bounds
+    
+    def frozen_copy(self):
+        copy = self.copy()
+        copy.freeze()
+        return copy
 
 
 class SeparableModel:
@@ -749,4 +875,5 @@ if __name__ == "__main__":
     lags = xp.array([[0., 0., 0.], [0., 1., 2.]])
     print(model(lags))
 
-    print(model.jacobian(lags))
+    model2 = LogScaleReparameterizedModel(model)
+    print(model2.free_parameter_bounds)

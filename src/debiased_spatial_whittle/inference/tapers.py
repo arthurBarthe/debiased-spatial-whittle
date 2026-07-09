@@ -2,7 +2,6 @@ from typing import Callable
 
 from debiased_spatial_whittle.backend import BackendManager
 from debiased_spatial_whittle.caching import Freezable, ban_if_frozen, lru_cache_frozen
-from debiased_spatial_whittle.models.base import CovarianceModel
 
 xp = BackendManager.get_backend()
 ones = BackendManager.get_ones()
