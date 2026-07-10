@@ -3,8 +3,10 @@ from typing import Tuple
 
 from charset_normalizer.md import lru_cache
 from scipy.stats import multivariate_normal
+from debiased_spatial_whittle.models.tapers import CovarianceTaper
 from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.models.tapered import TaperedCovarianceModel
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.backend import BackendManager
 from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
@@ -258,3 +260,111 @@ class MultivariateSamplerOnRectangularGrid:
         """
         sample = self._sample()
         return SampleOnRectangularGrid(self.grid, sample)
+
+
+class SamplerOnRectangularGridTapered(SamplerOnRectangularGrid):
+    """
+    Class that allows to define efficient samplers on rectangular grids for tapered covariance models.
+    
+    This sampler automatically converts a base covariance model into a tapered covariance model
+    using the specified taper function. This is useful for creating sparse covariance matrices
+    while preserving the overall structure of the base model.
+    
+    Attributes
+    ----------
+    model: CovarianceModel
+        Original covariance model (before tapering)
+    
+    tapered_model: TaperedCovarianceModel
+        The tapered version of the original model
+        
+    taper: CovarianceTaper
+        The taper function used to modify the covariance
+        
+    grid: RectangularGrid
+        Grid on which we wish to sample
+        
+    tol: float
+        Tolerance level for circulant embedding
+        
+    Notes
+    -----
+    This sampler accounts for the grid's mask by setting missing values to zero.
+    The tapering is applied to the covariance model before sampling.
+    
+    Examples
+    --------
+    >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
+    >>> from debiased_spatial_whittle.models.tapers import WendlandTaper
+    >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+    >>> model = ExponentialModel(rho=12., sigma=1.)
+    >>> grid = RectangularGrid((256, 128))
+    >>> taper = WendlandTaper(range=10.0)
+    >>> sampler = SamplerOnRectangularGridTapered(model, grid, taper)
+    >>> sample = sampler()
+    >>> sample.shape
+    (256, 128)
+    """
+    
+    def __init__(
+        self, 
+        model: CovarianceModel, 
+        grid: RectangularGrid, 
+        taper: CovarianceTaper = None, 
+        taper_range: float = None,
+        tol: float = 0.01
+    ):
+        """
+        Parameters
+        ----------
+        model: CovarianceModel
+            Original covariance model from which we wish to sample
+            
+        grid: RectangularGrid
+            Grid on which we wish to sample
+            
+        taper: CovarianceTaper, optional
+            Taper function to apply to the covariance model. If None, 
+            a default WendlandTaper is used.
+            
+        taper_range: float, optional
+            Range parameter for the taper function. Required if taper is None.
+            
+        tol: float
+            Tolerance level for circulant embedding. The circulant embedding method 
+            embeds the covariance matrix into a circulant matrix, which is then 
+            diagonal in the Fourier domain. However, the circulant embedding might 
+            not be non-negative definite. This results in negative values on the 
+            diagonal. We compute the absolute value of the sum of negative values,
+            and the sum of positive values. If the ratio of the two is greater than 
+            the tolerance level, we raise an error.
+        """
+        # Import taper classes if needed
+        if taper is None:
+            if taper_range is None:
+                raise ValueError("taper_range must be specified when taper is None")
+            from debiased_spatial_whittle.models.tapers import WendlandTaper
+            taper = WendlandTaper(range=taper_range)
+        
+        # Create tapered model
+        self._original_model = model
+        self._taper = taper
+        tapered_model = TaperedCovarianceModel(model, taper, range=taper.range)
+        
+        # Initialize parent class with tapered model
+        super().__init__(tapered_model, grid, tol)
+    
+    @property
+    def original_model(self) -> CovarianceModel:
+        """Original covariance model (before tapering)"""
+        return self._original_model
+    
+    @property
+    def taper(self) -> CovarianceTaper:
+        """Taper function used for the covariance model"""
+        return self._taper
+    
+    @property
+    def tapered_model(self) -> TaperedCovarianceModel:
+        """Tapered covariance model used for sampling"""
+        return self.model
