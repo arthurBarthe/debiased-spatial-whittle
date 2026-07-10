@@ -114,7 +114,8 @@ class SamplerOnRectangularGrid:
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
             if not self.exact:
-                cov *= self.sampling_grid.spatial_kernel()
+                from debiased_spatial_whittle.inference.tapers import HanningTaper
+                cov *= self.sampling_grid.spatial_kernel(HanningTaper())
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = xp.real(f)
             min_, max_ = xp.min(f), xp.max(f)
@@ -159,8 +160,6 @@ class SamplerOnRectangularGrid:
         result = self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
         return SampleOnRectangularGrid(self.grid, result)
-
-
 
 
 class MultivariateSamplerOnRectangularGrid:
