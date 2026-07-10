@@ -349,7 +349,7 @@ class SamplerOnRectangularGridTapered(SamplerOnRectangularGrid):
         # Create tapered model
         self._original_model = model
         self._taper = taper
-        tapered_model = TaperedCovarianceModel(model, taper, range=taper.range)
+        tapered_model = TaperedCovarianceModel(model, taper)
         
         # Initialize parent class with tapered model
         super().__init__(tapered_model, grid, tol)
