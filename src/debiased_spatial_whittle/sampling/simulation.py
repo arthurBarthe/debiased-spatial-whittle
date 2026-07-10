@@ -59,8 +59,23 @@ class SamplerOnRectangularGrid:
     """
 
     def __init__(
-        self, model: CovarianceModel, grid: RectangularGrid, exact: bool = True
+        self, model: CovarianceModel, grid: RectangularGrid, tol: float = 0.01
     ):
+        """
+        Parameters
+        ----------
+        model: CovarianceModel
+            Model from which we wish to sample
+
+        grid: RectangularGrid
+            Grid on which we wish to sample
+        tol: float
+            Tolerance level. The circulant embedding method embeds the covariance matrix into a circulant matrix, which
+            is then diagonal in the Fourier domain. However, the circulant embedding might not be non-negative definite.
+            This results in negative values on the diagonal. We compute the absolute value of the sum of negative values,
+            and the sum of positive values. If the ratio of the two is greater than the tolerance level, we raise
+            an error.
+        """
         self.model = model
         self.grid = grid
         self.sampling_grid = grid
@@ -68,7 +83,7 @@ class SamplerOnRectangularGrid:
         self._n_sims = 1
         self._i_sim = 0
         self._z = None
-        self.exact = exact
+        self.tol = tol
         try:
             self.spectral_amplitudes
         except:
@@ -113,19 +128,19 @@ class SamplerOnRectangularGrid:
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
-            if not self.exact:
-                from debiased_spatial_whittle.inference.tapers import HanningTaper
-                cov *= self.sampling_grid.spatial_kernel(HanningTaper())
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = xp.real(f)
-            min_, max_ = xp.min(f), xp.max(f)
-            if min_ <= -1e-2:
-                print(min_, max_)
+            if self._get_level(f) > self.tol:
                 raise ValueError(
-                    f"Embedding is not positive definite, min value {min_}."
+                    f"Embedding is not positive definite, {self._get_level(f)} > {self.tol}"
                 )
             self._f = xp.maximum(f, xp.zeros_like(f))
         return self._f
+
+    def _get_level(self, amplitudes: xp.ndarray):
+        negative = xp.sum(xp.abs(amplitudes[amplitudes < 0]))
+        positive = xp.sum(amplitudes[amplitudes > 0])
+        return negative / positive
 
     def __call__(self):
         """
