@@ -52,7 +52,7 @@ def ravel_multi_index(coords, shape):
 
 
 class BackendManager:
-    backend_name = "numpy"
+    backend_name = "torch"
     device = "cpu"
     block = False
 

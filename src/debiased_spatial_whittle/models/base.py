@@ -32,7 +32,7 @@ class ModelParameter:
 
     def __set_name__(self, owner, name):
         self.name = name
-        if not hasattr(owner, '_parameters'):
+        if not '_parameters' in owner.__dict__:
             owner._parameters = []
         owner._parameters.append(name)
 
@@ -263,7 +263,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if not hasattr(cls, "_parameters") and cls.__name__ != "BaseCovarianceModel":
+        if not hasattr(cls, "_parameters"):
             cls._parameters = []
 
     def _init_parameter_bounds(self):

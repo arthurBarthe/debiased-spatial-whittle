@@ -552,6 +552,7 @@ class DebiasedWhittle:
         param_names: tuple[str] = None,
         n_sims: int = 1000,
         block_size: int = 100,
+        sampler = None
     ) -> xp.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
@@ -594,7 +595,8 @@ class DebiasedWhittle:
         frozen_model = model.frozen_copy()
         if param_names is None:
             param_names = model.free_parameter_names
-        sampler = SamplerOnRectangularGrid(frozen_model, self.expected_periodogram.grid)
+        if sampler is None:
+            sampler = SamplerOnRectangularGrid(frozen_model, self.expected_periodogram.grid)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):
