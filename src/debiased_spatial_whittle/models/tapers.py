@@ -129,7 +129,7 @@ class SphericalTaper(CovarianceTaper):
         
         # Apply linear taper where distance <= range
         r = normalized_dist[mask]
-        taper_values[mask] = 1 - r
+        taper_values[mask] = (1 - r) ** 2 * (1 + r / 2)
         
         return taper_values
 
