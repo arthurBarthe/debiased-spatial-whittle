@@ -203,7 +203,7 @@ class NuggetModel(CovarianceModel):
     def compute(self, lags: xp.ndarray, nugget: xp.ndarray, *params) -> xp.ndarray:
         child_params = params
         n_spatial_dim = lags.shape[0]
-        zero_lag = xp.zeros((n_spatial_dim, lags.shape[-1]))
+        zero_lag = xp.zeros((n_spatial_dim, ))
         variance = self.children[0].compute(zero_lag, *child_params)
         return xp.all(lags == 0, 0) * nugget * variance + (
             1 - nugget
