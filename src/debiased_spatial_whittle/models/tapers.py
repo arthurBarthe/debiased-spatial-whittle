@@ -71,22 +71,28 @@ class CompactCovarianceTaper(CovarianceTaper):
 
 class WendlandTaper(CovarianceTaper):
     """
-    Wendland covariance taper function.
+    Wendland covariance taper function (C2 type).
     
     Implements the Wendland C2 function, which is a compactly supported
     positive definite function commonly used in covariance tapering.
     
-    The Wendland function is defined as:
+    The Wendland C2 function is defined as:
     W(r) = (1 - r)^4 * (1 + 4r) for r <= 1, 0 otherwise
     
     Attributes
     ----------
     range : float
         The distance at which the taper becomes zero
+    
+    type : str
+        Type of Wendland function: 'C2' or 'C4'
     """
     
-    def __init__(self, range: float = 1.0):
+    def __init__(self, range: float = 1.0, type: str = 'C2'):
         self.range = float(range)
+        self.type = type
+        if type not in ['C2', 'C4']:
+            raise ValueError(f"type must be 'C2' or 'C4', got {type}")
     
     def compute_taper(self, lags: xp.ndarray) -> xp.ndarray:
         """Compute Wendland taper values."""
@@ -96,9 +102,14 @@ class WendlandTaper(CovarianceTaper):
         mask = normalized_dist <= 1.0
         taper_values = xp.zeros_like(normalized_dist)
         
-        # Apply Wendland C2 function where distance <= range
+        # Apply the selected Wendland function where distance <= range
         r = normalized_dist[mask]
-        taper_values[mask] = (1 - r)**4 * (1 + 4 * r)
+        if self.type == 'C2':
+            # Wendland C2: (1 - r)^4 * (1 + 4r)
+            taper_values[mask] = (1 - r)**4 * (1 + 4 * r)
+        elif self.type == 'C4':
+            # Wendland C4: (1 - r)^6 * (35r^2 + 18r + 3)/3
+            taper_values[mask] = (1 - r)**6 * (35 * r**2 + 18 * r + 3) / 3
         
         return taper_values
 
