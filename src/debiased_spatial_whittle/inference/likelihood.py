@@ -196,6 +196,7 @@ class MultivariateDebiasedWhittle:
         param_names: tuple[str] = None,
         n_sims: int = 400,
         block_size: int = 100,
+        sampler: MultivariateSamplerOnRectangularGrid = None,
     ) -> xp.ndarray:
         """
         Computes the sample covariance matrix of the gradient of the debiased Whittle likelihood from
@@ -213,6 +214,8 @@ class MultivariateDebiasedWhittle:
             Number of samples per simulations. A higher number should improve
             computational efficiency, but for large grids this may cause
             Out Of Memory issues.
+        sampler
+            Sampler used to compute the covariance matrix of the gradient of the debiased Whittle likelihood
 
         Returns
         -------
@@ -221,7 +224,8 @@ class MultivariateDebiasedWhittle:
         """
         if param_names is None:
             param_names = model.free_parameter_names
-        sampler = MultivariateSamplerOnRectangularGrid(model, self.expected_periodogram.grid, p=2)
+        if sampler is None:
+            sampler = MultivariateSamplerOnRectangularGrid(model, self.expected_periodogram.grid, p=2)
         sampler.n_sims = block_size
         gradients = []
         for i_sample in range(n_sims):

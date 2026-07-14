@@ -11,7 +11,7 @@ from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.multivariate_periodogram import Periodogram as MultivariatePeriodogram
 from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, MultivariateDebiasedWhittle, Estimator
-from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid, SamplerOnRectangularGridTapered
 
 
 class GoodnessOfFit:
@@ -86,6 +86,7 @@ def corner_plot_variance_of_estimates(
     model: ModelInterface,
     grid: RectangularGrid,
     dbw: DebiasedWhittle | MultivariateDebiasedWhittle = None,
+    sampler: SamplerOnRectangularGrid = None,
     n_sims: int = 250,
     width: int = 800,
     height: int = 800,
@@ -155,7 +156,8 @@ def corner_plot_variance_of_estimates(
             dbw = DebiasedWhittle(periodogram, ep)
     
     # Compute variance of estimates
-    cov_mat = dbw.variance_of_estimates(model)
+    jmat = dbw.jmatrix_sample(model, n_sims=n_sims, sampler=sampler)
+    cov_mat = dbw.variance_of_estimates(model, jmat)
     
     # Convert to numpy if needed (for torch backend)
     if hasattr(cov_mat, 'numpy'):
