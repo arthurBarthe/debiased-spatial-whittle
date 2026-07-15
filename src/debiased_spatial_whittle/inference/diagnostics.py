@@ -44,11 +44,29 @@ class GoodnessOfFit:
     def sampler(self):
         return SamplerOnRectangularGrid(self.model, self.grid)
 
-    def compute_residuals(self, sample, model):
+    def compute_residuals(self, sample = None, model = None):
+        if sample is None:
+            sample = self.sample
+        if model is None:
+            model = self.model
         periodogram = self.periodogram_computer(sample)
         ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
         residuals = 1 - np.exp(-periodogram / ep)
         return residuals
+
+    def spatial_residuals(self, sample = None, model = None):
+        randn = BackendManager.get_randn()
+        if sample is None:
+            sample = self.sample
+        if model is None:
+            model = self.model
+        fftn, ifftn = BackendManager.get_fft_methods()
+        periodogram = self.periodogram_computer(sample)
+        ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
+        residuals = np.sqrt(periodogram / ep)
+        z = randn(*sample.grid.n) + 1j * randn(*sample.grid.n)
+        spatial_residuals = fftn(residuals * z) / np.sqrt(sample.grid.n_points)
+        return np.real(spatial_residuals)
 
     def compute_diagnostic_statistic(self, sample=None, model=None):
         if sample is None:
@@ -123,17 +141,12 @@ def corner_plot_variance_of_estimates(
     """
     # Get parameter names and true values
     # Use free_parameters_repr if available for LaTeX representations
-    if hasattr(model, 'free_parameters_repr'):
-        param_names_raw = model.parameter_names
-        param_names_repr = model.free_parameters_repr
-        # Wrap LaTeX in $...$ for plotly rendering
-        param_names = [f'${name}$' for name in param_names_repr]
-    else:
-        param_names = model.parameter_names
-        param_names_raw = model.parameter_names
+    param_names_repr = model.free_parameters_repr
+    # Wrap LaTeX in $...$ for plotly rendering
+    param_names = [f'${name}$' for name in param_names_repr]
     
-    true_params = model.get_parameters(param_names_raw)
-    n_params = len(param_names)
+    true_params = model.free_parameters
+    n_params = len(true_params)
     
     # Convert to numpy arrays
     import numpy as np
@@ -334,5 +347,298 @@ def corner_plot_variance_of_estimates(
         showlegend=True,
         legend=dict(x=1.05, y=1.0),
     )
+    
+    return fig
+
+
+def generate_goodness_of_fit_plots_3d(goodness_of_fit: GoodnessOfFit):
+    """
+    Generate animated diagnostic plots for 3D GoodnessOfFit data using Plotly.
+    
+    Creates three plots with animation for the temporal/frame dimension:
+    1. Animated image plot of residuals from compute_residuals
+    2. Histogram of residuals from compute_residuals (static)
+    3. Animated image plot of spatial residuals from spatial_residuals
+    
+    Parameters
+    ----------
+    goodness_of_fit : GoodnessOfFit
+        GoodnessOfFit object containing the model, grid, and 3D sample data
+        
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
+        Figure containing the animated diagnostic plots
+    """
+    # Compute residuals
+    residuals = goodness_of_fit.compute_residuals()
+    spatial_residuals = goodness_of_fit.spatial_residuals()
+    
+    # Check if data is 3D
+    if residuals.ndim != 3 or spatial_residuals.ndim != 3:
+        raise ValueError("generate_goodness_of_fit_plots_3d requires 3D data (n_x, n_y, n_frames)")
+    
+    # Get number of frames
+    n_frames = residuals.shape[-1]
+    
+    # Create subplot figure for animated plots
+    fig = make_subplots(
+        rows=1, 
+        cols=3,
+        subplot_titles=(
+            'Residuals Image Plot (Animated)',
+            'Residuals Histogram', 
+            'Spatial Residuals Image Plot (Animated)'
+        ),
+        horizontal_spacing=0.15
+    )
+    
+    # Create frames for animation
+    frames = []
+    
+    for frame_idx in range(n_frames):
+        # Select current frame
+        residuals_frame = residuals[..., frame_idx]
+        spatial_residuals_frame = spatial_residuals[..., frame_idx]
+        
+        # Create traces for this frame
+        residuals_img = go.Heatmap(
+            z=residuals_frame,
+            colorscale='RdBu',
+            colorbar=dict(orientation='h', y=-0.4, len=0.25, x=0.15),
+            zmin=-2,
+            zmax=2
+        )
+        
+        # Histogram of current frame residuals
+        residuals_flat = residuals_frame.flatten()
+        hist = go.Histogram(
+            x=residuals_flat,
+            nbinsx=50,
+            marker_color='lightblue',
+            name='Residuals'
+        )
+        
+        spatial_res_img = go.Heatmap(
+            z=spatial_residuals_frame,
+            colorscale='RdYlBu',
+            colorbar=dict(orientation='h', y=-0.4, len=0.25, x=0.8),
+            zmin=-2,
+            zmax=2
+        )
+        
+        # Add traces to frame with explicit trace indices
+        # This tells Plotly which existing traces to update
+        frame_traces = [residuals_img, hist, spatial_res_img]
+        frames.append(go.Frame(data=frame_traces, name=str(frame_idx), traces=[0, 1, 2]))
+    
+    # Add initial frame data (frame 0)
+    residuals_frame0 = residuals[..., 0]
+    spatial_residuals_frame0 = spatial_residuals[..., 0]
+    
+    residuals_img_initial = go.Heatmap(
+        z=residuals_frame0,
+        colorscale='RdBu',
+        colorbar=dict(orientation='h', y=-0.4, len=0.25, x=0.15),
+        zmin=-2,
+        zmax=2
+    )
+    
+    residuals_flat_initial = residuals_frame0.flatten()
+    hist_initial = go.Histogram(
+        x=residuals_flat_initial,
+        nbinsx=50,
+        marker_color='lightblue',
+        name='Residuals'
+    )
+    
+    spatial_res_img_initial = go.Heatmap(
+        z=spatial_residuals_frame0,
+        colorscale='RdYlBu',
+        colorbar=dict(orientation='h', y=-0.4, len=0.25, x=0.8),
+        zmin=-2,
+        zmax=2
+    )
+    
+    # Add initial traces
+    fig.add_trace(residuals_img_initial, row=1, col=1)
+    fig.add_trace(hist_initial, row=1, col=2)
+    fig.add_trace(spatial_res_img_initial, row=1, col=3)
+    
+    # Add animation frames and controls
+    fig.frames = frames
+    
+    # Add animation slider
+    sliders = [{
+        'active': 0,
+        'yanchor': 'top',
+        'xanchor': 'left',
+        'currentvalue': {
+            'font': {'size': 20},
+            'prefix': 'Frame: ',
+            'visible': True,
+            'xanchor': 'right'
+        },
+        'transition': {'duration': 300, 'easing': 'cubic-in-out'},
+        'pad': {'b': 10, 't': 50},
+        'len': 0.9,
+        'x': 0.1,
+        'y': 0,
+        'steps': [{
+            'args': [[f.name], {
+                'frame': {'duration': 300, 'redraw': False},
+                'mode': 'immediate',
+                'transition': {'duration': 300}
+            }],
+            'label': str(frame_idx),
+            'method': 'animate'
+        } for frame_idx, f in enumerate(frames)]
+    }]
+    
+    fig.update_layout(
+        sliders=sliders,
+        height=600,
+        width=1200,
+        title_text='3D Goodness of Fit Diagnostic Plots (Animated)',
+        showlegend=False,
+        updatemenus=[{
+            'type': 'buttons',
+            'direction': 'left',
+            'pad': {'r': 10, 't': 80},
+            'showactive': False,
+            'x': 0.1,
+            'xanchor': 'right',
+            'y': 0,
+            'yanchor': 'top',
+            'buttons': [{
+                'args': [None, {
+                    'frame': {'duration': 500, 'redraw': False},
+                    'fromcurrent': True,
+                    'transition': {'duration': 300, 'easing': 'quadratic-in-out'}
+                }],
+                'label': '▶️',
+                'method': 'animate'
+            }, {
+                'args': [[None], {
+                    'frame': {'duration': 0, 'redraw': False},
+                    'mode': 'immediate'
+                }],
+                'label': '⏸️',
+                'method': 'animate'
+            }]
+        }]
+    )
+    
+    # Update axis labels
+    fig.update_xaxes(title_text='X', row=1, col=1)
+    fig.update_yaxes(title_text='Y', row=1, col=1)
+    
+    fig.update_xaxes(title_text='Residual Value', row=1, col=2)
+    fig.update_yaxes(title_text='Count', row=1, col=2)
+    
+    fig.update_xaxes(title_text='X', row=1, col=3)
+    fig.update_yaxes(title_text='Y', row=1, col=3)
+    
+    return fig
+
+# Note: For more reliable interactive visualization of 3D data, consider using
+# the Dash-based approach in dash_3d_diagnostics.py which provides a slider
+# interface for exploring different temporal frames.
+
+
+def generate_goodness_of_fit_plots(goodness_of_fit: GoodnessOfFit, frame=None):
+    """
+    Generate diagnostic plots for a GoodnessOfFit object using Plotly.
+    
+    Creates three plots:
+    1. Image plot of residuals from compute_residuals
+    2. Histogram of residuals from compute_residuals
+    3. Image plot of spatial residuals from spatial_residuals
+    
+    Parameters
+    ----------
+    goodness_of_fit : GoodnessOfFit
+        GoodnessOfFit object containing the model, grid, and sample
+    
+    frame : int, optional
+        Frame index for 3D data. If None, uses the full data.
+        If provided, selects the specified frame from the last dimension.
+        
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
+        Figure containing the three diagnostic plots
+    """
+    # Compute residuals
+    residuals = goodness_of_fit.compute_residuals()
+    spatial_residuals = goodness_of_fit.spatial_residuals()
+    
+    # Handle frame selection for 3D data
+    if frame is not None:
+        # Select the specified frame from the last dimension
+        if residuals.ndim > 2:
+            residuals = residuals[..., frame]
+        if spatial_residuals.ndim > 2:
+            spatial_residuals = spatial_residuals[..., frame]
+    
+    # Create subplot figure - back to simpler 1-row approach
+    fig = make_subplots(
+        rows=1, 
+        cols=3,
+        subplot_titles=(
+            'Residuals Image Plot',
+            'Residuals Histogram', 
+            'Spatial Residuals Image Plot'
+        ),
+        horizontal_spacing=0.15
+    )
+    
+    # Plot 1: Image plot of residuals
+    fftshift, _ = BackendManager.get_fftshift_methods()
+    residuals_img = go.Heatmap(
+        z=fftshift(residuals),
+        colorscale='RdBu',
+        colorbar=dict(orientation='h', y=-0.4, len=0.2, x=0.12)
+    )
+    fig.add_trace(residuals_img, row=1, col=1)
+    
+    # Plot 2: Histogram of residuals
+    residuals_flat = residuals.flatten()
+    hist = go.Histogram(
+        x=residuals_flat,
+        nbinsx=50,
+        marker_color='lightblue',
+        name='Residuals'
+    )
+    fig.add_trace(hist, row=1, col=2)
+    
+    # Plot 3: Image plot of spatial residuals
+    spatial_res_img = go.Heatmap(
+        z=spatial_residuals,
+        colorscale='RdYlBu',
+        colorbar=dict(orientation='h', y=-0.4, len=0.2, x=0.88),
+        zmin=-2,
+        zmax=2
+    )
+    fig.add_trace(spatial_res_img, row=1, col=3)
+    
+    # Update layout to make room for horizontal colorbars
+    fig.update_layout(
+        height=600,
+        width=1200,
+        title_text='Goodness of Fit Diagnostic Plots',
+        showlegend=False,
+        margin=dict(b=150)  # Extra bottom margin for colorbars
+    )
+    
+    # Update axis labels
+    fig.update_xaxes(title_text='X', row=1, col=1)
+    fig.update_yaxes(title_text='Y', row=1, col=1)
+    
+    fig.update_xaxes(title_text='Residual Value', row=1, col=2)
+    fig.update_yaxes(title_text='Count', row=1, col=2)
+    
+    fig.update_xaxes(title_text='X', row=1, col=3)
+    fig.update_yaxes(title_text='Y', row=1, col=3)
     
     return fig
