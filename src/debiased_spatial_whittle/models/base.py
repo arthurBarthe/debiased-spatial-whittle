@@ -1,3 +1,4 @@
+import logging
 import copy
 from abc import ABC, abstractmethod
 
@@ -141,6 +142,9 @@ class ModelInterface(ABC):
 
     def free_parameter_values_to_array_deep(self):
         return xp.array(self.free_parameters)
+
+    def free_parameter_bounds_to_list_deep(self):
+        return self.free_parameter_bounds
 
     # --------------------------------------------------
 
@@ -294,6 +298,16 @@ class CovarianceModel(ModelInterface, Freezable):
         self._name = value if value else self.__class__.__name__
 
     @property
+    def display_subscript(self) -> str:
+        if not hasattr(self, "_display_subscript"):
+            return None
+        return self._display_subscript
+
+    @display_subscript.setter
+    def display_subscript(self, value: str):
+        self._display_subscript = value
+
+    @property
     def free_parameter_bounds(self):
         out = []
         for param_name in self._parameters:
@@ -303,12 +317,16 @@ class CovarianceModel(ModelInterface, Freezable):
             out.extend(child.free_parameter_bounds)
         return out
 
-    # old method name
-    def free_parameter_bounds_to_list_deep(self):
-        return self.free_parameter_bounds
-
     @ban_if_frozen
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
+        """
+        Set the parameter bounds.
+        """
+        if name.count("_") == 0:
+            if name in self._parameters:
+                self._parameter_bounds[name] = bounds
+                return True
+            return False
         model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             self._parameter_bounds[param_name] = bounds
@@ -343,7 +361,10 @@ class CovarianceModel(ModelInterface, Freezable):
     def parameters_repr(self) -> tuple[str]:
         out = []
         for pname in self._parameters:
-            out.append(getattr(self.__class__, pname).latex_display)
+            if self.display_subscript is not None:
+                out.append(rf"{getattr(self.__class__, pname).latex_display}_{self.display_subscript}")
+            else:
+                out.append(getattr(self.__class__, pname).latex_display)
         for child in self.children:
             out.extend(child.parameters_repr)
         return out
@@ -351,11 +372,12 @@ class CovarianceModel(ModelInterface, Freezable):
     @property
     def free_parameters_repr(self) -> tuple[str]:
         out = []
-        for pname in self._parameters:
-            if not pname in self._frozen_parameters:
-                out.append(getattr(self.__class__, pname).latex_display)
-        for child in self.children:
-            out.extend(child.free_parameters_repr)
+        parameters_rep = self.parameters_repr
+        parameter_names = self.parameter_names
+        free_parameter_names = self.free_parameter_names
+        for pname, prepr in zip(parameter_names, parameters_rep):
+            if pname in free_parameter_names:
+                out.append(prepr)
         return out
 
     def get_parameter(self, name: str):
@@ -374,16 +396,22 @@ class CovarianceModel(ModelInterface, Freezable):
         model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             setattr(self, param_name, value)
+            logging.debug(f"Set {param_name} to: {value} in {model_name}")
             return True
         else:
             for child in self.children:
-                value = child.set_parameter(name, value)
-                if value:
+                assigned = child.set_parameter(name, value)
+                if assigned:
                     return True
             return False
 
     @ban_if_frozen
     def freeze_parameter(self, name):
+        if name.count("_") == 0:
+            if name in self._parameters:
+                self._frozen_parameters.append(name)
+                return True
+            return False
         model_name, param_name = name.split("_", 1)
         if model_name == self.name:
             self._frozen_parameters.append(param_name)
@@ -593,6 +621,19 @@ class SumModel(CovarianceModel):
         return result
 
 
+class Sum2Models(CovarianceModel):
+    theta = ModelParameter(default=xp.pi / 4, bounds=(0, xp.pi / 2), latex_display=r"\theta")
+
+    def __init__(self, model1: CovarianceModel, model2: CovarianceModel, theta: float = None, name: str = None):
+        super().__init__((model1, model2), theta, name=name)
+
+    def compute(self, lags: xp.ndarray, theta, *params) -> xp.ndarray:
+        children_params = self._split_children_params(*params)
+        acv1 = self.children[0].compute(lags, *children_params[0])
+        acv2 = self.children[1].compute(lags, *children_params[1])
+        return xp.cos(theta) * acv1 + xp.sin(theta) * acv2
+
+
 class ProductModel(CovarianceModel):
     """
     A covariance model that represents the product of multiple covariance models.
@@ -630,6 +671,7 @@ class ReparameterizedModel(ModelInterface, ABC):
         self._parameter_bounds = []
         self._frozen_parameters = []
         self.name = name
+        super().__init__()
 
     @property
     def name(self):
@@ -664,8 +706,10 @@ class ReparameterizedModel(ModelInterface, ABC):
 
     def set_parameter(self, name: str, value: xp.ndarray):
         current_parameters = self.parameters
-        new_parameters = [current_parameters[i] if name != pname else value for i, pname in enumerate(self.free_parameter_names)]
-        self.base_model.set_parameters(dict(zip(self.base_model.parameter_names, self.map_parameters(new_parameters))))
+        new_parameters = [current_parameters[i] if name != pname else value for i, pname in enumerate(self.parameter_names)]
+        mapped_parameters = self.map_parameters(*new_parameters)
+        mapped_parameter = mapped_parameters[self.parameter_names.index(name)]
+        self.base_model.set_parameter(name, mapped_parameter)
 
     def set_parameter_bounds(self, name: str, bounds: tuple[float, float]) -> None:
         self._parameter_bounds[name] = bounds
@@ -699,15 +743,17 @@ class ReparameterizedModel(ModelInterface, ABC):
 
 class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     """
-    Class that allows to use a log scale parameterization of a base model.
+    Class that allows to use a log scale parameterization of a base model. One can specify which
+    parameters use the log scale representation via the sel argument.
     """
     def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
-        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
+        self.sel = xp.array(sel).astype(bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
 
     def map_parameters(self, *params):
         mapped_params = []
         for log, param in zip(self.sel, params):
+            param = xp.asarray(param)
             if log:
                 mapped_params.append(xp.exp(param))
             else:
@@ -717,6 +763,7 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     def imap_parameters(self, *params):
         mapped_params = []
         for log, param in zip(self.sel, params):
+            param = xp.asarray(param)
             if log:
                 mapped_params.append(xp.log(param))
             else:
@@ -736,13 +783,14 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
 
     @property
     def free_parameters_repr(self):
-        return tuple([f"log {p_repr}" if self.sel[self.parameter_names.index(p_name)] else f"{p_repr}"
+        return tuple([f"log {p_repr}" if self.sel[self.parameter_names.index(p_name)] else p_repr
                       for (p_repr, p_name) in zip(self.base_model.free_parameters_repr, self.free_parameter_names)])
 
     @property
     def parameters_repr(self):
         repr_base_params = self.base_model.parameters_repr
-        return tuple([f"log {p_repr}" for p_repr in repr_base_params])
+        return tuple([f"log {p_repr}" if self.sel[i] else p_repr
+                      for (i, p_repr) in enumerate(repr_base_params)])
 
     def frozen_copy(self):
         copy = self.copy()

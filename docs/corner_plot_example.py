@@ -17,9 +17,11 @@ from debiased_spatial_whittle.inference.diagnostics import corner_plot_variance_
 
 # Create a SquaredExponentialModel
 model = ExponentialModel(rho=3, sigma=0.8)
+model.display_subscript = "S"
 
 # Apply BivariateUniformCorrelation
 bivariate_model = BivariateUniformCorrelation(model, r=0.5, f=1.0)
+bivariate_model.display_subscript = "B"
 
 # Log Transform on some of the range parameter
 bivariate_model_log = LogScaleReparameterizedModel(bivariate_model, (False, False, True, True))
@@ -28,7 +30,7 @@ bivariate_model_log = LogScaleReparameterizedModel(bivariate_model, (False, Fals
 grid = RectangularGrid((64, 64), nvars=2)
 
 # Create the corner plot with larger size
-fig = corner_plot_variance_of_estimates(bivariate_model_log, grid, width=1200, height=1200, n_sims=10)
+fig = corner_plot_variance_of_estimates(bivariate_model_log, grid, width=1200, height=1200, n_sims=100)
 
 # Display the figure
 fig.show()

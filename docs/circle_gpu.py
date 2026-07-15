@@ -20,6 +20,7 @@ from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhi
 # ##Model Specification
 
 model = SquaredExponentialModel(rho=32, sigma=0.9)
+print(model)
 
 # ##Grid specification
 
@@ -29,15 +30,14 @@ x_0, y_0, diameter = m // 2, m // 2, m
 x, y = xp.meshgrid(xp.arange(shape[0]), xp.arange(shape[1]), indexing="ij")
 circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
 circle = circle * 1.0
-grid_circle = RectangularGrid(shape)
-grid_circle.mask = circle
+grid_circle = RectangularGrid(shape, mask=circle)
 
 # ##Sample generation
 
 sampler = SamplerOnRectangularGrid(model, grid_circle)
-z = sampler()
+sample = sampler()
 
-plt.imshow(xp.to_cpu(z), origin="lower", cmap="Spectral")
+plt.imshow(sample, origin="lower", cmap="Spectral")
 plt.show()
 
 # ##Inference
@@ -49,5 +49,5 @@ estimator = Estimator(debiased_whittle, use_gradients=False)
 
 model_est = SquaredExponentialModel(sigma=0.9)
 model_est.fix_parameter("sigma")
-estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
-print("Estimated range parameter:", model_est.rho)
+estimate = estimator(model_est, sample, opt_callback=lambda *args, **kwargs: print(*args))
+print(estimate)

@@ -18,7 +18,7 @@ class Sample(Freezable):
         self.freeze()
 
     def __array__(self, *args, **kwargs):
-        return xp.to_cpu(self.values)
+        return xp.to_numpy(self.values)
 
 
 class SampleOnRectangularGrid(Sample):

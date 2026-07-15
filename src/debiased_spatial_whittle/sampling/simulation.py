@@ -3,6 +3,8 @@ from typing import Tuple
 
 from charset_normalizer.md import lru_cache
 from scipy.stats import multivariate_normal
+
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen, lru_cache_frozen
 from debiased_spatial_whittle.models.tapers import CovarianceTaper
 from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
@@ -25,7 +27,7 @@ def prod_list(l: Tuple[int]):
         return l[0] * prod_list(l[1:])
 
 
-class SamplerOnRectangularGrid:
+class SamplerOnRectangularGrid(Freezable):
     """
     Class that allows to define efficient samplers on rectangular grids for fixed models.
 
@@ -92,6 +94,8 @@ class SamplerOnRectangularGrid:
             print("up-sampling")
             n = tuple(2 * n for n in self.grid.n)
             self.sampling_grid = RectangularGrid(n, grid.delta)
+        super().__init__()
+        self.freeze()
 
     @property
     def model(self) -> CovarianceModel:
@@ -99,6 +103,7 @@ class SamplerOnRectangularGrid:
         return self._model
 
     @model.setter
+    @ban_if_frozen
     def model(self, value: CovarianceModel):
         self._model = value
         self._f = None
@@ -110,6 +115,7 @@ class SamplerOnRectangularGrid:
         return self._grid
 
     @grid.setter
+    @ban_if_frozen
     def grid(self, value: RectangularGrid):
         self._grid = value
         self._f = None
@@ -126,6 +132,7 @@ class SamplerOnRectangularGrid:
         self._n_sims = value
 
     @property
+    @lru_cache_frozen
     def spectral_amplitudes(self):
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
@@ -144,14 +151,14 @@ class SamplerOnRectangularGrid:
         positive = xp.sum(amplitudes[amplitudes > 0])
         return negative / positive
 
-    def __call__(self):
+    def __call__(self) -> SampleOnRectangularGrid:
         """
         Samples a realization of a Gaussian Process specified by
         the provided covariance model, on the provided rectangular grid.
 
         Returns
         -------
-        sample: ndarray
+        sample
             Sample values corresponding to the grid and covariance model. Shape is equal to the n attribute of grid.
 
         Raises

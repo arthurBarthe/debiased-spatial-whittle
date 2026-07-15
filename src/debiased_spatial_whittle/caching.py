@@ -6,7 +6,7 @@ def ban_if_frozen(func):
 
     def wrapper(self, *args, **kwargs):
         if hasattr(self, "frozen") and self.frozen:
-            raise ValueError("Not available as the instance is frozen")
+            raise ValueError("Method is not available as the instance is frozen")
         else:
             return func(self, *args, **kwargs)
 
@@ -22,13 +22,13 @@ def lru_cache_frozen(func):
             if hasattr(arg, "frozen") and not arg.frozen:
                 frozen = False
         if frozen:
-            logging.info(f"Using cached value - {func.__name__}")
+            logging.debug(f"Using cached value - {func.__name__} - {repr(func)}")
             for arg in args:
                 if hasattr(arg, "frozen"):
                     arg.callers.append(cached)
             return cached(*args, **kwargs)
         else:
-            logging.info(f"Computing value. - {func.__name__}")
+            logging.debug(f"Computing value. - {func.__name__} - {repr(func)}")
             return func(*args, **kwargs)
 
     return wrapper

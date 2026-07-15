@@ -26,15 +26,14 @@ model = SquaredExponentialModel(rho=15, sigma=0.9)
 
 shape = (512, 512)
 mask_france = ImgGrid(shape).get_new()
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
 # ##Sample generation
 
-z = sampler()
+sample = sampler()
 plt.figure()
-plt.imshow(z, origin="lower", cmap="RdBu")
+plt.imshow(sample, origin="lower", cmap="RdBu")
 plt.show()
 
 # ##Inference
@@ -49,4 +48,4 @@ model_est.sigma = 0.9
 model_est.fix_parameter("sigma")
 
 model.rho = xp.arange(5, 20)
-print(debiased_whittle(z, model))
+print(debiased_whittle(sample, model))

@@ -4,6 +4,7 @@
 # ##Imports
 
 from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend("numpy")
 xp = BackendManager.get_backend()
 
 import matplotlib.pyplot as plt
@@ -25,13 +26,12 @@ x_0, y_0, diameter = m // 2, m // 2, m
 x, y = xp.meshgrid(xp.arange(shape[0]), xp.arange(shape[1]), indexing="ij")
 circle = ((x - x_0) ** 2 + (y - y_0) ** 2) <= 1 / 4 * diameter**2
 circle = circle * 1.0
-grid_circle = RectangularGrid(shape)
-grid_circle.mask = circle
+grid_circle = RectangularGrid(shape, mask=circle)
 
 # ##Sample generation
 
 sampler = SamplerOnRectangularGrid(model, grid_circle)
-z = sampler()
+sample = sampler()
 
 # ##Inference
 
@@ -42,8 +42,8 @@ estimator = Estimator(debiased_whittle, use_gradients=False)
 
 model_est = SquaredExponentialModel(sigma=0.9)
 model_est.fix_parameter("sigma")
-estimate = estimator(model_est, z)
+estimate = estimator(model_est, sample)
 print("Estimated range parameter:", model_est.rho)
 
-plt.imshow(z, origin="lower", cmap="Spectral")
+plt.imshow(sample, origin="lower", cmap="Spectral")
 plt.show()

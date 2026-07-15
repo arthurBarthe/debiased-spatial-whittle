@@ -41,9 +41,9 @@ data = s()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
-ax.imshow(data[..., 0], cmap="inferno")
+ax.imshow(data.values[..., 0], cmap="inferno")
 ax = fig.add_subplot(1, 2, 2)
-ax.imshow(data[..., 1], cmap="inferno")
+ax.imshow(data.values[..., 1], cmap="inferno")
 plt.show()
 
 # ##Profile likelihood plot for the correlation parameter

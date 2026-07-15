@@ -233,7 +233,7 @@ class AnisotropicModel(CovarianceModel):
     """
 
     eta = ModelParameter(default=1, bounds=(0, xp.inf))
-    phi = ModelParameter(default=0, bounds=(-xp.pi / 2, xp.pi / 2))
+    phi = ModelParameter(default=0, bounds=(0, xp.pi / 2))
 
     def __init__(self, base_model, eta=None, phi=None, name=None):
         super().__init__((base_model,), eta, phi, name=name)

@@ -95,24 +95,27 @@ class BackendManager:
         cls.block = True
         if cls.backend_name == "numpy":
             numpy.to_cpu = lambda x: x
+            numpy.to_numpy = lambda x: x
             numpy.item = lambda x: x
             return numpy
         elif cls.backend_name == "cupy":
             cupy.to_cpu = lambda x: x.get()
+            cupy.to_numpy = lambda x: x.get()
             cupy.item = lambda x: x.item()
             return cupy
         elif cls.backend_name == "autograd":
             import autograd.numpy
-
             return autograd.numpy
         elif cls.backend_name == "torch":
             torch.set_default_device(cls.device)
             torch.to_cpu = lambda x: x.cpu()
+            torch.to_numpy = lambda x: x.cpu().numpy()
             torch.item = lambda x: x.item()
             torch.set_default_dtype(torch.float64)
             torch.array = lambda x: torch.tensor(
                 x, dtype=torch.float64, device=cls.device
             )
+            torch.asarray = lambda *args, **kwargs: torch.as_tensor(*args, **kwargs)
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)

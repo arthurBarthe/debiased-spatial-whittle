@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
 from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('numpy')
 xp = BackendManager.get_backend()
 rand = BackendManager.get_rand()
 
@@ -22,11 +23,10 @@ mask_bernoulli = rand(*shape) <= p_obs
 
 mask_france = ImgGrid(shape).get_new() * mask_bernoulli
 print(f"Number of observations: {xp.sum(mask_france)}")
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
-z = sampler()
+sample = sampler()
 
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
@@ -34,9 +34,8 @@ debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
 model_est = SquaredExponentialModel()
-estimate = estimator(model_est, z)
-print(estimate.rho)
+estimate = estimator(model_est, sample)
+print(estimate)
 
-z[mask_france == 0] = xp.nan
-plt.imshow(z, origin="lower", cmap="Spectral")
+plt.imshow(sample, origin="lower", cmap="Spectral")
 plt.show()

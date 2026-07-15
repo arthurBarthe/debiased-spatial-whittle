@@ -4,6 +4,7 @@
 # ##Imports
 
 from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('numpy')
 xp = BackendManager.get_backend()
 
 import matplotlib.pyplot as plt
@@ -18,13 +19,13 @@ from debiased_spatial_whittle.grids.old import ImgGrid
 # ##Model specification
 
 model = SpectralMatern(rho=15, nu=1.5)
-
+lags = xp.zeros((2, ))
+model(lags)
 # ##Grid specification
 
 shape = (512, 512)
 mask_france = ImgGrid(shape).get_new()
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
 # ##Sample generation
@@ -46,4 +47,5 @@ model_est.set_parameter_bounds("Matern32Model_rho", (1., 100.))
 model_est.set_parameter_bounds("Matern32Model_sigma", (.1, 10.))
 # model_est.set_parameter_bounds("SpectralMatern_nu", (.1, 10.))
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
-print(estimate.rho)
+
+print(estimate)

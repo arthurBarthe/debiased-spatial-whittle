@@ -283,7 +283,8 @@ class MultivariateDebiasedWhittle:
         hmat = self.fisher(model)
         if jmat is None:
             jmat = self.jmatrix_sample(model, n_sims=250)
-        return xp.dot(inv(hmat), xp.dot(jmat, inv(hmat)))
+        hmat_pinv = xp.linalg.pinv(hmat)
+        return hmat_pinv @ jmat @ hmat_pinv
 
 
 class DebiasedWhittle:
@@ -651,7 +652,8 @@ class DebiasedWhittle:
         hmat = self.fisher(model)
         if jmat is None:
             jmat = self.jmatrix_sample(model, n_sims=250)
-        return xp.dot(inv(hmat), xp.dot(jmat, inv(hmat)))
+        hmat_pinv = xp.linalg.pinv(hmat)
+        return hmat_pinv @ jmat @ hmat_pinv
 
 
 class Estimator:

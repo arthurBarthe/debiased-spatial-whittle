@@ -1,3 +1,5 @@
+import logging
+
 from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
@@ -16,6 +18,9 @@ from debiased_spatial_whittle.inference.least_squares import LeastSquareEstimato
 from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, Estimator
 
 import matplotlib.pyplot as plt
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 # ##Set up grid and model
 
@@ -40,8 +45,8 @@ periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid, periodogram)
 
 model_est = SquaredExponentialModel(rho=10.0, name="sq")
-model_est.set_parameter_bounds("sq_rho", (5, 100))
-model_est.set_parameter_bounds("sq_sigma", (0.1, 10))
+model_est.set_parameter_bounds("rho", (5, 100))
+model_est.set_parameter_bounds("sigma", (0.1, 10))
 model_est = AnisotropicModel(model_est)
 
 model_est_ = NuggetModel(model_est, nugget=1e-3)
