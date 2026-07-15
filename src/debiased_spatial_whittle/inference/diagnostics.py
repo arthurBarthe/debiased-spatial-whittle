@@ -11,7 +11,8 @@ from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.multivariate_periodogram import Periodogram as MultivariatePeriodogram
 from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, MultivariateDebiasedWhittle, Estimator
-from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid, SamplerOnRectangularGridTapered
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid, SamplerOnRectangularGridTapered, \
+    MultivariateSamplerOnRectangularGrid
 
 
 class GoodnessOfFit:
@@ -108,6 +109,7 @@ def corner_plot_variance_of_estimates(
     n_sims: int = 250,
     width: int = 800,
     height: int = 800,
+    n_estimates: int = 0,
     **kwargs
 ):
     """
@@ -131,6 +133,9 @@ def corner_plot_variance_of_estimates(
         Width of the figure in pixels
     height : int, default=800
         Height of the figure in pixels
+    n_estimates : int, default=0
+        Number of simulations to run for estimation. If greater than 0, samples from
+        the model, estimates parameters, and adds scatter plots of estimates to the corner plot.
     **kwargs
         Additional keyword arguments passed to the subplot titles
         
@@ -181,6 +186,48 @@ def corner_plot_variance_of_estimates(
     # Compute standard deviations from covariance matrix
     std_devs = np.sqrt(np.diag(cov_mat))
     
+    # Run simulations and collect estimates if n_estimates > 0
+    estimates = None
+    if n_estimates > 0:
+        # Ensure dbw exists
+        if dbw is None:
+            if grid.nvars > 1:
+                periodogram = MultivariatePeriodogram()
+                ep = ExpectedPeriodogram(grid, periodogram)
+                dbw = MultivariateDebiasedWhittle(periodogram, ep)
+            else:
+                periodogram = Periodogram()
+                ep = ExpectedPeriodogram(grid, periodogram)
+                dbw = DebiasedWhittle(periodogram, ep)
+        
+        # Create estimator
+        estimator = Estimator(dbw)
+        
+        # Create sampler if not provided
+        if sampler is None:
+            if grid.nvars == 1:
+                sampler = SamplerOnRectangularGrid(model, grid)
+            else:
+                sampler = MultivariateSamplerOnRectangularGrid(model, grid, p=grid.nvars)
+        
+        # Collect estimates
+        estimates_list = []
+        for _ in range(n_estimates):
+            # Sample from true model
+            sample = sampler()
+            # Create a copy of the model for estimation
+            model_copy = model.copy()
+            # Estimate parameters
+            estimator(model_copy, sample)
+            # Get free parameter values as numpy array
+            estimated_params = np.asarray([
+                p.numpy() if hasattr(p, 'numpy') else 
+                (p.cpu().numpy() if hasattr(p, 'cpu') else p) 
+                for p in model_copy.free_parameters
+            ], dtype=np.float64)
+            estimates_list.append(estimated_params)
+        estimates = np.array(estimates_list)
+    
     # Create subplot grid without titles
     fig = make_subplots(
         rows=n_params,
@@ -230,6 +277,35 @@ def corner_plot_variance_of_estimates(
                     col=col,
                 )
                 
+                # Add standard deviation annotation
+                fig.add_annotation(
+                    x=mu - 3.5 * sigma,
+                    y=0.95 * pdf.max(),
+                    text=f"Std: {sigma:.4f}",
+                    showarrow=False,
+                    font=dict(size=10, color="black"),
+                    xanchor="left",
+                    yanchor="bottom",
+                    row=row,
+                    col=col,
+                )
+                
+                # Add scatter plot of estimates (rug plot)
+                if estimates is not None:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=estimates[:, i],
+                            y=np.zeros(n_estimates),
+                            mode='markers',
+                            marker=dict(color='black', size=4, opacity=0.3),
+                            name='Estimates',
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=row,
+                        col=col,
+                    )
+                
                 # Update axis labels - only on outer edges
                 # For diagonal (histograms), show x-axis label only on bottom row
                 if i == n_params - 1:
@@ -262,6 +338,9 @@ def corner_plot_variance_of_estimates(
                     [cov_mat[j, j], cov_mat[j, i]],
                     [cov_mat[i, j], cov_mat[i, i]]
                 ])
+                
+                # Compute correlation between parameters j and i
+                correlation = cov_mat[j, i] / (np.sqrt(cov_mat[j, j] * cov_mat[i, i]))
                 
                 # Compute eigenvalues and eigenvectors
                 eigvals, eigvecs = np.linalg.eigh(cov_ji)
@@ -312,6 +391,19 @@ def corner_plot_variance_of_estimates(
                     col=col,
                 )
                 
+                # Add correlation annotation
+                fig.add_annotation(
+                    x=true_params_np[j] - 0.5 * std_devs[j],
+                    y=true_params_np[i] + 0.5 * std_devs[i],
+                    text=f"Corr: {correlation:.3f}",
+                    showarrow=False,
+                    font=dict(size=10, color="black"),
+                    xanchor="left",
+                    yanchor="bottom",
+                    row=row,
+                    col=col,
+                )
+                
                 # Mark true parameter value
                 fig.add_trace(
                     go.Scatter(
@@ -325,6 +417,22 @@ def corner_plot_variance_of_estimates(
                     row=row,
                     col=col,
                 )
+                
+                # Add scatter plot of estimate pairs
+                if estimates is not None:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=estimates[:, j],
+                            y=estimates[:, i],
+                            mode='markers',
+                            marker=dict(color='black', size=4, opacity=0.3),
+                            name='Estimates',
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=row,
+                        col=col,
+                    )
                 
                 # Update axis labels - only on outer edges
                 # For lower triangle, only show x-axis label on bottom row
