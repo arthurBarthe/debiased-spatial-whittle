@@ -80,6 +80,8 @@ class SamplerOnRectangularGrid(Freezable):
             and the sum of positive values. If the ratio of the two is greater than the tolerance level, we raise
             an error.
         """
+        if grid.nvars > 1:
+            raise ValueError(f"This sampler is for univariate grids. This grid has {grid.nvars} variates.")
         self.model = model
         self.grid = grid
         self.sampling_grid = grid
