@@ -805,7 +805,7 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     @property
     def free_parameter_bounds(self):
         base_bounds = self.base_model.free_parameter_bounds
-        free_sel = [sel_i if pname in self.free_parameters for (pname, sel_i) in zip(self.parameter_names, self.sel)]
+        free_sel = [sel_i for (pname, sel_i) in zip(self.parameter_names, self.sel) if pname in self.free_parameter_names]
         mapped_bounds = []
         for i, (lower, upper) in enumerate(base_bounds):
             if free_sel[i]:
