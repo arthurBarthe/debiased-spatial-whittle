@@ -281,7 +281,12 @@ class CovarianceModel(ModelInterface, Freezable):
             setattr(self, param_name, param_value)
 
     def copy(self):
-        return copy.deepcopy(self)
+        """
+        Return a copy of the model. The copy will be unfrozen by default.
+        """
+        model_copy = copy.deepcopy(self)
+        model_copy.unfreeze()
+        return model_copy
 
     def frozen_copy(self):
         copy = self.copy()
@@ -800,9 +805,10 @@ class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
     @property
     def free_parameter_bounds(self):
         base_bounds = self.base_model.free_parameter_bounds
+        free_sel = [sel_i if pname in self.free_parameters for (pname, sel_i) in zip(self.parameter_names, self.sel)]
         mapped_bounds = []
         for i, (lower, upper) in enumerate(base_bounds):
-            if self.sel[i]:
+            if free_sel[i]:
                 # Log scale: transform bounds using log
                 # Convert to backend type, apply log, then convert back to Python float
                 lower_t = xp.log(xp.asarray(lower))
@@ -914,9 +920,6 @@ class SeparableModel:
 
 if __name__ == "__main__":
     from rich import print
-    import sys
-
-    sys.stdout.isatty = lambda: True
     from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
     model = SquaredExponentialModel(rho=32)
     print(model)
