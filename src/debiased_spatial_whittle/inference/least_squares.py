@@ -34,6 +34,7 @@ class LeastSquareEstimator:
         periodogram: Periodogram,
         expected_periodogram: ExpectedPeriodogram,
         verbose: int = 0,
+        **ls_kwargs
     ):
         """
         Parameters
@@ -48,6 +49,7 @@ class LeastSquareEstimator:
         self.periodogram = periodogram
         self.expected_periodogram = expected_periodogram
         self.verbose = verbose
+        self.ls_kwargs = ls_kwargs
 
     def __call__(self, data: xp.array, model: CovarianceModel) -> CovarianceModel:
         """
@@ -77,6 +79,7 @@ class LeastSquareEstimator:
             bounds=bounds,
             verbose=self.verbose,
             x_scale="jac",
+            **self.ls_kwargs
         )
         return model
 
