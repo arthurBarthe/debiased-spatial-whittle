@@ -1,3 +1,4 @@
+import copy
 from functools import lru_cache
 import logging
 
@@ -57,6 +58,20 @@ class Freezable:
             for k, v in self.__dict__.items():
                 if isinstance(v, Freezable):
                     v.unfreeze(recursive=True)
+
+    def copy(self):
+        """
+        Return a copy of the model. The copy will be unfrozen by default.
+        """
+        duplicate = copy.deepcopy(self)
+        duplicate.callers = []
+        duplicate.unfreeze()
+        return duplicate
+
+    def frozen_copy(self):
+        copy = self.copy()
+        copy.freeze()
+        return copy
 
     def _delete_caches(self):
         for caller in self.callers:

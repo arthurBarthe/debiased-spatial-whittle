@@ -280,19 +280,6 @@ class CovarianceModel(ModelInterface, Freezable):
         for param_name, param_value in zip(self._parameters, params):
             setattr(self, param_name, param_value)
 
-    def copy(self):
-        """
-        Return a copy of the model. The copy will be unfrozen by default.
-        """
-        model_copy = copy.deepcopy(self)
-        model_copy.unfreeze()
-        return model_copy
-
-    def frozen_copy(self):
-        copy = self.copy()
-        copy.freeze()
-        return copy
-
     @property
     def name(self):
         return self._name
@@ -301,6 +288,12 @@ class CovarianceModel(ModelInterface, Freezable):
     @ban_if_frozen
     def name(self, value):
         self._name = value if value else self.__class__.__name__
+
+    def copy(self):
+        return Freezable.copy(self)
+    
+    def frozen_copy(self):
+        return Freezable.frozen_copy(self)
 
     @property
     def display_subscript(self) -> str:
@@ -667,7 +660,7 @@ class ProductModel(CovarianceModel):
         return result
 
 
-class ReparameterizedModel(ModelInterface, ABC):
+class ReparameterizedModel(ModelInterface, ABC, Freezable):
     """
     Class that allows to use an alternative parameterization of a base model.
     """
@@ -688,7 +681,12 @@ class ReparameterizedModel(ModelInterface, ABC):
         self._name = name
 
     def copy(self):
-        return copy.deepcopy(self)
+        duplicate = Freezable.copy(self)
+        duplicate.base_model.unfreeze()
+        return duplicate
+
+    def frozen_copy(self):
+        return Freezable.frozen_copy(self)
 
     @abstractmethod
     def map_parameters(self, *params):
@@ -746,7 +744,7 @@ class ReparameterizedModel(ModelInterface, ABC):
         return ProductModel(self, other)
 
 
-class LogScaleReparameterizedModel(ReparameterizedModel, Freezable):
+class LogScaleReparameterizedModel(ReparameterizedModel):
     """
     Class that allows to use a log scale parameterization of a base model. One can specify which
     parameters use the log scale representation via the sel argument.
