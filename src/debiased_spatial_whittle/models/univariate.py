@@ -253,6 +253,7 @@ class AnisotropicModel(CovarianceModel):
         return xp.stack((row_1, row_2), axis=0)
 
     def compute(self, lags: xp.ndarray, eta: xp.ndarray, phi: xp.ndarray, *params) -> xp.ndarray:
+        lags = lags + 1e-5      # this is a small fix to avoid nans in the jacobian computation.
         child_params = params
         lags = xp.swapaxes(lags, 0, -1)
         lags = xp.expand_dims(lags, -1)
