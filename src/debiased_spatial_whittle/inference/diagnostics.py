@@ -1,5 +1,7 @@
+from progressbar import progressbar
+
 from debiased_spatial_whittle.backend import BackendManager
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
 from functools import cached_property
 from scipy.stats import chisquare, norm, chi2
@@ -52,7 +54,7 @@ class GoodnessOfFit:
             model = self.model
         periodogram = self.periodogram_computer(sample)
         ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
-        residuals = 1 - np.exp(-periodogram / ep)
+        residuals = 1 - xp.exp(-periodogram / ep)
         return residuals
 
     def spatial_residuals(self, sample = None, model = None):
@@ -64,17 +66,17 @@ class GoodnessOfFit:
         fftn, ifftn = BackendManager.get_fft_methods()
         periodogram = self.periodogram_computer(sample)
         ep = ExpectedPeriodogram(self.grid, self.periodogram_computer)(model)
-        residuals = np.sqrt(periodogram / ep)
+        residuals = xp.sqrt(periodogram / ep)
         z = randn(*sample.grid.n) + 1j * randn(*sample.grid.n)
-        spatial_residuals = fftn(residuals * z) / np.sqrt(sample.grid.n_points)
-        return np.real(spatial_residuals)
+        spatial_residuals = fftn(residuals * z) / xp.sqrt(sample.grid.n_points)
+        return xp.real(spatial_residuals)
 
     def compute_diagnostic_statistic(self, sample=None, model=None):
         if sample is None:
             sample = self.sample
             model = self.model
         residuals = self.compute_residuals(sample, model).flatten()
-        bin_counts = np.bincount((residuals * self.n_bins).astype(np.int64))
+        bin_counts = xp.bincount((residuals * self.n_bins).astype(xp.int64))
         statistic, pvalue = chisquare(bin_counts)
         return statistic, pvalue
 
@@ -98,7 +100,7 @@ class GoodnessOfFit:
                     sample, self.model
                 )
             statistic_values.append(statistic_value)
-        return np.mean(statistic <= statistic_values)
+        return xp.mean(statistic <= statistic_values)
 
 
 def corner_plot_variance_of_estimates(
@@ -155,11 +157,7 @@ def corner_plot_variance_of_estimates(
     
     # Convert to numpy arrays
     import numpy as np
-    true_params_np = np.asarray([
-        p.numpy() if hasattr(p, 'numpy') else 
-        (p.cpu().numpy() if hasattr(p, 'cpu') else p) 
-        for p in true_params
-    ], dtype=np.float64)
+    true_params_np = np.asarray([xp.to_numpy(param) for param in true_params])
     
     # Create dbw if not provided
     if dbw is None:
@@ -178,10 +176,7 @@ def corner_plot_variance_of_estimates(
     cov_mat = dbw.variance_of_estimates(model, jmat)
     
     # Convert to numpy if needed (for torch backend)
-    if hasattr(cov_mat, 'numpy'):
-        cov_mat = cov_mat.numpy()
-    elif hasattr(cov_mat, 'cpu'):
-        cov_mat = cov_mat.cpu().numpy()
+    cov_mat = xp.to_numpy(cov_mat)
 
     # Compute standard deviations from covariance matrix
     std_devs = np.sqrt(np.diag(cov_mat))
@@ -189,17 +184,6 @@ def corner_plot_variance_of_estimates(
     # Run simulations and collect estimates if n_estimates > 0
     estimates = None
     if n_estimates > 0:
-        # Ensure dbw exists
-        if dbw is None:
-            if grid.nvars > 1:
-                periodogram = MultivariatePeriodogram()
-                ep = ExpectedPeriodogram(grid, periodogram)
-                dbw = MultivariateDebiasedWhittle(periodogram, ep)
-            else:
-                periodogram = Periodogram()
-                ep = ExpectedPeriodogram(grid, periodogram)
-                dbw = DebiasedWhittle(periodogram, ep)
-        
         # Create estimator
         estimator = Estimator(dbw)
         
@@ -212,17 +196,16 @@ def corner_plot_variance_of_estimates(
         
         # Collect estimates
         estimates_list = []
-        for _ in range(n_estimates):
+        for _ in progressbar(range(n_estimates)):
             # Sample from true model
             sample = sampler()
             # Create a copy of the model for estimation
             model_copy = model.copy()
             # Estimate parameters
             estimator(model_copy, sample)
+            del sample
             # Get free parameter values as numpy array
-            estimated_params = np.asarray([
-                p.numpy() if hasattr(p, 'numpy') else 
-                (p.cpu().numpy() if hasattr(p, 'cpu') else p) 
+            estimated_params = np.asarray([xp.to_numpy(p)
                 for p in model_copy.free_parameters
             ], dtype=np.float64)
             estimates_list.append(estimated_params)
