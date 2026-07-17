@@ -4,7 +4,7 @@ from debiased_spatial_whittle.backend import BackendManager
 xp = BackendManager.get_backend()
 
 from functools import cached_property
-from scipy.stats import chisquare, norm, chi2
+from scipy.stats import chisquare, norm, chi2, gaussian_kde
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
@@ -273,15 +273,22 @@ def corner_plot_variance_of_estimates(
                     col=col,
                 )
                 
-                # Add scatter plot of estimates (rug plot)
+                # Add kernel density estimate of estimates
                 if estimates is not None:
+                    # Create KDE for this parameter
+                    kde = gaussian_kde(estimates[:, i])
+                    x_kde = np.linspace(mu - 4 * sigma, mu + 4 * sigma, 100)
+                    kde_values = kde(x_kde)
+                    # Normalize KDE to match the scale of the theoretical PDF
+                    kde_values = kde_values / kde_values.max() * pdf.max() * 0.8
+                    
                     fig.add_trace(
                         go.Scatter(
-                            x=estimates[:, i],
-                            y=np.zeros(n_estimates),
-                            mode='markers',
-                            marker=dict(color='black', size=4, opacity=0.3),
-                            name='Estimates',
+                            x=x_kde,
+                            y=kde_values,
+                            mode='lines',
+                            line=dict(color='black', width=1.5, dash='dash'),
+                            name='KDE',
                             showlegend=False,
                             hoverinfo='skip'
                         ),
