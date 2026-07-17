@@ -279,8 +279,6 @@ def corner_plot_variance_of_estimates(
                     kde = gaussian_kde(estimates[:, i])
                     x_kde = np.linspace(mu - 4 * sigma, mu + 4 * sigma, 100)
                     kde_values = kde(x_kde)
-                    # Normalize KDE to match the scale of the theoretical PDF
-                    kde_values = kde_values / kde_values.max() * pdf.max() * 0.8
                     
                     fig.add_trace(
                         go.Scatter(
