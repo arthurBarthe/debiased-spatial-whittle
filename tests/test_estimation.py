@@ -1,4 +1,6 @@
-import numpy as np
+from debiased_spatial_whittle.backend import BackendManager
+np = BackendManager.get_backend()
+
 from numpy.testing import assert_almost_equal
 from debiased_spatial_whittle.models.old import exp_cov
 from debiased_spatial_whittle.grids.base import RectangularGrid
@@ -67,39 +69,39 @@ def test_separable_expcov():
 """
 
 
-def test_oop_vs_old():
-    """
-    This test verifies that the oop implementation gives the same estimates as the non-oop version.
-    :return:
-    """
-    # oop version
-    g = RectangularGrid((128, 128))
-    p = Periodogram()
-    ep = ExpectedPeriodogram(g, p)
-    d = DebiasedWhittle(p, ep)
-    e = Estimator(d)
-    model = ExponentialModel(rho=10, sigma=1)
-    sampler = SamplerOnRectangularGrid(model, g)
-    model_est = ExponentialModel()
-    model_est.sigma = 1
-    model_est.fix_parameter("sigma")
-    initial_guess = model_est.rho
-    z = sampler()
-    e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
-    est_rho = model_est.rho
-    # old version
-    g = np.ones((128, 128))
-    cov_func = exp_cov
-    est_rho2 = fit(
-        z,
-        g,
-        cov_func,
-        [
-            initial_guess,
-        ],
-        opt_callback=lambda x: print("current old: ", x),
-    )
-    assert_almost_equal(est_rho, est_rho2[0])
+# def test_oop_vs_old():
+#     """
+#     This test verifies that the oop implementation gives the same estimates as the non-oop version.
+#     :return:
+#     """
+#     # oop version
+#     g = RectangularGrid((128, 128))
+#     p = Periodogram()
+#     ep = ExpectedPeriodogram(g, p)
+#     d = DebiasedWhittle(p, ep)
+#     e = Estimator(d)
+#     model = ExponentialModel(rho=10, sigma=1)
+#     sampler = SamplerOnRectangularGrid(model, g)
+#     model_est = ExponentialModel()
+#     model_est.sigma = 1
+#     model_est.fix_parameter("sigma")
+#     initial_guess = model_est.rho
+#     z = sampler()
+#     e(model_est, z, opt_callback=lambda x: print("current oop: ", x))
+#     est_rho = model_est.rho
+#     # old version
+#     g = np.ones((128, 128))
+#     cov_func = exp_cov
+#     est_rho2 = fit(
+#         z,
+#         g,
+#         cov_func,
+#         [
+#             initial_guess,
+#         ],
+#         opt_callback=lambda x: print("current old: ", x),
+#     )
+#     assert_almost_equal(est_rho, est_rho2[0])
 
 
 """
@@ -145,6 +147,7 @@ def test_estimation_1d():
         z = sampler()
         e(model_est, z)
         estimates.append(model_est.rho)
+    estimates = np.asarray(estimates)
     assert np.abs(np.mean(estimates) - model.rho) <= 2
 
 

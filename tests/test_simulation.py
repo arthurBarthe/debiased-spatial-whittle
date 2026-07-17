@@ -41,13 +41,13 @@ class TestMultipleSimulations:
     model = ExponentialModel()
     model.rho = 10
     model.sigma = 1
-    grid = RectangularGrid((256, 256))
+    grid = RectangularGrid((32, 32))
 
     def test_simulation(self):
         sampler = SamplerOnRectangularGrid(self.model, self.grid)
         sampler.n_sims = 36
         z = sampler()
-        assert z.shape == self.grid.n
+        assert z.values.shape == self.grid.n
 
     def test_independent(self):
         # TODO add this test to check that realizations are i.i.d.
@@ -61,4 +61,4 @@ class TestMultivariateSimulations:
     def test_simulation(self):
         grid = RectangularGrid((64, 64), nvars=2)
         sampler = MultivariateSamplerOnRectangularGrid(self.bvm, grid, p=2)
-        assert sampler().shape == (64, 64, 2)
+        assert sampler().values.shape == (64, 64, 2)

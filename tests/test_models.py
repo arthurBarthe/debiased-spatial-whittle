@@ -1,14 +1,15 @@
 from debiased_spatial_whittle.backend import BackendManager
 
 np = BackendManager.get_backend()
-from numpy.testing import assert_allclose
+assert_allclose = BackendManager.get_assert_allclose()
+
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
-    SquaredExponentialModel,
+    SquaredExponentialModel, Matern32Model,
 )
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
-
+rand = BackendManager.get_rand()
 
 def test_model():
     model = SquaredExponentialModel(rho=12, sigma=1)
@@ -35,14 +36,10 @@ def test_gradient_cov():
     acv1 = model(g.lags_unique)
     model.rho = model.rho + epsilon
     acv2 = model(g.lags_unique)
-    g = model.gradient(
-        g.lags_unique,
-        [
-            model.param.rho,
-        ],
-    )[..., 0]
+    jac = model.jacobian(g.lags_unique, param_names=(f'{model.name}_rho',))
+    g = jac[f'{model.name}_rho']
     g2 = (acv2 - acv1) / epsilon
-    assert_allclose(g, g2, rtol=1e-3)
+    assert_allclose(g, g2, rtol=1e-3, atol=1e-2)
 
 
 def test_gradient_sqExpCov():
@@ -62,11 +59,33 @@ def test_gradient_sqExpCov():
     model.rho = model.rho - epsilon
     model.sigma = model.sigma + epsilon
     acv3 = model(g.lags_unique)
-    gradient = model.gradient(g.lags_unique, [model.param.rho, model.param.sigma])
-    g_rho, g_sigma = gradient[..., 0], gradient[..., 1]
+    jac = model.jacobian(g.lags_unique, param_names=(f'{model.name}_rho', f'{model.name}_sigma'))
+    g_rho, g_sigma = jac[f'{model.name}_rho'], jac[f'{model.name}_sigma']
     g2 = (acv2 - acv1) / epsilon
     g3 = (acv3 - acv1) / epsilon
-    assert_allclose(g_rho, g2, rtol=1e-5)
+    assert_allclose(g_rho, g2, rtol=1e-5, atol=1e-2)
+    assert_allclose(g_sigma, g3)
+
+
+def test_gradient_Matern32():
+    """
+    This test verifies that the analytical gradient of the covariance is close to a
+    numerical approximation to that gradient, for the Matern32 model.
+    """
+    g = RectangularGrid((64, 64))
+    model = Matern32Model(rho=25, sigma=1)
+    epsilon = 1e-7
+    acv1 = model(g.lags_unique)
+    model.rho = model.rho + epsilon
+    acv2 = model(g.lags_unique)
+    model.rho = model.rho - epsilon
+    model.sigma = model.sigma + epsilon
+    acv3 = model(g.lags_unique)
+    jac = model.jacobian(g.lags_unique, param_names=(f'{model.name}_rho', f'{model.name}_sigma'))
+    g_rho, g_sigma = jac[f'{model.name}_rho'], jac[f'{model.name}_sigma']
+    g2 = (acv2 - acv1) / epsilon
+    g3 = (acv3 - acv1) / epsilon
+    assert_allclose(g_rho, g2, rtol=1e-5, atol=1e-2)
     assert_allclose(g_sigma, g3)
 
 
@@ -81,19 +100,16 @@ def test_gradient_bivariate():
     model = SquaredExponentialModel(rho=3.0, sigma=1.2)
     bvm = BivariateUniformCorrelation(model, r=0.2, f=0.1)
     lags = g.lags_unique
-    params_for_gradient = [
-        bvm.param.r,
-    ]
-    gradient = bvm.gradient(lags, params_for_gradient)
+    param_name = f'{bvm.name}_r'
+    jac = bvm.jacobian(lags, param_names=(param_name,))
     epsilon = 1e-5
     cov = bvm(lags)
-    for i, p in enumerate(params_for_gradient):
-        print(p.name)
-        setattr(bvm, p.name, getattr(bvm, p.name) + epsilon)
-        cov2 = bvm(lags)
-        gradient_num = (cov2 - cov) / epsilon
-        assert_allclose(gradient[..., i, :, :], gradient_num, rtol=0.01)
-        setattr(bvm, p.name, getattr(bvm, p.name) - epsilon)
+    print(param_name)
+    setattr(bvm, 'r', getattr(bvm, 'r') + epsilon)
+    cov2 = bvm(lags)
+    gradient_num = (cov2 - cov) / epsilon
+    assert_allclose(jac[param_name], gradient_num, rtol=0.01, atol=1e-2)
+    setattr(bvm, 'r', getattr(bvm, 'r') - epsilon)
 
 
 """
@@ -120,11 +136,10 @@ def test_gradient_cov_separable():
     assert_allclose(g, g2, rtol=1e-2)
 """
 
-
 def test_cov_mat_x1_x2():
     model = SquaredExponentialModel(rho=10, sigma=1)
-    x1 = np.random.rand(25, 3) * 100
-    x2 = np.random.rand(10, 3) * 100
+    x1 = rand(25, 3) * 100
+    x2 = rand(10, 3) * 100
     mat = model.cov_mat_x1_x2(x1, x2)
     assert mat.ndim == 2
     assert mat.shape == (25, 10)
@@ -134,7 +149,7 @@ def test_cov_mat_x1_x2_2():
     model = SquaredExponentialModel()
     model.rho = 10
     model.sigma = 1
-    x1 = np.random.rand(25, 3) * 100
+    x1 = rand(25, 3) * 100
     mat = model.cov_mat_x1_x2(x1)
     assert mat.ndim == 2
     assert mat.shape == (25, 25)

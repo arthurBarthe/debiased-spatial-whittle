@@ -1,17 +1,17 @@
 import sys, warnings
 from typing import Tuple
+
+from charset_normalizer.md import lru_cache
 from scipy.stats import multivariate_normal
-from debiased_spatial_whittle.models.base import (
-    CovarianceModel,
-    TMultivariateModel,
-    SquaredModel,
-    ChiSquaredModel,
-    SeparableModel,
-)
+
+from debiased_spatial_whittle.caching import Freezable, ban_if_frozen, lru_cache_frozen
+from debiased_spatial_whittle.models.tapers import CovarianceTaper
+from debiased_spatial_whittle.models.base import CovarianceModel, SeparableModel
 from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.models.tapered import TaperedCovarianceModel
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.backend import BackendManager
-
+from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
 
 xp = BackendManager.get_backend()
 fftn, ifftn = BackendManager.get_fft_methods()
@@ -27,7 +27,7 @@ def prod_list(l: Tuple[int]):
         return l[0] * prod_list(l[1:])
 
 
-class SamplerOnRectangularGrid:
+class SamplerOnRectangularGrid(Freezable):
     """
     Class that allows to define efficient samplers on rectangular grids for fixed models.
 
@@ -63,8 +63,25 @@ class SamplerOnRectangularGrid:
     """
 
     def __init__(
-        self, model: CovarianceModel, grid: RectangularGrid, exact: bool = True
+        self, model: CovarianceModel, grid: RectangularGrid, tol: float = 0.01
     ):
+        """
+        Parameters
+        ----------
+        model: CovarianceModel
+            Model from which we wish to sample
+
+        grid: RectangularGrid
+            Grid on which we wish to sample
+        tol: float
+            Tolerance level. The circulant embedding method embeds the covariance matrix into a circulant matrix, which
+            is then diagonal in the Fourier domain. However, the circulant embedding might not be non-negative definite.
+            This results in negative values on the diagonal. We compute the absolute value of the sum of negative values,
+            and the sum of positive values. If the ratio of the two is greater than the tolerance level, we raise
+            an error.
+        """
+        if grid.nvars > 1:
+            raise ValueError(f"This sampler is for univariate grids. This grid has {grid.nvars} variates.")
         self.model = model
         self.grid = grid
         self.sampling_grid = grid
@@ -72,13 +89,15 @@ class SamplerOnRectangularGrid:
         self._n_sims = 1
         self._i_sim = 0
         self._z = None
-        self.exact = exact
+        self.tol = tol
         try:
             self.spectral_amplitudes
         except:
             print("up-sampling")
             n = tuple(2 * n for n in self.grid.n)
             self.sampling_grid = RectangularGrid(n, grid.delta)
+        super().__init__()
+        self.freeze()
 
     @property
     def model(self) -> CovarianceModel:
@@ -86,6 +105,7 @@ class SamplerOnRectangularGrid:
         return self._model
 
     @model.setter
+    @ban_if_frozen
     def model(self, value: CovarianceModel):
         self._model = value
         self._f = None
@@ -97,6 +117,7 @@ class SamplerOnRectangularGrid:
         return self._grid
 
     @grid.setter
+    @ban_if_frozen
     def grid(self, value: RectangularGrid):
         self._grid = value
         self._f = None
@@ -113,31 +134,33 @@ class SamplerOnRectangularGrid:
         self._n_sims = value
 
     @property
+    @lru_cache_frozen
     def spectral_amplitudes(self):
         """Spectral amplitudes of the covariance matrix on the circulant embedded grid."""
         if self._f is None:
             cov = self.sampling_grid.autocov(self.model)
-            if not self.exact:
-                cov *= self.sampling_grid.spatial_kernel()
             f = prod_list(self.sampling_grid.n) * ifftn(cov)
             f = xp.real(f)
-            min_, max_ = xp.min(f), xp.max(f)
-            if min_ <= -1e-2:
-                print(min_, max_)
+            if self._get_level(f) > self.tol:
                 raise ValueError(
-                    f"Embedding is not positive definite, min value {min_}."
+                    f"Embedding is not positive definite, {self._get_level(f)} > {self.tol}"
                 )
             self._f = xp.maximum(f, xp.zeros_like(f))
         return self._f
 
-    def __call__(self):
+    def _get_level(self, amplitudes: xp.ndarray):
+        negative = xp.sum(xp.abs(amplitudes[amplitudes < 0]))
+        positive = xp.sum(amplitudes[amplitudes > 0])
+        return negative / positive
+
+    def __call__(self) -> SampleOnRectangularGrid:
         """
         Samples a realization of a Gaussian Process specified by
         the provided covariance model, on the provided rectangular grid.
 
         Returns
         -------
-        sample: ndarray
+        sample
             Sample values corresponding to the grid and covariance model. Shape is equal to the n attribute of grid.
 
         Raises
@@ -162,10 +185,7 @@ class SamplerOnRectangularGrid:
             self._z = z_inv * xp.expand_dims(self.grid.mask, -1)
         result = self._z[..., self._i_sim % self._n_sims]
         self._i_sim += 1
-        return result
-
-
-from numpy.linalg import eigh
+        return SampleOnRectangularGrid(self.grid, result)
 
 
 class MultivariateSamplerOnRectangularGrid:
@@ -211,11 +231,12 @@ class MultivariateSamplerOnRectangularGrid:
     def spatial_axes(self):
         return tuple(range(self.grid.ndim))
 
+    @lru_cache
     def compute_spectral_decomposition(self):
         # cov shape (2 * n1 - 1, 2 * n2 - 1, p, p)
         cov = self.sampling_grid.autocov(self.model)
         f = prod_list(self.sampling_grid.n) * ifftn(cov, axes=self.spatial_axes)
-        return eigh(f)
+        return xp.linalg.eigh(f)
 
     def _sample(self):
         # lambdas shape (p, ), r_matrix shape (p, p)
@@ -246,120 +267,113 @@ class MultivariateSamplerOnRectangularGrid:
         sample
             Simulated sample.
         """
-        return self._sample()
+        sample = self._sample()
+        return SampleOnRectangularGrid(self.grid, sample)
 
 
-class SamplerSeparable:
+class SamplerOnRectangularGridTapered(SamplerOnRectangularGrid):
     """
-    Class for approximate sampling of Separable models.
-    """
-
-    def __init__(self, model: SeparableModel, grid: RectangularGrid, n_sim: int = 100):
-        assert isinstance(model, SeparableModel)
-        self.model = model
-        self.grid = grid
-        self.n_sim = n_sim
-        self.samplers = self._setup_samplers()
-
-    def _setup_samplers(self):
-        samplers = []
-        for model, dims in zip(self.model.models, self.model.dims):
-            sampler = SamplerOnRectangularGrid(model, self.grid.separate(dims))
-            samplers.append(sampler)
-        return samplers
-
-    def _unit_sample(self):
-        zs = []
-        for sampler in self.samplers:
-            zs.append(sampler())
-        return xp.prod(zs)
-
-    def __call__(self):
-        z = xp.zeros(self.grid.n)
-        for i in range(self.n_sim):
-            z_i = self._unit_sample()
-            z = i / (i + 1) * z + 1 / (i + 1) * z_i
-        return z * xp.sqrt(self.n_sim)
-
-
-class SamplerBUCOnRectangularGrid:
-    """
-    Class to sample from the BivariateUniformCorrelation model on a rectangular grid with nvars=2.
-
+    Class that allows to define efficient samplers on rectangular grids for tapered covariance models.
+    
+    This sampler automatically converts a base covariance model into a tapered covariance model
+    using the specified taper function. This is useful for creating sparse covariance matrices
+    while preserving the overall structure of the base model.
+    
     Attributes
     ----------
+    model: CovarianceModel
+        Original covariance model (before tapering)
+    
+    tapered_model: TaperedCovarianceModel
+        The tapered version of the original model
+        
+    taper: CovarianceTaper
+        The taper function used to modify the covariance
+        
     grid: RectangularGrid
-        Sampling grid. Should have attribute nvars=2.
-
-    model: BivariateUniformCorrelation
-        Bivariate covariance model
-
-    f: ndarray
-        Spectral amplitudes
+        Grid on which we wish to sample
+        
+    tol: float
+        Tolerance level for circulant embedding
+        
+    Notes
+    -----
+    This sampler accounts for the grid's mask by setting missing values to zero.
+    The tapering is applied to the covariance model before sampling.
+    
+    Examples
+    --------
+    >>> from debiased_spatial_whittle.models.univariate import ExponentialModel
+    >>> from debiased_spatial_whittle.models.tapers import WendlandTaper
+    >>> from debiased_spatial_whittle.grids.base import RectangularGrid
+    >>> model = ExponentialModel(rho=12., sigma=1.)
+    >>> grid = RectangularGrid((256, 128))
+    >>> taper = WendlandTaper(range=10.0)
+    >>> sampler = SamplerOnRectangularGridTapered(model, grid, taper)
+    >>> sample = sampler()
+    >>> sample.shape
+    (256, 128)
     """
-
-    def __init__(self, model: BivariateUniformCorrelation, grid: RectangularGrid):
-        assert isinstance(model, BivariateUniformCorrelation)
-        self.model = model
-        self.grid = grid
-        self.e_dist = multivariate_normal([0, 0], [[1, model.r], [model.r, 1]])
-        self._f = None
-
-    @property
-    def f(self):
-        if self._f is None:
-            cov = self.grid.autocov(self.model.base_model)
-            f = prod_list(self.grid.n) * ifftn(cov)
-            f = xp.real(f)
-            min_ = xp.min(f)
-            if min_ <= -1e-5:
-                sys.exit(0)
-                warnings.warn(f"Embedding is not positive definite, min value {min_}.")
-            self._f = xp.maximum(f, xp.zeros_like(f))
-        return self._f
-
-    def __call__(
-        self, periodic: bool = False, return_spectral: bool = False
-    ) -> xp.ndarray:
+    
+    def __init__(
+        self, 
+        model: CovarianceModel, 
+        grid: RectangularGrid, 
+        taper: CovarianceTaper = None, 
+        taper_range: float = None,
+        tol: float = 0.01
+    ):
         """
-        Sample a realization.
-
         Parameters
         ----------
-        periodic
-            if true, returns a periodic sample on an embedding grid
-
-        return_spectral
-            if true, returns the spectral amplitudes as well
-
-        Returns
-        -------
-        sample: ndarray
-            shape (n1, ..., nd, 2) where the last dimension indexes the two variates.
+        model: CovarianceModel
+            Original covariance model from which we wish to sample
+            
+        grid: RectangularGrid
+            Grid on which we wish to sample
+            
+        taper: CovarianceTaper, optional
+            Taper function to apply to the covariance model. If None, 
+            a default WendlandTaper is used.
+            
+        taper_range: float, optional
+            Range parameter for the taper function. Required if taper is None.
+            
+        tol: float
+            Tolerance level for circulant embedding. The circulant embedding method 
+            embeds the covariance matrix into a circulant matrix, which is then 
+            diagonal in the Fourier domain. However, the circulant embedding might 
+            not be non-negative definite. This results in negative values on the 
+            diagonal. We compute the absolute value of the sum of negative values,
+            and the sum of positive values. If the ratio of the two is greater than 
+            the tolerance level, we raise an error.
         """
-        f = self.f
-        e = self.e_dist.rvs(size=f.shape + (2,))
-        e = BackendManager.convert(e)
-        e[..., -1] *= self.model.f
-        e = e[..., 0, :] + 1j * e[..., 1, :]
-        f = xp.expand_dims(self.f, -1)
-        z = xp.sqrt(f) * e
-        if return_spectral:
-            return z
-        z_inv = (
-                1
-                / xp.sqrt(
-                xp.array(
-                    [
-                        self.grid.n_points,
-                    ]
-                )
-            )
-                * xp.real(fftn(z, None, list(range(z.ndim - 1))))
-        )
-        if periodic:
-            return z_inv
-        for i, n in enumerate(self.grid.n):
-            z_inv = xp.take(z_inv, xp.arange(n), i)
-        z_inv = xp.reshape(z_inv, self.grid.n + (2,))
-        return z_inv * self.grid.mask
+        # Import taper classes if needed
+        if taper is None:
+            if taper_range is None:
+                raise ValueError("taper_range must be specified when taper is None")
+            from debiased_spatial_whittle.models.tapers import WendlandTaper
+            taper = WendlandTaper(range=taper_range)
+        
+        # Create tapered model
+        self._original_model = model
+        self._taper = taper
+        tapered_model = TaperedCovarianceModel(model, taper)
+        
+        # Initialize parent class with tapered model
+        super().__init__(tapered_model, grid, tol)
+    
+    @property
+    def original_model(self) -> CovarianceModel:
+        """Original covariance model (before tapering)"""
+        return self._original_model
+    
+    @property
+    def taper(self) -> CovarianceTaper:
+        """Taper function used for the covariance model"""
+        return self._taper
+    
+    @property
+    def tapered_model(self) -> TaperedCovarianceModel:
+        """Tapered covariance model used for sampling"""
+        return self.model

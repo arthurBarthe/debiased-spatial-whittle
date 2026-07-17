@@ -1,5 +1,5 @@
 site_name: Documentation Debiased Spatial Whittle
-
+site_url: ""
 use_directory_urls: false
 
 theme:
@@ -15,8 +15,10 @@ plugins:
 - search
 - mkdocs-jupyter:
     include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py', 'france_interpolation.py', 'dual_remote_sensing.py']
+    'anisotropic.py', 'france_interpolation.py', 'dual_remote_sensing.py', 'corner_plot_example.py']
     execute: true
+    cache: false
+    no_prompt: true
 - mkdocstrings:
     handlers:
       python:
@@ -68,6 +70,7 @@ nav:
           - 'Non-overlapping grids': multivariate_two_grids.py
           - 'Dual remote sensing': dual_remote_sensing.py
       - Interpolation: france_interpolation.py
+      - Predicted distributions of estimates: corner_plot_example.py
   - Reference:
       - grids: grids.md
       - models: models.md

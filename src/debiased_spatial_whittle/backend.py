@@ -52,7 +52,7 @@ def ravel_multi_index(coords, shape):
 
 
 class BackendManager:
-    backend_name = "numpy"
+    backend_name = "torch"
     device = "cpu"
     block = False
 
@@ -95,23 +95,27 @@ class BackendManager:
         cls.block = True
         if cls.backend_name == "numpy":
             numpy.to_cpu = lambda x: x
+            numpy.to_numpy = lambda x: x
             numpy.item = lambda x: x
             return numpy
         elif cls.backend_name == "cupy":
             cupy.to_cpu = lambda x: x.get()
+            cupy.to_numpy = lambda x: x.get()
             cupy.item = lambda x: x.item()
             return cupy
         elif cls.backend_name == "autograd":
             import autograd.numpy
-
             return autograd.numpy
         elif cls.backend_name == "torch":
+            torch.set_default_device(cls.device)
             torch.to_cpu = lambda x: x.cpu()
+            torch.to_numpy = lambda x: x.cpu().numpy()
             torch.item = lambda x: x.item()
-            torch.set_default_tensor_type(torch.DoubleTensor)
+            torch.set_default_dtype(torch.float64)
             torch.array = lambda x: torch.tensor(
                 x, dtype=torch.float64, device=cls.device
             )
+            torch.asarray = lambda *args, **kwargs: torch.as_tensor(*args, **kwargs)
             torch.ndarray = torch.Tensor
             torch.expand_dims = torch.unsqueeze
             torch.take = lambda a, indices, axis: torch.index_select(a, axis, indices)
@@ -122,6 +126,7 @@ class BackendManager:
             torch.digitize = torch.bucketize
             torch.ravel_multi_index = ravel_multi_index
             torch.Tensor.astype = lambda self, type: self.to(dtype=type)
+            torch.transpose = torch.permute
             return torch
 
     @classmethod
@@ -156,6 +161,17 @@ class BackendManager:
             )
 
     @classmethod
+    def get_ones_like(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return numpy.ones_like
+        if cls.backend_name == "cupy":
+            return cupy.ones_like
+        elif cls.backend_name == "torch":
+            return lambda *args, **kargs: torch.ones_like(
+                *args, **kargs, device=BackendManager.device
+            )
+
+    @classmethod
     def get_randn(cls):
         if cls.backend_name == "numpy" or cls.backend_name == "autograd":
             return numpy.random.randn
@@ -163,6 +179,19 @@ class BackendManager:
             return cupy.random.randn
         elif cls.backend_name == "torch":
             return lambda *args, **kargs: torch.randn(
+                *args, **kargs, dtype=torch.float64, device=cls.device
+            )
+        else:
+            raise Exception("No backend set")
+
+    @classmethod
+    def get_rand(cls):
+        if cls.backend_name == "numpy" or cls.backend_name == "autograd":
+            return numpy.random.rand
+        elif cls.backend_name == "cupy":
+            return cupy.random.rand
+        elif cls.backend_name == "torch":
+            return lambda *args, **kargs: torch.rand(
                 *args, **kargs, dtype=torch.float64, device=cls.device
             )
         else:
@@ -279,3 +308,28 @@ class BackendManager:
             return a.get()
         if cls.backend_name == "numpy":
             return a.cpu()
+
+    @classmethod
+    def to_device(cls, a):
+        if cls.backend_name == "torch":
+            return a.to(device=cls.device)
+        else:
+            return a
+
+    @classmethod
+    def get_assert_allclose(cls):
+        if cls.backend_name == "numpy":
+            return numpy.testing.assert_allclose
+        if cls.backend_name == "cupy":
+            return cupy.testing.assert_allclose
+        if cls.backend_name == "torch":
+            return torch.testing.assert_allclose
+
+    @classmethod
+    def get_hanning(cls):
+        if cls.backend_name == "numpy":
+            return numpy.hanning
+        if cls.backend_name == "cupy":
+            return cupy.hanning
+        if cls.backend_name == "torch":
+            return torch.hann_window

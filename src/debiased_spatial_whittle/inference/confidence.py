@@ -8,6 +8,9 @@ from debiased_spatial_whittle.models.base import CovarianceModel
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram
 
+ones = BackendManager.get_ones()
+ones_like = BackendManager.get_ones_like()
+
 
 class CovarianceFFT:
     def __init__(self, grid: RectangularGrid):
@@ -70,12 +73,12 @@ class CovarianceFFT:
         ep = expected_periodogram(model)
         s = []
         if f is None:
-            f = xp.ones_like(ep)
-            f2 = xp.ones_like(ep)
+            f = ones_like(ep)
+            f2 = ones_like(ep)
         if normalize is True:
             ep = expected_periodogram(model)
         else:
-            ep = xp.ones(n)
+            ep = ones(n)
         for m1 in progressbar(range(-n1 + 1, n1)):
             for m2 in range(-n2 + 1, n2):
                 ep_i1 = self._get_indices_ep1(n, (m1, m2))
@@ -86,7 +89,7 @@ class CovarianceFFT:
                 s.append(xp.sum(seq * f_seq / seq_ep))
         if return_terms:
             return xp.sum(s), xp.array(s)
-        return xp.sum(s)
+        return sum(s)
 
     def exact_summation2(
         self,

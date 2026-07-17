@@ -1,2 +1,3 @@
 src/debiased_spatial_whittle/__pycache__/
 src/debiased_spatial_whittle/bayes/__pycache__/
+*.pyc

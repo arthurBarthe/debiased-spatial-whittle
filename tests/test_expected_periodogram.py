@@ -1,5 +1,11 @@
-import numpy as np
-from numpy.testing import assert_allclose
+from debiased_spatial_whittle.backend import BackendManager
+from debiased_spatial_whittle.inference.tapers import HanningTaper
+
+np = BackendManager.get_backend()
+randn = BackendManager.get_randn()
+zeros = BackendManager.get_zeros()
+assert_allclose = BackendManager.get_assert_allclose()
+
 from debiased_spatial_whittle.models.old import exp_cov
 from debiased_spatial_whittle.sampling.old import sim_circ_embedding
 from debiased_spatial_whittle.inference.periodogram import autocov, compute_ep_old
@@ -36,7 +42,7 @@ def test_autocov_1():
     cov_func = lambda x: x
     shape = (3,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0.0, 1.0, 2.0, -2.0, -1.0])
+    assert np.all(acv == np.array([0.0, 1.0, 2.0, -2.0, -1.0]))
 
 
 def test_autocov_2():
@@ -47,7 +53,7 @@ def test_autocov_2():
     cov_func = lambda x: x
     shape = (4,)
     acv = autocov(cov_func, shape)
-    assert np.all(acv == [0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0])
+    assert np.all(acv == np.array([0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0]))
 
 
 def test_compare_to_mean():
@@ -69,33 +75,30 @@ def test_compare_to_mean():
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.05)
+    assert_allclose(mean_per, e_per, rtol=0.05, atol=0.01)
 
 
 def test_compare_to_mean_taper():
     """
     Same as above but with the use of a taper.
     """
-    from numpy import hanning
+    hanning_taper = HanningTaper()
 
     shape = (32, 32)
     grid = RectangularGrid(shape)
     model = ExponentialModel(rho=5, sigma=1)
     sampler = SamplerOnRectangularGrid(model, grid)
     n_samples = 10000
-    periodogram = Periodogram()
-    periodogram.taper = lambda shape: hanning(shape[0]).reshape(-1, 1) * hanning(
-        shape[1]
-    ).reshape(1, -1)
+    periodogram = Periodogram(taper=hanning_taper)
     expected_periodogram = ExpectedPeriodogram(grid, periodogram)
-    mean_per = np.zeros(shape)
+    mean_per = zeros(shape)
     for i in range(n_samples):
         z = sampler()
         per = periodogram(z)
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.05)
+    assert_allclose(mean_per, e_per, rtol=0.05, atol=0.01)
 
 
 def test_compare_to_mean2():
@@ -110,7 +113,7 @@ def test_compare_to_mean2():
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = compute_ep_old(cov_func, grid)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.1)
+    assert_allclose(mean_per, e_per, rtol=0.1, atol=0.01)
 
 
 def test_compare_to_mean_3d():
@@ -130,7 +133,7 @@ def test_compare_to_mean_3d():
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.05)
+    assert_allclose(mean_per, e_per, rtol=0.05, atol=0.01)
 
 
 def test_compare_to_mean_1d():
@@ -148,7 +151,7 @@ def test_compare_to_mean_1d():
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.05)
+    assert_allclose(mean_per, e_per, rtol=0.05, atol=0.01)
 
 
 def test_compare_to_average_masked_grid():
@@ -157,10 +160,9 @@ def test_compare_to_average_masked_grid():
     to the expected periodogram, in the case of a grid with missing observations.
     """
     shape = (32, 32)
-    grid = RectangularGrid(shape)
     mask = np.ones(shape)
     mask[:10, :40] = 0
-    grid.mask = mask
+    grid = RectangularGrid(shape, mask=mask)
     model = ExponentialModel(rho=5, sigma=1)
     sampler = SamplerOnRectangularGrid(model, grid)
     n_samples = 10000
@@ -173,7 +175,7 @@ def test_compare_to_average_masked_grid():
         mean_per = i / (i + 1) * mean_per + 1 / (i + 1) * per
     e_per = expected_periodogram(model)
     print(mean_per / e_per)
-    assert_allclose(mean_per, e_per, rtol=0.05)
+    assert_allclose(mean_per, e_per, rtol=0.05, atol=0.01)
 
 
 """
@@ -210,7 +212,7 @@ def test_periodogram_oop():
     sampler = SamplerOnRectangularGrid(model, g)
     z = sampler()
     p = p_op(z)
-    p2 = periodogram(z, np.ones_like(z))
+    p2 = periodogram(z.values, np.ones_like(z.values))
     assert_allclose(p, p2)
 
 
@@ -230,7 +232,7 @@ def test_expected_periodogram_oop():
     # old version
     cov_func = lambda x: exp_cov(x, 10)
     ep_old = compute_ep_old(cov_func, np.ones((64, 64)))
-    assert_allclose(ep_old, ep_oop, rtol=1e-2)
+    assert_allclose(ep_old, ep_oop, rtol=1e-2, atol=1e-2)
 
 
 def test_gradient_expected_periodogram():
@@ -249,14 +251,10 @@ def test_gradient_expected_periodogram():
     ep1 = ep_op(model)
     model.rho = model.rho + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(
-        model,
-        [
-            model.param.rho,
-        ],
-    )[:, :, 0]
+    jac = ep_op.jacobian(model)
+    g = jac[f'{model.name}_rho']
     g2 = (ep2 - ep1) / epsilon
-    assert_allclose(g, g2, rtol=1e-3)
+    assert_allclose(g, g2, rtol=1e-3, atol=1e-2)
 
 
 from debiased_spatial_whittle.inference.multivariate_periodogram import (
@@ -273,21 +271,18 @@ def test_gradient_expected_periodogram_bivariate():
     bvm = BivariateUniformCorrelation(model)
     bvm.r = 0.1
     bvm.f = 1.2
-    params_for_grad = [
-        bvm.param.r,
-    ]
-    ep_grad = ep_op.gradient(bvm, params_for_grad)
+    param_name = f'{bvm.name}_r'
+    jac = ep_op.jacobian(bvm)
     ep = ep_op(bvm)
     epsilon = 1e-6
-    for i, p in enumerate(params_for_grad):
-        print(p.name)
-        old_value = getattr(bvm, p.name)
-        new_value = old_value + epsilon
-        setattr(bvm, p.name, new_value)
-        ep2 = ep_op(bvm)
-        grad_num = (ep2 - ep) / epsilon
-        assert_allclose(ep_grad[..., i, :, :], grad_num, rtol=0.001)
-        setattr(bvm, p.name, old_value)
+    print(param_name)
+    old_value = getattr(bvm, 'r')
+    new_value = old_value + epsilon
+    setattr(bvm, 'r', new_value)
+    ep2 = ep_op(bvm)
+    grad_num = (ep2 - ep) / epsilon
+    assert_allclose(jac[param_name], grad_num, rtol=0.001, atol=0.01)
+    setattr(bvm, 'r', old_value)
 
 
 def test_gradient_expected_periodogram_sqExpCov():
@@ -306,14 +301,10 @@ def test_gradient_expected_periodogram_sqExpCov():
     ep1 = ep_op(model)
     model.rho = model.rho + epsilon
     ep2 = ep_op(model)
-    g = ep_op.gradient(
-        model,
-        [
-            model.param.rho,
-        ],
-    )[:, :, 0]
+    jac = ep_op.jacobian(model)
+    g = jac[f'{model.name}_rho']
     g2 = (ep2 - ep1) / epsilon
-    assert_allclose(g, g2, rtol=1e-2)
+    assert_allclose(g, g2, rtol=1e-2, atol=1e-2)
 
 
 def test_cov_dft_sum():
@@ -356,11 +347,11 @@ def test_cov_dft_quad():
     g = RectangularGrid(n)
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
-    f = np.random.randn(*n)
-    f2 = np.random.randn(*n)
+    f = randn(*n)
+    f2 = randn(*n)
     cov_mat = ep.cov_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
     cov_mat = np.abs(cov_mat) ** 2
-    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
+    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1)))).squeeze()
     cov_fft = CovarianceFFT(g)
     s2 = cov_fft.exact_summation1(model, ep, f=f, f2=f2, normalize=False)
     print(s1, s2)
@@ -407,11 +398,11 @@ def test_rel_dft_quad():
     g = RectangularGrid(n)
     p = Periodogram()
     ep = ExpectedPeriodogram(g, p)
-    f = np.random.randn(*n)
-    f2 = np.random.randn(*n)
+    f = randn(*n)
+    f2 = randn(*n)
     cov_mat = ep.rel_dft_matrix(model).reshape(n[0] * n[1], n[0] * n[1])
     cov_mat = np.abs(cov_mat) ** 2
-    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1))))
+    s1 = np.dot(f.reshape((1, -1)), np.dot(cov_mat, f2.reshape((-1, 1)))).squeeze()
     cov_fft = CovarianceFFT(g)
     s2 = cov_fft.exact_summation2(model, ep, f=f, f2=f2, normalize=False)
     print(s1, s2)

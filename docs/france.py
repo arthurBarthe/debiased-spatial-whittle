@@ -3,10 +3,13 @@
 
 # ##Imports
 
+from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('numpy')
+xp = BackendManager.get_backend()
 
 import matplotlib.pyplot as plt
-import debiased_spatial_whittle.grids as grids
 from debiased_spatial_whittle.models.spectral import SpectralMatern
+from debiased_spatial_whittle.models.univariate import Matern32Model
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
@@ -15,14 +18,14 @@ from debiased_spatial_whittle.grids.old import ImgGrid
 
 # ##Model specification
 
-model = SpectralMatern(rho=15, nu=2.0)
-
+model = SpectralMatern(rho=15, nu=1.5)
+lags = xp.zeros((2, ))
+model(lags)
 # ##Grid specification
 
 shape = (512, 512)
 mask_france = ImgGrid(shape).get_new()
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
 # ##Sample generation
@@ -39,7 +42,10 @@ expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
-model_est = SpectralMatern()
-model_est.set_param_bounds(dict(rho=(3, 50), nu=(0.5, 5)))
+model_est = Matern32Model()
+model_est.set_parameter_bounds("Matern32Model_rho", (1., 100.))
+model_est.set_parameter_bounds("Matern32Model_sigma", (.1, 10.))
+# model_est.set_parameter_bounds("SpectralMatern_nu", (.1, 10.))
 estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
-print(estimate.rho)
+
+print(estimate)

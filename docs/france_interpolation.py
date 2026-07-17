@@ -25,15 +25,14 @@ model = SquaredExponentialModel(rho=7, sigma=0.9)
 
 shape = (128, 128)
 mask_france = ImgGrid(shape).get_new().astype(bool)
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
 # ##Sample generation
 
-z = sampler()
+sample = sampler()
 plt.figure()
-plt.imshow(z, origin="lower", cmap="RdBu")
+plt.imshow(sample, origin="lower", cmap="RdBu")
 plt.title("full sample")
 plt.show()
 
@@ -49,7 +48,7 @@ def add_missing_circle(mask, centre, radius):
 
 xs_pred, ys_pred, sel_pred = add_missing_circle(mask_france, (64, 64), 15)
 
-z_obs = z * mask_france
+z_obs = sample * mask_france
 plt.figure()
 plt.imshow(z_obs, origin="lower", cmap="RdBu")
 plt.title("partial sample")

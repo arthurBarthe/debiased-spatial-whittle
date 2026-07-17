@@ -44,6 +44,7 @@ model_2 = SquaredExponentialModel(rho=2.0, sigma=1 / 1.41)
 model = model_1 + model_2
 model = NuggetModel(model, nugget=1e-2)
 model.fix_parameter("nugget")
+print(model)
 
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid, periodogram)
