@@ -232,8 +232,8 @@ class AnisotropicModel(CovarianceModel):
     >>> model = AnisotropicModel(base_model, eta=1.5, phi=xp.pi / 3)
     """
 
-    eta = ModelParameter(default=1, bounds=(0, xp.inf))
-    phi = ModelParameter(default=0, bounds=(0, xp.pi / 2))
+    eta = ModelParameter(default=1, bounds=(0, xp.inf), latex_display=r"\eta")
+    phi = ModelParameter(default=0, bounds=(0, xp.pi / 2), latex_display=r"\phi")
 
     def __init__(self, base_model, eta=None, phi=None, name=None):
         super().__init__((base_model,), eta, phi, name=name)
@@ -242,25 +242,22 @@ class AnisotropicModel(CovarianceModel):
     def base_model(self):
         return self.children[0]
 
-    @property
-    def scaling_matrix(self):
-        return xp.array([[self.eta, 0], [0, 1 / self.eta]])
+    def _scaling_matrix(self, eta):
+        row_1 = xp.stack((eta, xp.array(0.)))
+        row_2 = xp.stack((xp.array(0.), 1 / eta))
+        return xp.stack((row_1, row_2), axis=0)
 
-    @property
-    def rotation_matrix(self):
-        return xp.array(
-            [
-                [xp.cos(self.phi), -xp.sin(self.phi)],
-                [xp.sin(self.phi), xp.cos(self.phi)],
-            ]
-        )
+    def _rotation_matrix(self, phi):
+        row_1 = xp.stack((xp.cos(phi), -xp.sin(phi)))
+        row_2 = xp.stack((xp.sin(phi), xp.cos(phi)))
+        return xp.stack((row_1, row_2), axis=0)
 
     def compute(self, lags: xp.ndarray, eta: xp.ndarray, phi: xp.ndarray, *params) -> xp.ndarray:
         child_params = params
         lags = xp.swapaxes(lags, 0, -1)
         lags = xp.expand_dims(lags, -1)
-        lags = xp.matmul(self.rotation_matrix, lags)
-        lags = xp.matmul(self.scaling_matrix, lags)
+        lags = xp.matmul(self._rotation_matrix(phi), lags)
+        lags = xp.matmul(self._scaling_matrix(eta), lags)
         lags = xp.squeeze(lags, -1)
         lags = xp.swapaxes(lags, 0, -1)
         return self.children[0].compute(lags, *child_params)
