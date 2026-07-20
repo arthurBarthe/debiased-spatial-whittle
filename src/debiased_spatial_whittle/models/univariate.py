@@ -92,8 +92,8 @@ class Matern32Model(BaseCovarianceModel):
     >>> model = Matern32Model(rho=5, sigma=1)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter", latex_display=r"\rho")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter", latex_display=r"\sigma")
 
     def __init__(self, rho=None, sigma=None, name=None):
         super().__init__(rho, sigma, name=name)
@@ -126,8 +126,8 @@ class Matern52Model(BaseCovarianceModel):
     >>> model = Matern52Model(rho=10, sigma=0.9)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0, xp.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    rho = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Range parameter", latex_display=r"\rho")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter", latex_display=r"\sigma")
 
     def __init__(self, rho=None, sigma=None, name=None):
         super().__init__(rho, sigma, name=name)
@@ -158,9 +158,9 @@ class RationalQuadraticModel(BaseCovarianceModel):
     >>> model = RationalQuadraticModel(rho=20, alpha=1.5)
     """
 
-    rho = ModelParameter(default=1.0, bounds=(0.0, xp.inf))
-    alpha = ModelParameter(default=1.0, bounds=(0, xp.inf))
-    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf))
+    rho = ModelParameter(default=1.0, bounds=(0.0, xp.inf), doc="Range parameter", latex_display=r"\rho")
+    alpha = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Alpha parameter", latex_display=r"\alpha")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter", latex_display=r"\sigma")
 
     def __init__(self, rho=None, alpha=None, sigma=None, name=None):
         super().__init__(rho, alpha, sigma, name=name)
@@ -283,7 +283,7 @@ class AmplitudeModel(CovarianceModel):
     >>> model = AmplitudeModel(base_model, sigma=2.0)
     """
     
-    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter")
+    sigma = ModelParameter(default=1.0, bounds=(0, xp.inf), doc="Amplitude parameter", latex_display=r"\sigma")
     
     def __init__(self, base_model, sigma=None, name=None):
         super().__init__((base_model,), sigma, name=name)

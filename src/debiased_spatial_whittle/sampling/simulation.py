@@ -1,6 +1,7 @@
 import sys, warnings
 from typing import Tuple
 
+import torch
 from charset_normalizer.md import lru_cache
 from scipy.stats import multivariate_normal
 
@@ -193,7 +194,7 @@ class MultivariateSamplerOnRectangularGrid:
     Implements circulant embedding for multivariate random fields, as proposed by Chan & Wood (1999).
     """
 
-    def __init__(self, model: CovarianceModel, grid: RectangularGrid, p: int):
+    def __init__(self, model: CovarianceModel, grid: RectangularGrid, p: int, tol: float = 0.001):
         """
         Parameters
         ----------
@@ -208,6 +209,7 @@ class MultivariateSamplerOnRectangularGrid:
         self.grid = grid
         self.p = p
         self.sampling_grid = grid
+        self.tol = tol
 
     @property
     def model(self) -> CovarianceModel:
@@ -238,9 +240,17 @@ class MultivariateSamplerOnRectangularGrid:
         f = prod_list(self.sampling_grid.n) * ifftn(cov, axes=self.spatial_axes)
         return xp.linalg.eigh(f)
 
+    def _get_level(self, amplitudes: xp.ndarray):
+        negative = xp.sum(xp.abs(amplitudes[amplitudes < 0]))
+        positive = xp.sum(amplitudes[amplitudes > 0])
+        return negative / positive
+
     def _sample(self):
         # lambdas shape (p, ), r_matrix shape (p, p)
         lambdas, r_matrix = self.compute_spectral_decomposition()
+        if self._get_level(lambdas) > self.tol:
+            raise ValueError("Embedding is not positive definite within the tolerance level.")
+        lambdas = xp.maximum(lambdas, xp.array(0.))
         shape = self.sampling_grid.n + (1, self.p)
         # e shape (n1, ..., nd, p, 1)
         e = randn(*lambdas.shape) + 1j * randn(*lambdas.shape)

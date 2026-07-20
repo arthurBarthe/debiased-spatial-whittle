@@ -751,6 +751,8 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
     """
     def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
+        if not len(sel) == base_model.n_parameters:
+            raise ValueError("The sel tuple needs to have one boolean value per parameter of the base model.")
         self.sel = xp.array(sel).astype(bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
 
     def map_parameters(self, *params):
