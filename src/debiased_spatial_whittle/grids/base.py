@@ -368,3 +368,96 @@ class RectangularGrid(Freezable):
             shape[d] = self.n[d]
         g = RectangularGrid(shape)
         return g
+
+
+class FourierGrid(Freezable):
+    """
+    Grid class for Fourier space, wrapping a RectangularGrid.
+    
+    The extent and delta for this grid are based on the Fourier frequencies of the underlying grid.
+    
+    Attributes
+    ----------
+    n: tuple[int, ...]
+        spatial dimensions of the grid in number of points
+
+    delta: tuple[float, ...]
+        frequency spacing along all dimensions
+
+    nvars: int
+        number of variates observed on the grid
+
+    mask: ndarray
+        array of 0's (missing) and 1's (observed)
+
+    extent: tuple[float, ...]
+        frequency extent of the grid
+
+    n_points: int
+        total number of points of the grid
+
+    ndim: int
+        number of spatial dimensions
+    """
+
+    def __init__(self, grid: RectangularGrid):
+        """
+        Parameters
+        ----------
+        grid : RectangularGrid
+            The underlying rectangular grid to wrap.
+        """
+        assert isinstance(grid, RectangularGrid), "grid must be an instance of RectangularGrid"
+        self._n = grid.n
+        self._nvars = grid.nvars
+        self._original_grid = grid
+        self._mask = ones(self.n)
+        if self.nvars > 1:
+            self._mask = ones(self.n + (self.nvars,))
+        super().__init__()
+        self.freeze()
+
+    def __repr__(self):
+        return f"FourierGrid(n={self.n}, delta={self.delta}, nvars={self.nvars})"
+
+    @property
+    def n(self) -> tuple[int, ...]:
+        """size of the grid"""
+        return self._n
+
+    @property
+    def ndim(self) -> int:
+        """number of spatial dimensions of the grid"""
+        return len(self.n)
+
+    @property
+    def delta(self) -> tuple[float, ...]:
+        """frequency spacing along all dimensions."""
+        import numpy as np
+        return tuple([1 / (n_i * d_i) for n_i, d_i in zip(self.n, self._original_grid.delta)])
+
+    @property
+    def nvars(self) -> int:
+        """number of variates."""
+        return self._nvars
+
+    @property
+    def mask(self) -> xp.ndarray:
+        """array of 0's (missing) and 1's (observed)"""
+        return self._mask
+
+    @property
+    def n_points(self) -> int:
+        """total number of points of the grid"""
+        return xp.prod(xp.array(self.n))
+
+    @property
+    def extent(self) -> tuple[float, ...]:
+        """frequency extent of the grid."""
+        import numpy as np
+        return tuple([1 / d_i for d_i in self._original_grid.delta])
+
+    @property
+    def original_grid(self) -> RectangularGrid:
+        """The original RectangularGrid that this FourierGrid wraps."""
+        return self._original_grid

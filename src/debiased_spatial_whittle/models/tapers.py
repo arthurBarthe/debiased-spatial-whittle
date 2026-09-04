@@ -91,8 +91,8 @@ class WendlandTaper(CovarianceTaper):
     def __init__(self, range: float = 1.0, type: str = 'C2'):
         self.range = float(range)
         self.type = type
-        if type not in ['C2', 'C4']:
-            raise ValueError(f"type must be 'C2' or 'C4', got {type}")
+        if type not in ['C2', 'C4', 'C6']:
+            raise ValueError(f"type must be 'C2', 'C4', or 'C6', got {type}")
     
     def compute_taper(self, lags: xp.ndarray) -> xp.ndarray:
         """Compute Wendland taper values."""
@@ -110,6 +110,8 @@ class WendlandTaper(CovarianceTaper):
         elif self.type == 'C4':
             # Wendland C4: (1 - r)^6 * (35r^2 + 18r + 3)/3
             taper_values[mask] = (1 - r)**6 * (35 * r**2 + 18 * r + 3) / 3
+        elif self.type == 'C6':
+            taper_values[mask] = (1 - r)**8 * (32 * r**3 + 25 * r ** 2 + 8 * r + 1)
         
         return taper_values
 

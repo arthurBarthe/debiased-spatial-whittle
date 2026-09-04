@@ -583,7 +583,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     # ------------ backward compatibility ---------
     def fix_parameter(self, param_name: str):
-        self.freeze_parameter(f'{self.name}_{param_name}')
+        self.freeze_parameter(param_name)
 
 
 class BaseCovarianceModel(CovarianceModel):

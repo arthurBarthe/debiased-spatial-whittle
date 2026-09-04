@@ -25,6 +25,8 @@ model = NuggetModel(model, nugget=0.0001)
 sampler = SamplerOnRectangularGrid(model, grid)
 z = sampler()
 
+z.show()
+
 
 anim = video_plot_3d(z, get_title=lambda i: "", cmap="Spectral")
 plt.close()

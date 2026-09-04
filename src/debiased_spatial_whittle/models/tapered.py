@@ -36,14 +36,7 @@ class TaperedCovarianceModel(CovarianceModel):
     >>> tapered_model(lags)
     """
     
-    range = ModelParameter(
-        default=1.0, 
-        bounds=(0, xp.inf), 
-        doc="Range parameter for the taper function", 
-        latex_display=r"r"
-    )
-    
-    def __init__(self, base_model, taper: CovarianceTaper = None, range: float = None, name: str = None):
+    def __init__(self, base_model, taper: CovarianceTaper = None, name: str = None):
         """
         Initialize a tapered covariance model.
         
@@ -55,23 +48,13 @@ class TaperedCovarianceModel(CovarianceModel):
         taper : CovarianceTaper, optional
             The taper function to use. If None, a default WendlandTaper is used.
             
-        range : float, optional
-            The range parameter for the taper function
-            
         name : str, optional
             Name for the model
         """
         super().__init__((base_model,), range, name=name)
         
         # Set the taper function
-        if taper is None:
-            from debiased_spatial_whittle.models.tapers import WendlandTaper
-            self._taper = WendlandTaper(range=self.range if range is None else range)
-        else:
-            self._taper = taper
-            # Update taper range if provided
-            if range is not None and hasattr(taper, 'range'):
-                taper.range = range
+        self._taper = taper
     
     @property
     def base_model(self):
@@ -87,11 +70,8 @@ class TaperedCovarianceModel(CovarianceModel):
     def taper(self, value):
         """Set the taper function."""
         self._taper = value
-        # Update taper range to match model range if applicable
-        if hasattr(value, 'range') and hasattr(self, '_range'):
-            value.range = self.range
     
-    def compute(self, lags: xp.ndarray, range: xp.ndarray, *params) -> xp.ndarray:
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
         """
         Compute the tapered covariance.
         
@@ -111,9 +91,6 @@ class TaperedCovarianceModel(CovarianceModel):
         xp.ndarray
             Array of shape (n_points,) containing tapered covariance values
         """
-        # Update taper range
-        self.taper.range = float(range.item() if hasattr(range, 'item') else range)
-        
         # Compute base model covariance (pass only the base model parameters, not the range)
         base_cov = self.children[0].compute(lags, *params)
         

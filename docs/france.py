@@ -10,15 +10,17 @@ xp = BackendManager.get_backend()
 import matplotlib.pyplot as plt
 from debiased_spatial_whittle.models.spectral import SpectralMatern
 from debiased_spatial_whittle.models.univariate import Matern32Model
-from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.grids.base import RectangularGrid, FourierGrid
 from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
 from debiased_spatial_whittle.grids.old import ImgGrid
+from debiased_spatial_whittle.sampling.samples import FourierValues
+
 
 # ##Model specification
 
-model = SpectralMatern(rho=15, nu=1.5)
+model = Matern32Model(rho=15)
 lags = xp.zeros((2, ))
 model(lags)
 # ##Grid specification
@@ -31,13 +33,15 @@ sampler = SamplerOnRectangularGrid(model, grid_france)
 # ##Sample generation
 
 z = sampler()
-plt.figure()
-plt.imshow(z, origin="lower", cmap="RdBu")
-plt.show()
+z.show()
 
 # ##Inference
 
 periodogram = Periodogram()
+f_grid = FourierGrid(grid_france)
+periodogram_values = FourierValues(f_grid, periodogram(z))
+periodogram_values.show()
+
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
