@@ -10,8 +10,16 @@ from debiased_spatial_whittle.caching import Freezable, ban_if_frozen
 xp = BackendManager.get_backend()
 inv = BackendManager.get_inv()
 
-from torch.autograd.functional import jacobian
 from copy import deepcopy
+
+try:
+    import torch
+    from torch.autograd.functional import jacobian
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
 
 try:
     from rich import print
@@ -19,6 +27,7 @@ try:
     from rich.tree import Tree
     from rich.text import Text
     from rich.style import Style
+
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -26,14 +35,16 @@ except ImportError:
 
 class ModelParameter:
     def __init__(self, default, bounds=(None, None), doc="", latex_display: str = None):
-        self.default = BackendManager.to_device(xp.squeeze(xp.asarray(default)).astype(xp.float64))
+        self.default = BackendManager.to_device(
+            xp.squeeze(xp.asarray(default)).astype(xp.float64)
+        )
         self.bounds = bounds
         self.doc = doc
         self.latex_display = latex_display
 
     def __set_name__(self, owner, name):
         self.name = name
-        if not '_parameters' in owner.__dict__:
+        if not "_parameters" in owner.__dict__:
             owner._parameters = []
         owner._parameters.append(name)
 
@@ -43,19 +54,40 @@ class ModelParameter:
         return obj.__dict__.get(f"_{self.name}", self.default)
 
     def __set__(self, obj, value):
-        if hasattr(obj, '_frozen_parameters') and self.name in obj._frozen_parameters:
+        if hasattr(obj, "_frozen_parameters") and self.name in obj._frozen_parameters:
             raise ValueError(f"Parameter {self.name} is frozen and cannot be set.")
-        if hasattr(obj, 'frozen') and obj.frozen:
-            raise ValueError(f"Parameter {self.name} cannot be set at the model is frozen.")
+        if hasattr(obj, "frozen") and obj.frozen:
+            raise ValueError(
+                f"Parameter {self.name} cannot be set at the model is frozen."
+            )
         if value is not None:
-            obj.__dict__[f"_{self.name}"] = BackendManager.to_device(xp.squeeze(xp.asarray(value)).astype(xp.float64))
-
+            # If the value is already a torch tensor with requires_grad, preserve it
+            if (
+                BackendManager.backend_name == "torch"
+                and TORCH_AVAILABLE
+                and isinstance(value, torch.Tensor)
+            ):
+                # If it's a leaf tensor with requires_grad, keep it as is
+                if value.is_leaf and value.requires_grad:
+                    obj.__dict__[f"_{self.name}"] = value
+                else:
+                    # Otherwise, convert but preserve requires_grad if it's a tensor
+                    converted = BackendManager.to_device(
+                        xp.squeeze(xp.asarray(value)).astype(xp.float64)
+                    )
+                    if isinstance(value, torch.Tensor) and value.requires_grad:
+                        converted.requires_grad_(True)
+                    obj.__dict__[f"_{self.name}"] = converted
+            else:
+                obj.__dict__[f"_{self.name}"] = BackendManager.to_device(
+                    xp.squeeze(xp.asarray(value)).astype(xp.float64)
+                )
 
 
 class ModelInterface(ABC):
     def __init__(self):
         super().__init__()
-    
+
     @property
     @abstractmethod
     def name(self):
@@ -206,13 +238,17 @@ class ModelInterface(ABC):
                 if param_name in param_names:
                     full_args.append(args[param_names.index(param_name)])
                 else:
-                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
+                    full_args.append(
+                        self.parameters[self.parameter_names.index(param_name)]
+                    )
             return self.compute(lags, *full_args)
 
         out = jacobian(func, param_values, strategy="forward-mode", vectorize=True)
         return dict(zip(param_names, out))
 
-    def jacobian_scipy(self, lags: xp.ndarray, param_names: tuple[str] = None) -> xp.ndarray:
+    def jacobian_scipy(
+        self, lags: xp.ndarray, param_names: tuple[str] = None
+    ) -> xp.ndarray:
         """
         Examples
         --------
@@ -223,6 +259,7 @@ class ModelInterface(ABC):
         >>> model.jacobian_scipy(lags)
         """
         from scipy.differentiate import jacobian
+
         if param_names is None:
             param_names = self.parameter_names
         param_values = self.get_parameters(param_names)
@@ -233,12 +270,14 @@ class ModelInterface(ABC):
                 if param_name in param_names:
                     full_args.append(x[param_names.index(param_name)])
                 else:
-                    full_args.append(self.parameters[self.parameter_names.index(param_name)])
+                    full_args.append(
+                        self.parameters[self.parameter_names.index(param_name)]
+                    )
             return self.compute(np.expand_dims(lags, -1), *full_args)
 
         def func2(x):
             shape = x.shape[1:]
-            return np.apply_along_axis(func, axis=0, arr=x).reshape((-1, ) + shape)
+            return np.apply_along_axis(func, axis=0, arr=x).reshape((-1,) + shape)
 
         out = jacobian(func2, param_values)
         acv_shape = self.compute(lags, *self.parameters).shape
@@ -253,10 +292,7 @@ class ModelInterface(ABC):
         raise NotImplementedError()
 
 
-
-
 class CovarianceModel(ModelInterface, Freezable):
-
     def __init__(self, children: tuple[ModelInterface], *params, name: str = None):
         self.name = name
         self._frozen_parameters = []
@@ -291,7 +327,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     def copy(self):
         return Freezable.copy(self)
-    
+
     def frozen_copy(self):
         return Freezable.frozen_copy(self)
 
@@ -340,7 +376,7 @@ class CovarianceModel(ModelInterface, Freezable):
     def parameter_names(self) -> tuple[str]:
         out = []
         for param_name in self._parameters:
-            out.append(f'{self.name}_{param_name}')
+            out.append(f"{self.name}_{param_name}")
         for child in self.children:
             out.extend(child.parameter_names)
         return out
@@ -350,7 +386,7 @@ class CovarianceModel(ModelInterface, Freezable):
         out = []
         for param_name in self._parameters:
             if not param_name in self._frozen_parameters:
-                out.append(f'{self.name}_{param_name}')
+                out.append(f"{self.name}_{param_name}")
         for child in self.children:
             out.extend(child.free_parameter_names)
         return tuple(out)
@@ -360,7 +396,9 @@ class CovarianceModel(ModelInterface, Freezable):
         out = []
         for pname in self._parameters:
             if self.display_subscript is not None:
-                out.append(rf"{getattr(self.__class__, pname).latex_display}_{self.display_subscript}")
+                out.append(
+                    rf"{getattr(self.__class__, pname).latex_display}_{self.display_subscript}"
+                )
             else:
                 out.append(getattr(self.__class__, pname).latex_display)
         for child in self.children:
@@ -438,22 +476,23 @@ class CovarianceModel(ModelInterface, Freezable):
     def __repr__(self):
         """Text representation of the model showing tree structure, parameter names, values, and fixed status."""
         return self._repr_tree()
-    
+
     def __rich__(self):
         """Rich terminal representation for use with rich library."""
         if RICH_AVAILABLE:
             from rich.tree import Tree
+
             class_name = self.__class__.__name__
             tree = Tree(f"[bold blue]{self.name}[/bold blue] ([dim]{class_name}[/dim])")
             self._build_rich_tree(tree)
             return tree
         return self._repr_tree()
-    
+
     def _build_rich_tree(self, parent_tree):
         """Recursively build rich tree structure."""
         if not RICH_AVAILABLE:
             return
-        
+
         # Add parameters
         if self._parameters:
             params_tree = parent_tree.add("[bold]Parameters[/bold]")
@@ -467,22 +506,24 @@ class CovarianceModel(ModelInterface, Freezable):
                     bounds = self._parameter_bounds[param_name]
                     bounds_text = f" [dim](bounds: [{bounds[0]}, {bounds[1]}])[/dim]"
                 params_tree.add(f"{param_name}: {param_value}{fixed_text}{bounds_text}")
-        
+
         # Add children recursively
         for child in self.children:
             child_class_name = child.__class__.__name__
-            child_tree = parent_tree.add(f"[bold cyan]{child.name}[/bold cyan] ([dim]{child_class_name}[/dim])")
+            child_tree = parent_tree.add(
+                f"[bold cyan]{child.name}[/bold cyan] ([dim]{child_class_name}[/dim])"
+            )
             child._build_rich_tree(child_tree)
-    
+
     def _repr_tree(self, prefix="", is_last=True):
         """Recursive helper for text representation."""
         lines = []
         connector = "└── " if is_last else "├── "
         class_name = self.__class__.__name__
         lines.append(f"{prefix}{connector}{self.name} ({class_name})")
-        
+
         new_prefix = prefix + ("    " if is_last else "│   ")
-        
+
         # Parameters
         if self._parameters:
             for idx, param_name in enumerate(self._parameters):
@@ -494,52 +535,66 @@ class CovarianceModel(ModelInterface, Freezable):
                 if not is_fixed and param_name in self._parameter_bounds:
                     bounds = self._parameter_bounds[param_name]
                     bounds_info = f" [{bounds[0]}, {bounds[1]}]"
-                is_last_param = (idx == len(self._parameters) - 1) and (not self.children)
+                is_last_param = (idx == len(self._parameters) - 1) and (
+                    not self.children
+                )
                 param_connector = "└── " if is_last_param else "├── "
-                lines.append(f"{new_prefix}{param_connector}{param_name}: {param_value}{fixed_marker}{bounds_info}")
-        
+                lines.append(
+                    f"{new_prefix}{param_connector}{param_name}: {param_value}{fixed_marker}{bounds_info}"
+                )
+
         # Children
         for idx, child in enumerate(self.children):
-            is_last_child = (idx == len(self.children) - 1)
+            is_last_child = idx == len(self.children) - 1
             lines.append(child._repr_tree(new_prefix, is_last_child))
-        
-        return '\n'.join(lines)
+
+        return "\n".join(lines)
 
     def _repr_html_(self):
         """HTML representation of the model showing tree structure, parameter names, values, and fixed status."""
         html = []
-        html.append('<div style="margin-left:15px;padding-left:10px;border-left:solid gray 2px;">')
+        html.append(
+            '<div style="margin-left:15px;padding-left:10px;border-left:solid gray 2px;">'
+        )
         class_name = self.__class__.__name__
-        html.append(f'<b>{self.name} ({class_name})</b>')
-        
+        html.append(f"<b>{self.name} ({class_name})</b>")
+
         # Parameters table
         if self._parameters:
             html.append('<table style="margin-left:15px;">')
-            html.append('<tr><th style="text-align:left;">Parameter</th><th style="text-align:left;">Value</th><th>Fixed</th><th style="text-align:left;">Bounds</th></tr>')
+            html.append(
+                '<tr><th style="text-align:left;">Parameter</th><th style="text-align:left;">Value</th><th>Fixed</th><th style="text-align:left;">Bounds</th></tr>'
+            )
             for param_name in self._parameters:
                 param_obj = getattr(self.__class__, param_name)
                 param_value = getattr(self, param_name)
                 is_fixed = param_name in self._frozen_parameters
-                fixed_str = 'Yes' if is_fixed else 'No'
-                fixed_style = 'color:orange;' if is_fixed else ''
+                fixed_str = "Yes" if is_fixed else "No"
+                fixed_style = "color:orange;" if is_fixed else ""
                 # Add bounds column
-                bounds_str = '-' if is_fixed else f'[{self._parameter_bounds[param_name][0]}, {self._parameter_bounds[param_name][1]}]'
-                html.append(f'<tr><td>{param_name}</td><td>{param_value}</td><td style="{fixed_style}">{fixed_str}</td><td>{bounds_str}</td></tr>')
-            html.append('</table>')
-        
+                bounds_str = (
+                    "-"
+                    if is_fixed
+                    else f"[{self._parameter_bounds[param_name][0]}, {self._parameter_bounds[param_name][1]}]"
+                )
+                html.append(
+                    f'<tr><td>{param_name}</td><td>{param_value}</td><td style="{fixed_style}">{fixed_str}</td><td>{bounds_str}</td></tr>'
+                )
+            html.append("</table>")
+
         # Children
         for child in self.children:
             html.append(child._repr_html_())
-        
-        html.append('</div>')
-        return '\n'.join(html)
+
+        html.append("</div>")
+        return "\n".join(html)
 
     def predict(
-            self,
-            x_obs: xp.ndarray,
-            y_obs: xp.ndarray,
-            x_pred: xp.ndarray,
-            return_variance: bool = False,
+        self,
+        x_obs: xp.ndarray,
+        y_obs: xp.ndarray,
+        x_pred: xp.ndarray,
+        return_variance: bool = False,
     ):
         """
         Compute conditional mean at a set of locations x_pred given values y_obs observed at x_obs.
@@ -583,7 +638,7 @@ class CovarianceModel(ModelInterface, Freezable):
 
     # ------------ backward compatibility ---------
     def fix_parameter(self, param_name: str):
-        self.freeze_parameter(f'{self.name}_{param_name}')
+        self.freeze_parameter(f"{self.name}_{param_name}")
 
 
 class BaseCovarianceModel(CovarianceModel):
@@ -596,8 +651,9 @@ class SumModel(CovarianceModel):
     A covariance model that represents the sum of multiple covariance models.
     The compute method returns the sum of the covariances of the children.
     """
+
     _parameters = []
-    
+
     def __init__(self, *models, name: str = None):
         # SumModel itself has no parameters, only children
         children = []
@@ -620,9 +676,17 @@ class SumModel(CovarianceModel):
 
 
 class Sum2Models(CovarianceModel):
-    theta = ModelParameter(default=xp.pi / 4, bounds=(0, xp.pi / 2), latex_display=r"\theta")
+    theta = ModelParameter(
+        default=xp.pi / 4, bounds=(0, xp.pi / 2), latex_display=r"\theta"
+    )
 
-    def __init__(self, model1: CovarianceModel, model2: CovarianceModel, theta: float = None, name: str = None):
+    def __init__(
+        self,
+        model1: CovarianceModel,
+        model2: CovarianceModel,
+        theta: float = None,
+        name: str = None,
+    ):
         super().__init__((model1, model2), theta, name=name)
 
     def compute(self, lags: xp.ndarray, theta, *params) -> xp.ndarray:
@@ -637,8 +701,9 @@ class ProductModel(CovarianceModel):
     A covariance model that represents the product of multiple covariance models.
     The compute method returns the product of the covariances of the children.
     """
+
     _parameters = []
-    
+
     def __init__(self, *models, name: str = None):
         # ProductModel itself has no parameters, only children
         children = []
@@ -664,6 +729,7 @@ class ReparameterizedModel(ModelInterface, ABC, Freezable):
     """
     Class that allows to use an alternative parameterization of a base model.
     """
+
     def __init__(self, base_model: ModelInterface, name: str = None):
         self.base_model = base_model
         self._parameter_bounds = []
@@ -709,7 +775,10 @@ class ReparameterizedModel(ModelInterface, ABC, Freezable):
 
     def set_parameter(self, name: str, value: xp.ndarray):
         current_parameters = self.parameters
-        new_parameters = [current_parameters[i] if name != pname else value for i, pname in enumerate(self.parameter_names)]
+        new_parameters = [
+            current_parameters[i] if name != pname else value
+            for i, pname in enumerate(self.parameter_names)
+        ]
         mapped_parameters = self.map_parameters(*new_parameters)
         mapped_parameter = mapped_parameters[self.parameter_names.index(name)]
         self.base_model.set_parameter(name, mapped_parameter)
@@ -731,7 +800,11 @@ class ReparameterizedModel(ModelInterface, ABC, Freezable):
 
     @property
     def free_parameter_names(self) -> tuple:
-        return tuple(filter(lambda pname: pname not in self._frozen_parameters, self.parameter_names))
+        return tuple(
+            filter(
+                lambda pname: pname not in self._frozen_parameters, self.parameter_names
+            )
+        )
 
     def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
         base_model_params = self.map_parameters(*params)
@@ -749,9 +822,14 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
     Class that allows to use a log scale parameterization of a base model. One can specify which
     parameters use the log scale representation via the sel argument.
     """
+
     def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
-        self.sel = xp.array(sel).astype(bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
+        self.sel = (
+            xp.array(sel).astype(bool)
+            if sel
+            else xp.ones(self.base_model.n_parameters).astype(bool)
+        )
 
     def map_parameters(self, *params):
         mapped_params = []
@@ -786,14 +864,26 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
 
     @property
     def free_parameters_repr(self):
-        return tuple([f"log {p_repr}" if self.sel[self.parameter_names.index(p_name)] else p_repr
-                      for (p_repr, p_name) in zip(self.base_model.free_parameters_repr, self.free_parameter_names)])
+        return tuple(
+            [
+                f"log {p_repr}"
+                if self.sel[self.parameter_names.index(p_name)]
+                else p_repr
+                for (p_repr, p_name) in zip(
+                    self.base_model.free_parameters_repr, self.free_parameter_names
+                )
+            ]
+        )
 
     @property
     def parameters_repr(self):
         repr_base_params = self.base_model.parameters_repr
-        return tuple([f"log {p_repr}" if self.sel[i] else p_repr
-                      for (i, p_repr) in enumerate(repr_base_params)])
+        return tuple(
+            [
+                f"log {p_repr}" if self.sel[i] else p_repr
+                for (i, p_repr) in enumerate(repr_base_params)
+            ]
+        )
 
     def frozen_copy(self):
         copy = self.copy()
@@ -803,7 +893,11 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
     @property
     def free_parameter_bounds(self):
         base_bounds = self.base_model.free_parameter_bounds
-        free_sel = [sel_i for (pname, sel_i) in zip(self.parameter_names, self.sel) if pname in self.free_parameter_names]
+        free_sel = [
+            sel_i
+            for (pname, sel_i) in zip(self.parameter_names, self.sel)
+            if pname in self.free_parameter_names
+        ]
         mapped_bounds = []
         for i, (lower, upper) in enumerate(base_bounds):
             if free_sel[i]:
@@ -811,8 +905,12 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
                 # Convert to backend type, apply log, then convert back to Python float
                 lower_t = xp.log(xp.asarray(lower))
                 upper_t = xp.log(xp.asarray(upper))
-                mapped_bounds.append((lower_t.item() if hasattr(lower_t, 'item') else float(lower_t),
-                                      upper_t.item() if hasattr(upper_t, 'item') else float(upper_t)))
+                mapped_bounds.append(
+                    (
+                        lower_t.item() if hasattr(lower_t, "item") else float(lower_t),
+                        upper_t.item() if hasattr(upper_t, "item") else float(upper_t),
+                    )
+                )
             else:
                 # No transformation
                 mapped_bounds.append((lower, upper))
@@ -822,22 +920,27 @@ class LogScaleReparameterizedModel(ReparameterizedModel):
 class SigmoidReparameterizedModel(ReparameterizedModel, Freezable):
     """
     Class that applies a sigmoid transformation to map unbounded parameters to bounded ones.
-    
+
     The transformation maps from (-inf, inf) to the bounds of each parameter in the base model.
     For a parameter with bounds (a, b), the mapping is:
         x -> a + (b - a) * sigmoid(x)
     where sigmoid(x) = 1 / (1 + exp(-x))
-    
+
     The inverse mapping is:
         y -> logit((y - a) / (b - a))
     where logit(p) = log(p / (1 - p))
     """
+
     def __init__(self, base_model: ModelInterface, sel: tuple[bool] = None):
         super().__init__(base_model)
-        self.sel = xp.array(sel).astype(xp.bool) if sel else xp.ones(self.base_model.n_parameters).astype(bool)
+        self.sel = (
+            xp.array(sel).astype(xp.bool)
+            if sel
+            else xp.ones(self.base_model.n_parameters).astype(bool)
+        )
         # Store the bounds for mapping
         self._param_bounds = self.base_model.free_parameter_bounds
-    
+
     def map_parameters(self, *params):
         """Map from unbounded space to bounded space using sigmoid."""
         mapped_params = []
@@ -852,7 +955,7 @@ class SigmoidReparameterizedModel(ReparameterizedModel, Freezable):
             else:
                 mapped_params.append(param)
         return tuple(mapped_params)
-    
+
     def imap_parameters(self, *params):
         """Map from bounded space to unbounded space using logit."""
         mapped_params = []
@@ -871,28 +974,36 @@ class SigmoidReparameterizedModel(ReparameterizedModel, Freezable):
             else:
                 mapped_params.append(param)
         return tuple(mapped_params)
-    
+
     @property
     def parameter_names(self):
         return self.base_model.parameter_names
-    
+
     @property
     def free_parameter_names(self):
         return self.base_model.free_parameter_names
-    
+
     def freeze_parameter(self, name):
         self.base_model.freeze_parameter(name)
-    
+
     @property
     def free_parameters_repr(self):
-        return tuple([f"sigmoid {p_repr}" if self.sel[self.parameter_names.index(p_name)] else f"{p_repr}"
-                      for (p_repr, p_name) in zip(self.base_model.free_parameters_repr, self.free_parameter_names)])
-    
+        return tuple(
+            [
+                f"sigmoid {p_repr}"
+                if self.sel[self.parameter_names.index(p_name)]
+                else f"{p_repr}"
+                for (p_repr, p_name) in zip(
+                    self.base_model.free_parameters_repr, self.free_parameter_names
+                )
+            ]
+        )
+
     @property
     def parameters_repr(self):
         repr_base_params = self.base_model.parameters_repr
         return tuple([f"sigmoid {p_repr}" for p_repr in repr_base_params])
-    
+
     @property
     def free_parameter_bounds(self):
         # For transformed parameters (sigmoid), bounds are (-inf, inf)
@@ -901,11 +1012,11 @@ class SigmoidReparameterizedModel(ReparameterizedModel, Freezable):
         mapped_bounds = []
         for i, use_sigmoid in enumerate(self.sel):
             if use_sigmoid:
-                mapped_bounds.append((-float('inf'), float('inf')))
+                mapped_bounds.append((-float("inf"), float("inf")))
             else:
                 mapped_bounds.append(base_bounds[i])
         return mapped_bounds
-    
+
     def frozen_copy(self):
         copy = self.copy()
         copy.freeze()
@@ -919,9 +1030,10 @@ class SeparableModel:
 if __name__ == "__main__":
     from rich import print
     from debiased_spatial_whittle.models.univariate import SquaredExponentialModel
+
     model = SquaredExponentialModel(rho=32)
     print(model)
-    lags = xp.array([[0., 0., 0.], [0., 1., 2.]])
+    lags = xp.array([[0.0, 0.0, 0.0], [0.0, 1.0, 2.0]])
     print(model(lags))
 
     model2 = LogScaleReparameterizedModel(model)
