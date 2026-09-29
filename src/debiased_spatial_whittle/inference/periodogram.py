@@ -202,13 +202,18 @@ class Periodogram(Freezable):
         -------
         periodogram: ndarray
             Periodogram of the data
-            - shape (2 * n1 + 1, ..., 2 * nk + 1) if the fold attribute is False
+            - shape (2 * n1, ..., 2 * nk) if the fold attribute is False
             - shape (n1, ..., nk) if the fold attribute is True
         """
         # freeze on first call
         self.freeze()
         values = sample.values * self.taper(sample.grid.n)
-        periodogram_values = 1 / prod_list(values.shape) * xp.abs(fftn(values)) ** 2
+        norm = 1 / prod_list(values.shape)
+        if self.fold:
+            periodogram_values = norm * xp.abs(fftn(values)) ** 2
+        else:
+            padded_n = tuple(2 * s for s in values.shape)
+            periodogram_values = norm * xp.abs(fftn(values, s=padded_n)) ** 2
         return periodogram_values
 
 

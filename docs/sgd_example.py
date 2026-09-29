@@ -22,6 +22,7 @@ BackendManager.device = 'cpu'
 
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.models.univariate import ExponentialModel
+from debiased_spatial_whittle.models.base import LogScaleReparameterizedModel
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 from debiased_spatial_whittle.inference.sgd_whittle import FrequencyIndexDataset, StochasticDebiasedWhittle, SGDTrainer
 from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
@@ -31,21 +32,17 @@ def main():
     print("SGD Optimization for Debiased Whittle Likelihood")
     print("=" * 50)
     
-    # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
-    
     # Create grid: Use a smaller grid for memory efficiency
     # The original request was 256x512, but that's too large for this environment
-    # We'll use 32x64 which demonstrates the same concept
-    grid = RectangularGrid((32, 64))
+    # We'll use 128x128 which demonstrates the same concept
+    grid = RectangularGrid((256, 256))
     print(f"Grid shape: {grid.n}")
     print(f"Total grid points: {grid.n_points}")
-    print(f"Note: Using smaller grid (32x64) for memory efficiency. Same concept applies to 256x512.")
+    print(f"Note: Using smaller grid (128x128) for memory efficiency. Same concept applies to 256x512.")
     
     # Create true model with rho=6
-    true_rho = 6.0
-    true_sigma = 1.0
+    true_rho = 16.0
+    true_sigma = .7
     true_model = ExponentialModel(rho=torch.tensor(true_rho), sigma=torch.tensor(true_sigma))
     print(f"\nTrue model parameters:")
     print(f"  rho = {true_rho}")
@@ -69,16 +66,19 @@ def main():
     dataset = FrequencyIndexDataset(grid.n)
     print(f"Dataset size (number of frequency indices): {len(dataset)}")
     
-    # Create initial model with wrong rho - use leaf tensors
+    # Create initial model with wrong rho - use leaf tensors.
+    # Wrap in LogScaleReparameterizedModel so the optimizer works in log-space
+    # for both parameters, keeping them positive without explicit constraints.
     initial_rho = 3.0
     initial_sigma = 1.0
-    model = ExponentialModel(
-        rho=torch.tensor(initial_rho, requires_grad=True),
-        sigma=torch.tensor(initial_sigma, requires_grad=True)
+    base_model = ExponentialModel(
+        rho=torch.tensor(initial_rho),
+        sigma=torch.tensor(initial_sigma)
     )
-    print(f"\nInitial model parameters:")
-    print(f"  rho = {initial_rho}")
-    print(f"  sigma = {initial_sigma}")
+    model = LogScaleReparameterizedModel(base_model, sel=(True, True))
+    print(f"\nInitial model parameters (log-scale reparameterized):")
+    print(f"  rho = {initial_rho} (log: {np.log(initial_rho):.6f})")
+    print(f"  sigma = {initial_sigma} (log: {np.log(initial_sigma):.6f})")
     
     # Create and run trainer
     print(f"\nCreating SGD trainer...")
@@ -86,17 +86,17 @@ def main():
         stochastic_whittle=stochastic_whittle,
         model=model,
         dataset=dataset,
-        learning_rate=0.001,
-        batch_size=16,
-        n_epochs=50,
+        learning_rate=1e-2,
+        batch_size=256 ** 2 // 10,
+        n_epochs=500,
         momentum=0.9
     )
     
     print("Starting training...")
-    history = trainer.fit(sample, n_epochs=50, verbose=True)
+    history = trainer.fit(sample, verbose=True)
     
-    # Get final parameter values
-    final_params = trainer.get_parameter_values()
+    # Get final parameter values (actual, not log-space)
+    final_params = trainer.get_actual_parameter_values()
     
     print("\n" + "=" * 50)
     print("TRAINING COMPLETE")

@@ -12,17 +12,19 @@ implementations, but extracts values at specific frequency indices for stochasti
 
 import torch
 import numpy as np
+from itertools import product
 from typing import Tuple, List, Optional, Union
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from debiased_spatial_whittle.backend import BackendManager
-from debiased_spatial_whittle.models.base import CovarianceModel, ModelInterface
+from debiased_spatial_whittle.models.base import CovarianceModel, ModelInterface, ReparameterizedModel
 from debiased_spatial_whittle.models.univariate import ExponentialModel
 from debiased_spatial_whittle.grids.base import RectangularGrid
 from debiased_spatial_whittle.sampling.samples import SampleOnRectangularGrid
 from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
 
 xp = BackendManager.get_backend()
+fftshift, ifftshift = BackendManager.get_fftshift_methods()
 
 
 class FrequencyIndexDataset(Dataset):
@@ -127,13 +129,13 @@ class StochasticDebiasedWhittle:
         Periodogram object for computing periodogram values
     expected_periodogram : ExpectedPeriodogram
         Expected periodogram object
-    
+
     Attributes
     ----------
     grid : RectangularGrid
         The sampling grid
     """
-    
+
     def __init__(
         self,
         grid: RectangularGrid,
@@ -174,13 +176,11 @@ class StochasticDebiasedWhittle:
         if not isinstance(full_periodogram, torch.Tensor):
             full_periodogram = torch.tensor(full_periodogram, dtype=torch.float64)
         
-        # Extract values at the specified indices
-        batch_size = len(indices)
-        periodogram_values = torch.zeros(batch_size, dtype=torch.float64)
-        
-        for i, idx in enumerate(indices):
-            periodogram_values[i] = full_periodogram[idx].real
-        
+        # Extract values at the specified indices using vectorized advanced indexing
+        idx_array = torch.as_tensor(indices, dtype=torch.long)
+        idx_per_dim = torch.unbind(idx_array, dim=1)
+        periodogram_values = full_periodogram[idx_per_dim].real
+
         return periodogram_values
     
     def compute_expected_periodogram_at_indices(
@@ -214,13 +214,11 @@ class StochasticDebiasedWhittle:
         if not isinstance(full_ep, torch.Tensor):
             full_ep = torch.tensor(full_ep, dtype=torch.float64)
         
-        # Extract values at the specified indices
-        batch_size = len(indices)
-        ep_values = torch.zeros(batch_size, dtype=torch.float64)
-        
-        for i, idx in enumerate(indices):
-            ep_values[i] = full_ep[idx].real
-        
+        # Extract values at the specified indices using vectorized advanced indexing
+        idx_array = torch.as_tensor(indices, dtype=torch.long)
+        idx_per_dim = torch.unbind(idx_array, dim=1)
+        ep_values = full_ep[idx_per_dim].real
+
         return ep_values
     
     def compute_expected_periodogram_at_indices_autograd(
@@ -229,90 +227,172 @@ class StochasticDebiasedWhittle:
         indices: List[tuple[int, ...]]
     ) -> torch.Tensor:
         """
-        Compute the expected periodogram at specific frequency indices using direct evaluation.
-        
-        This method computes the expected periodogram by directly evaluating the
-        Fourier transform of the autocovariance at the specified frequency indices,
-        allowing for proper gradient backpropagation through the model parameters.
-        
-        For a stationary process, the expected periodogram at frequency k is:
-        f(k; theta) = sum_r cov(r; theta) * exp(-i * k^T * r)
-        
-        where cov(r; theta) is the autocovariance function parameterized by theta,
-        and r are the lag vectors.
-        
+        Compute the expected periodogram at specific frequency indices with autograd.
+
+        This method builds the expected periodogram through the existing FFT-based
+        ``compute_ep`` pipeline, while keeping an autograd graph connecting the free
+        model parameters to the output. The autocovariance is evaluated on the full
+        grid of lags in a single vectorized call to ``model.compute`` (structured like
+        the ``func`` in ``ModelInterface.jacobian``), then folded and transformed by
+        ``ExpectedPeriodogram.compute_ep``. The values at the requested frequency
+        indices are finally extracted via vectorized advanced indexing.
+
+        This replaces a slow per-frequency, per-lag direct-evaluation loop while
+        preserving gradients: free params (leaf tensors, ``requires_grad=True``)
+        -> ``model.compute`` -> ``ifftshift`` -> ``compute_ep`` (pad + fftn + real)
+        -> extracted values.
+
         Parameters
         ----------
         model : CovarianceModel
             The covariance model
         indices : List[tuple[int, ...]]
             List of frequency indices
-            
+
         Returns
         -------
         torch.Tensor
             Expected periodogram values at the specified indices, shape (batch_size,)
         """
-        # Get the Fourier frequencies for the grid
-        fourier_freqs = self.grid.fourier_frequencies
-        
-        if not isinstance(fourier_freqs, torch.Tensor):
-            fourier_freqs = torch.tensor(fourier_freqs, dtype=torch.float64)
-        
-        # Get the lags for the autocovariance
+        # Lags for the autocovariance grid: shape (ndim, 2*n1-1, ..., 2*nd-1)
         lags = self.grid.lags_unique
         if not isinstance(lags, torch.Tensor):
-            lags = torch.tensor(lags, dtype=torch.float64)
-        
-        batch_size = len(indices)
-        ep_values = torch.zeros(batch_size, dtype=torch.float64)
-        
-        ndim = len(self.grid.n)
-        
-        # Reshape lags for efficient computation
-        # lags shape: (ndim, 2*n1-1, 2*n2-1, ...)
-        lags_flat = lags.reshape(ndim, -1)  # (ndim, n_lags)
-        lags_expanded = lags_flat.T  # (n_lags, ndim)
-        
-        # For each frequency index, compute the spectral density
-        for i, idx in enumerate(indices):
-            # Get the frequency vector at this index
-            if ndim == 1:
-                freq_vec = fourier_freqs[idx[0]]
-            elif ndim == 2:
-                freq_vec = fourier_freqs[idx[0], idx[1]]
-            elif ndim == 3:
-                freq_vec = fourier_freqs[idx[0], idx[1], idx[2]]
-            else:
-                # Generic case for higher dimensions
-                freq_vec = fourier_freqs
-                for idim, iidx in enumerate(idx):
-                    freq_vec = freq_vec.select(dim=idim, index=iidx)
-            
-            # Compute the autocovariance at each lag point
-            # This will be differentiated through the model parameters
-            acv_values = torch.zeros(lags_flat.shape[1], dtype=torch.float64)
-            for j, lag_vec in enumerate(lags_expanded):
-                # Evaluate model at this specific lag
-                # lag_vec shape: (ndim,), we need to add a dimension for the model
-                lag_for_model = lag_vec.unsqueeze(1)  # (ndim, 1)
-                acv_values[j] = model(lag_for_model)
-            
-            # Compute the Fourier transform at this specific frequency
-            # f(omega) = sum_r cov(r) * exp(-i * omega^T * r)
-            
-            # Compute omega^T * r for each lag
-            omega_dot_r = torch.sum(freq_vec.unsqueeze(1) * lags_flat, dim=0)  # (n_lags,)
-            
-            # Compute the complex exponential
-            exp_term = torch.exp(-1j * omega_dot_r)
-            
-            # Compute the Fourier transform
-            ft = torch.sum(acv_values * exp_term)
-            
-            # The expected periodogram is the real part (should be real in theory)
-            ep_values[i] = ft.real
-        
+            lags = torch.as_tensor(lags, dtype=torch.float64)
+        ndim = self.grid.ndim
+
+        # Build acv with an autograd graph through the free parameters,
+        # mirroring the func pattern in ModelInterface.jacobian (base.py:235).
+        param_names = model.free_parameter_names
+        all_param_names = model.parameter_names
+        param_values = model.get_parameters(param_names)  # leaf tensors, requires_grad=True
+
+        # Trailing dim expected by compute (as ModelInterface.__call__ adds)
+        lags_expanded = lags.unsqueeze(-1)
+
+        def func(*args):
+            full_args = []
+            for pname in all_param_names:
+                if pname in param_names:
+                    full_args.append(args[param_names.index(pname)])
+                else:
+                    full_args.append(model.parameters[all_param_names.index(pname)])
+            return model.compute(lags_expanded, *full_args)
+
+        acv = func(*param_values)
+        # Squeeze the trailing dim added for compute (as ModelInterface.__call__ does)
+        if acv.shape[-1] == 1:
+            acv = acv.squeeze(-1)
+        # ifftshift the spatial dims (as grid.autocov does)
+        acv = ifftshift(acv, list(range(ndim)))
+
+        # Expected periodogram via existing FFT-based compute_ep
+        full_ep = self.expected_periodogram.compute_ep(
+            acv, self.expected_periodogram.periodogram.fold
+        )
+        if not isinstance(full_ep, torch.Tensor):
+            full_ep = torch.as_tensor(full_ep, dtype=torch.float64)
+
+        # Vectorized extraction at the batch indices
+        idx_array = torch.as_tensor(indices, dtype=torch.long)
+        idx_per_dim = torch.unbind(idx_array, dim=1)
+        ep_values = full_ep[idx_per_dim].real
+        return ep_values
+
+    def compute_expected_periodogram_at_indices_direct(
+        self,
+        model: CovarianceModel,
+        indices: List[tuple[int, ...]]
+    ) -> torch.Tensor:
+        """
+        Compute the expected periodogram at specific frequency indices directly,
+        without FFT.
+
+        This mirrors the folding stage of ``ExpectedPeriodogram.compute_ep`` (spatial
+        kernel weighting + fold over the ``2**ndim`` blocks) but replaces the FFT with
+        a vectorized evaluation of the DFT at the requested frequency indices only:
+
+            EP(k) = Re( sum_m folded[m] * exp(-2 pi i * k^T m / n) )
+
+        where ``m`` ranges over the grid multi-indices and ``k`` over the requested
+        frequency indices. The sum is computed as a batched matrix product between a
+        ``(B, M)`` phase matrix and the ``(M,)`` folded array, so there are no Python
+        loops over frequencies or lags. Gradients flow through the model free
+        parameters as in the autograd (FFT-based) method.
+
+        Parameters
+        ----------
+        model : CovarianceModel
+            The covariance model
+        indices : List[tuple[int, ...]]
+            List of frequency indices
+
+        Returns
+        -------
+        torch.Tensor
+            Expected periodogram values at the specified indices, shape (batch_size,)
+        """
+        ndim = self.grid.ndim
+        n = self.grid.n
+
+        # --- Autocovariance with an autograd graph through the free parameters ---
+        lags = self.grid.lags_unique
+        if not isinstance(lags, torch.Tensor):
+            lags = torch.as_tensor(lags, dtype=torch.float64)
+
+        param_names = model.free_parameter_names
+        all_param_names = model.parameter_names
+        param_values = model.get_parameters(param_names)
+
+        lags_expanded = lags.unsqueeze(-1)
+
+        def func(*args):
+            full_args = []
+            for pname in all_param_names:
+                if pname in param_names:
+                    full_args.append(args[param_names.index(pname)])
+                else:
+                    full_args.append(model.parameters[all_param_names.index(pname)])
+            return model.compute(lags_expanded, *full_args)
+
+        acv = func(*param_values)
+        if acv.shape[-1] == 1:
+            acv = acv.squeeze(-1)
+        acv = ifftshift(acv, list(range(ndim)))
+
+        # --- Spatial kernel weighting (same as compute_ep, d=(0,0)) ---
+        cg = self.grid.spatial_kernel(self.expected_periodogram.taper)
+        if not isinstance(cg, torch.Tensor):
+            cg = torch.as_tensor(cg, dtype=acv.dtype)
+        cbar = cg * acv
+
+        # --- Fold over the 2**ndim blocks (structural, independent of batch/grid) ---
+        if not isinstance(cbar, torch.Tensor):
+            cbar = torch.as_tensor(cbar, dtype=torch.float64)
+        result = torch.zeros(n, dtype=torch.complex128, device=cbar.device)
+        for indexes in product(*[(0, 1) for _ in range(ndim)]):
+            cbar_slices = tuple(
+                slice(i * s, (i + 1) * s) for i, s in zip(indexes, n)
+            )
+            res = cbar[cbar_slices]
+            padding = tuple((i, 0) for i in indexes)
+            result = result + xp.pad(res, padding, mode="constant")
+
+        # --- Vectorized DFT at the requested indices (no FFT) ---
+        M = int(np.prod(n))
+        result_flat = result.reshape(M)
+
+        # Multi-indices m in [0, n) per dim, shape (M, ndim), row-major.
+        grids = [torch.arange(s, dtype=torch.float64, device=cbar.device) for s in n]
+        mesh = torch.meshgrid(*grids, indexing="ij")
+        m_grid = torch.stack([m.reshape(-1) for m in mesh], dim=1)  # (M, ndim)
+
+        idx_array = torch.as_tensor(indices, dtype=torch.float64)  # (B, ndim)
+        # phase[b, l] = exp(-2 pi i * sum_j (k_bj / n_j) * m_lj )
+        omega = idx_array / torch.tensor(n, dtype=torch.float64, device=cbar.device)
+        exponent = -2j * torch.pi * (omega @ m_grid.T)  # (B, M)
+        phase = torch.exp(exponent)
+
+        ep_values = torch.real(phase @ result_flat)
         return ep_values
     
     def __call__(
@@ -346,7 +426,7 @@ class StochasticDebiasedWhittle:
         # Compute periodogram at the specified indices (using FFT-based implementation)
         p = self.compute_periodogram_at_indices(sample, indices)
         
-        # Compute expected periodogram at the specified indices (using autograd-compatible version)
+        # Compute expected periodogram at the specified indices (direct, autograd-compatible)
         ep = self.compute_expected_periodogram_at_indices_autograd(model, indices)
         
         # Compute the Whittle likelihood
@@ -433,34 +513,51 @@ class SGDTrainer:
         self.momentum = momentum
         self.weight_decay = weight_decay
         self.nesterov = nesterov
-        
-        # Store the original parameter values and create leaf tensors
+
+        # Build a DataLoader over the frequency indices (reshuffled each epoch)
+        self.dataloader = DataLoader(
+            self.dataset, batch_size=self.batch_size, shuffle=True
+        )
+
+        # Store the original parameter values and create leaf tensors.
+        # Use get_parameter/set_parameter (full names) so this works with both
+        # plain models (e.g. ExponentialModel) and ReparameterizedModel wrappers
+        # (e.g. LogScaleReparameterizedModel) where the optimized parameters are
+        # in a transformed (e.g. log) space.
         self._original_params = {}
-        
+        self._leaf_params: list[torch.Tensor] = []
+        self._leaf_param_names: list[str] = []
+        self._is_reparameterized = isinstance(self.model, ReparameterizedModel)
+
         for param_name in self.model.free_parameter_names:
             param_value = self.model.get_parameter(param_name)
-            if param_value is not None:
-                # Extract the parameter name without model prefix
-                if '_' in param_name:
-                    model_name, param_name_only = param_name.split('_', 1)
-                else:
-                    param_name_only = param_name
-                    model_name = None
-                
-                # Get the current value
-                current_value = getattr(self.model, param_name_only)
-                
-                # Store original value
-                if isinstance(current_value, torch.Tensor):
-                    self._original_params[param_name_only] = current_value.detach().item()
-                else:
-                    self._original_params[param_name_only] = float(current_value)
-                
-                # Create a new leaf tensor with requires_grad=True
-                new_param = torch.tensor(self._original_params[param_name_only], dtype=torch.float64, requires_grad=True)
-                
-                # Update the parameter in the model
-                setattr(self.model, param_name_only, new_param)
+            if param_value is None:
+                continue
+
+            # Extract the parameter name without model prefix (for storage key)
+            if '_' in param_name:
+                param_name_only = param_name.split('_', 1)[1]
+            else:
+                param_name_only = param_name
+
+            # Get the current value (in the model's native parameter space)
+            if isinstance(param_value, torch.Tensor):
+                orig_value = param_value.detach().item()
+            else:
+                orig_value = float(param_value)
+
+            self._original_params[param_name_only] = orig_value
+
+            # Create a new leaf tensor with requires_grad=True
+            new_param = torch.tensor(orig_value, dtype=torch.float64, requires_grad=True)
+            self._leaf_params.append(new_param)
+            self._leaf_param_names.append(param_name)
+
+            # Set the parameter on the model via set_parameter so the leaf is
+            # wired into the model's compute path. For ReparameterizedModel this
+            # stores exp(leaf) on the base model; for plain models it stores the
+            # leaf directly.
+            self.model.set_parameter(param_name, new_param)
         
         # Create optimizer
         self.optimizer = None
@@ -468,15 +565,10 @@ class SGDTrainer:
     
     def _create_optimizer(self):
         """Create the SGD optimizer with all trainable parameters."""
-        # Collect all parameters that are leaf tensors and require gradients
-        params = []
-        for param_name in self.model.free_parameter_names:
-            param_value = self.model.get_parameter(param_name)
-            if param_value is not None:
-                # Check if this is a leaf tensor
-                if param_value.is_leaf and param_value.requires_grad:
-                    params.append(param_value)
-        
+        # Use the leaf tensors stored in __init__ (not get_parameter, which
+        # returns non-leaf tensors for ReparameterizedModel).
+        params = [p for p in self._leaf_params if p.is_leaf and p.requires_grad]
+
         if params:
             self.optimizer = torch.optim.SGD(
                 params,
@@ -488,11 +580,18 @@ class SGDTrainer:
         else:
             raise ValueError("No trainable leaf parameters found in the model")
     
-    def _get_random_batch(self) -> List[tuple[int, ...]]:
-        """Get a random batch of frequency indices."""
-        indices = torch.randint(0, len(self.dataset), (self.batch_size,))
-        return [self.dataset[i] for i in indices.tolist()]
-    
+    def _refresh_parameters(self):
+        """Re-set the leaf tensors on the model.
+
+        For ReparameterizedModel, set_parameter stores a derived (non-leaf)
+        tensor on the base model; after an optimizer step updates the leaf
+        in-place, that derived tensor is stale. Calling set_parameter again
+        rebuilds it from the updated leaf. For plain models this is a no-op
+        (the leaf is already the model's parameter).
+        """
+        for name, leaf in zip(self._leaf_param_names, self._leaf_params):
+            self.model.set_parameter(name, leaf)
+
     def fit(
         self,
         sample: SampleOnRectangularGrid,
@@ -501,7 +600,10 @@ class SGDTrainer:
     ) -> dict:
         """
         Fit the model to the sample using SGD.
-        
+
+        Each epoch iterates over the full DataLoader of frequency indices,
+        performing one SGD update per batch.
+
         Parameters
         ----------
         sample : SampleOnRectangularGrid
@@ -510,165 +612,376 @@ class SGDTrainer:
             Number of epochs to train. If None, uses self.n_epochs
         verbose : bool, optional
             Whether to print training progress, default is True
-            
+
         Returns
         -------
         dict
-            Training history with 'loss' key containing the loss values per epoch
+            Training history with 'loss' key containing the loss values per batch
         """
         if n_epochs is None:
             n_epochs = self.n_epochs
-        
+
         history = {'loss': []}
-        
+
         for epoch in range(n_epochs):
-            # Zero gradients
-            self.optimizer.zero_grad()
-            
-            # Get a random batch of frequency indices
-            batch_indices = self._get_random_batch()
-            
-            # Compute the stochastic Whittle likelihood
-            loss = self.stochastic_whittle(sample, self.model, batch_indices)
-            
-            # Backward pass
-            loss.backward()
-            
-            # Update parameters
-            self.optimizer.step()
-            
-            # Store loss
-            history['loss'].append(loss.item())
-            
+            epoch_losses = []
+            for batch in self.dataloader:
+                # The DataLoader collates tuples of indices into per-dimension
+                # tensors; stack them into a (batch_size, ndim) long tensor as
+                # expected by the index-based compute methods.
+                if isinstance(batch, (tuple, list)):
+                    batch_indices = torch.stack(
+                        [torch.as_tensor(b, dtype=torch.long) for b in batch], dim=1
+                    )
+                else:
+                    batch_indices = torch.as_tensor(batch, dtype=torch.long)
+
+                # For ReparameterizedModel, refresh the base model's parameters
+                # from the (possibly updated) leaf tensors before each forward.
+                if self._is_reparameterized:
+                    self._refresh_parameters()
+
+                self.optimizer.zero_grad()
+                loss = self.stochastic_whittle(sample, self.model, batch_indices)
+                loss.backward()
+                self.optimizer.step()
+
+                loss_value = loss.item()
+                history['loss'].append(loss_value)
+                epoch_losses.append(loss_value)
+
             if verbose and (epoch % 10 == 0 or epoch == n_epochs - 1):
-                print(f"Epoch {epoch + 1}/{n_epochs}, Loss: {loss.item():.6f}")
+                mean_loss = sum(epoch_losses) / len(epoch_losses)
+                print(f"Epoch {epoch + 1}/{n_epochs}, Loss: {mean_loss:.6f}")
                 # Print current parameter values
                 for param_name in self.model.free_parameter_names:
                     param_value = self.model.get_parameter(param_name)
                     if param_value is not None:
                         print(f"  {param_name}: {param_value.item():.6f}")
-        
+
         return history
     
     def get_parameter_values(self) -> dict:
         """
-        Get the current values of all parameters.
-        
+        Get the current values of all parameters in the model's native
+        (optimized) space. For LogScaleReparameterizedModel these are the
+        log-space values; use get_actual_parameter_values for the base model
+        values.
+
         Returns
         -------
         dict
             Dictionary mapping parameter names to their current values
         """
+        if self._is_reparameterized:
+            self._refresh_parameters()
         return {name: self.model.get_parameter(name) for name in self.model.free_parameter_names}
 
+    def get_actual_parameter_values(self) -> dict:
+        """
+        Get the current values of all parameters in the base model's space
+        (i.e. the actual covariance parameters, not the reparameterized ones).
+        For plain models this is identical to get_parameter_values.
 
-def create_sgd_example():
+        Returns
+        -------
+        dict
+            Dictionary mapping parameter names to their actual values
+        """
+        if self._is_reparameterized:
+            self._refresh_parameters()
+            base = self.model.base_model
+            return {name: base.get_parameter(name) for name in base.free_parameter_names}
+        return self.get_parameter_values()
+
+
+class SampledPeriodogramsDataset(Dataset):
     """
-    Create a simple example script for SGD-based Debiased Whittle Likelihood optimization.
-    
-    This function creates and runs an example where we:
-    1. Simulate data from an Exponential covariance model with rho=6
-    2. Use SGD to estimate the rho parameter
-    3. Verify that the estimate is close to the true value
-    
-    Returns
-    -------
-    dict
-        Results containing true and estimated parameter values
+    Dataset of pre-computed periodograms from multiple samples on the same grid.
+
+    Each of the ``K`` samples is stored together with its parameter values.
+    The periodogram of every sample is computed once at construction time.
+    ``__getitem__`` returns a single frequency index, the associated parameter
+    values, and the periodogram value at that frequency — suitable for
+    mini-batch training of a :class:`NnConvolModel` via a debiased Whittle loss.
+
+    Parameters
+    ----------
+    grid : RectangularGrid
+        The common grid on which all samples live.
+    samples : list[SampleOnRectangularGrid]
+        ``K`` samples on ``grid``.
+    param_values : list[tuple]
+        ``K`` tuples of parameter values, one per sample.  Each tuple must
+        have the same length ``a`` (the number of model parameters), and the
+        order must match the declaration order of the ``ModelParameter``
+        descriptors on the target :class:`NnConvolModel`.
+    periodogram : Periodogram
+        Periodogram object used to pre-compute the periodograms.
+
+    Attributes
+    ----------
+    grid : RectangularGrid
+    periodograms : list[torch.Tensor]
+        Pre-computed periodograms, one per sample.
+    param_values : torch.Tensor
+        Stacked parameter values, shape ``(K, a)``.
+    n_freq : int
+        Total number of frequency points per sample.
     """
-    # Set up the backend to use torch
-    BackendManager.set_backend("torch")
-    BackendManager.device = "cpu"
-    
-    print("Creating SGD example...")
-    print(f"Backend: {BackendManager.backend_name}")
-    
-    # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
-    
-    # Create grid: 256 x 512 as requested
-    # Note: Using smaller grid for memory efficiency in this example
-    grid = RectangularGrid((32, 64))
-    print(f"Grid shape: {grid.n}")
-    print(f"Note: Using smaller grid (32x64) for memory efficiency. Same concept applies to 256x512.")
-    
-    # Create true model with rho=6
-    true_rho = 6.0
-    true_sigma = 1.0
-    true_model = ExponentialModel(rho=torch.tensor(true_rho), sigma=torch.tensor(true_sigma))
-    print(f"True model: rho={true_rho}, sigma={true_sigma}")
-    
-    # Sample from the true model
-    from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
-    sampler = SamplerOnRectangularGrid(true_model, grid)
-    sample = sampler()
-    print(f"Sample shape: {sample.values.shape}")
-    
-    # Create periodogram and expected periodogram
-    periodogram = Periodogram()
-    ep = ExpectedPeriodogram(grid, periodogram)
-    
-    # Create stochastic Whittle likelihood
-    stochastic_whittle = StochasticDebiasedWhittle(grid, periodogram, ep)
-    
-    # Create dataset for frequency indices
-    dataset = FrequencyIndexDataset(grid.n)
-    print(f"Dataset size: {len(dataset)}")
-    
-    # Create initial model with wrong rho
-    initial_rho = 3.0
-    initial_sigma = 1.0
-    model = ExponentialModel(
-        rho=torch.tensor(initial_rho, requires_grad=True),
-        sigma=torch.tensor(initial_sigma, requires_grad=True)
-    )
-    print(f"Initial model: rho={initial_rho}, sigma={initial_sigma}")
-    
-    # Create and run trainer
-    trainer = SGDTrainer(
-        stochastic_whittle=stochastic_whittle,
-        model=model,
-        dataset=dataset,
-        learning_rate=0.001,
-        batch_size=16,
-        n_epochs=50,
-        momentum=0.9
-    )
-    
-    print("Starting training...")
-    history = trainer.fit(sample, n_epochs=50, verbose=True)
-    
-    # Get final parameter values
-    final_params = trainer.get_parameter_values()
-    
-    print("\nTraining complete!")
-    print(f"True rho: {true_rho}")
-    print(f"Initial rho: {initial_rho}")
-    print(f"Estimated rho: {final_params['ExponentialModel_rho'].item():.6f}")
-    
-    # Check if the estimate is close to the true value
-    estimated_rho = final_params['ExponentialModel_rho'].item()
-    rho_error = abs(estimated_rho - true_rho)
-    rho_relative_error = rho_error / true_rho
-    
-    print(f"Absolute error: {rho_error:.6f}")
-    print(f"Relative error: {rho_relative_error:.6f}")
-    
-    if rho_relative_error < 0.2:  # Within 20% of true value
-        print("✓ Estimate is close to true value!")
-    else:
-        print("✗ Estimate is not close to true value")
-    
-    return {
-        'true_rho': true_rho,
-        'estimated_rho': estimated_rho,
-        'rho_error': rho_error,
-        'rho_relative_error': rho_relative_error,
-        'history': history
-    }
+
+    def __init__(
+        self,
+        grid: RectangularGrid,
+        samples: List[SampleOnRectangularGrid],
+        param_values: List[tuple],
+        periodogram: Periodogram,
+    ):
+        self.grid = grid
+        self.grid_shape = grid.n
+        self.n_freq = int(np.prod(grid.n))
+
+        if len(samples) != len(param_values):
+            raise ValueError(
+                f"Got {len(samples)} samples but {len(param_values)} parameter sets."
+            )
+        if len(samples) == 0:
+            raise ValueError("At least one sample is required.")
+
+        # Pre-compute periodograms (real-valued, shape grid.n)
+        self.periodograms = []
+        for s in samples:
+            p = periodogram(s)
+            if not isinstance(p, torch.Tensor):
+                p = torch.as_tensor(p, dtype=torch.float64)
+            self.periodograms.append(p.real)
+
+        # Stack parameter values into a single tensor (K, a)
+        self.param_values = torch.as_tensor(
+            param_values, dtype=torch.float64
+        )
+
+    def __len__(self) -> int:
+        return self.n_freq * len(self.periodograms)
+
+    def __getitem__(self, idx: int) -> tuple:
+        """
+        Return a single (frequency_index, parameter_values, periodogram_value).
+
+        Parameters
+        ----------
+        idx : int
+            Flat index in ``[0, K * n_freq)``.
+
+        Returns
+        -------
+        tuple
+            ``(freq_index, param_values, periodogram_value)`` where
+            ``freq_index`` is a tuple of ``int`` (one per grid dimension),
+            ``param_values`` is a ``torch.Tensor`` of shape ``(a,)``, and
+            ``periodogram_value`` is a scalar ``torch.Tensor``.
+        """
+        k = idx // self.n_freq          # which sample
+        f = idx % self.n_freq           # which frequency
+
+        # Convert flat frequency index to multi-index
+        freq_index = np.unravel_index(f, self.grid_shape)
+
+        # Parameter values for this sample
+        params = self.param_values[k]
+
+        # Periodogram value at this frequency
+        p_val = self.periodograms[k][freq_index]
+
+        return freq_index, params, p_val
 
 
-if __name__ == "__main__":
-    # Run the example when this file is executed directly
-    results = create_sgd_example()
+class NnConvolTrainer:
+    """
+    Trainer for the neural-network weights of a
+    :class:`~debiased_spatial_whittle.models.convol.NnConvolModel`.
+
+    The ``ModelParameter`` values (e.g. ``rho``, ``sigma``) are **not**
+    optimised — they are set from the dataset as constant inputs to the NN.
+    Only the ``torch.nn.Module`` weights of the NnConvolModel are trained.
+
+    The trainer iterates over a :class:`SampledPeriodogramsDataset` via a
+    :class:`~torch.utils.data.DataLoader`.  For each batch it:
+
+    1. Groups the batch items by their parameter values (items from the
+       same sample share the same parameters).
+    2. For each group, sets the model's ``ModelParameter`` values (as
+       constants) and computes the expected periodogram at the group's
+       frequency indices via the autograd-compatible FFT path.  Gradients
+       flow through the NN weights only.
+    3. Reassembles the per-group EP values in the original batch order
+       (preserving the autograd graph via ``torch.cat`` + indexing).
+    4. Computes the debiased Whittle loss ``mean(log(ep) + p / ep)``
+       against the batch periodogram values and backpropagates.
+
+    Parameters
+    ----------
+    stochastic_whittle : StochasticDebiasedWhittle
+        The stochastic Whittle likelihood object (provides EP computation).
+    model : NnConvolModel
+        The NN-based convolutional model to train.
+    dataset : SampledPeriodogramsDataset
+        Dataset of pre-computed periodograms and parameter values.
+    learning_rate : float, optional
+        Learning rate for the optimizer, default is 1e-3.
+    batch_size : int, optional
+        Batch size, default is 256.
+    n_epochs : int, optional
+        Number of training epochs, default is 100.
+    weight_decay : float, optional
+        Weight decay (L2 penalty), default is 0.0.
+    """
+
+    def __init__(
+        self,
+        stochastic_whittle: StochasticDebiasedWhittle,
+        model,
+        dataset: SampledPeriodogramsDataset,
+        learning_rate: float = 1e-3,
+        batch_size: int = 256,
+        n_epochs: int = 100,
+        weight_decay: float = 0.0,
+    ):
+        self.stochastic_whittle = stochastic_whittle
+        self.model = model
+        self.dataset = dataset
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.n_epochs = n_epochs
+        self.weight_decay = weight_decay
+
+        # Use a generator on the same device as the model to avoid
+        # device mismatches when torch.set_default_device is set to CUDA.
+        device = next(model.nn_module.parameters()).device
+        gen = torch.Generator(device=device)
+        self.dataloader = DataLoader(
+            self.dataset, batch_size=self.batch_size, shuffle=True,
+            drop_last=True, generator=gen,
+        )
+
+        # Store the model's free parameter names so we can set them from
+        # the dataset during training.  These are NOT optimised; they are
+        # constant inputs to the NN.
+        self._param_names = list(self.model.free_parameter_names)
+
+        # The optimizer only trains the NN module weights.
+        trainable = list(self.model.nn_module.parameters())
+        if not trainable:
+            raise ValueError("No trainable NN parameters found.")
+        self.optimizer = torch.optim.Adam(
+            trainable,
+            lr=self.learning_rate,
+            #weight_decay=self.weight_decay,
+        )
+
+    def _set_model_params(self, values: torch.Tensor):
+        """Set the model's ModelParameter values as non-grad constants.
+
+        Parameters
+        ----------
+        values : torch.Tensor
+            1-D tensor of parameter values, one per ``ModelParameter``.
+        """
+        for i, name in enumerate(self._param_names):
+            self.model.set_parameter(name, values[i].detach())
+
+    def fit(self, verbose: bool = True) -> dict:
+        """
+        Train the NN weights by iterating over the DataLoader.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Whether to print training progress, default is True.
+
+        Returns
+        -------
+        dict
+            Training history with 'loss' key containing per-batch loss values.
+        """
+        history = {"loss": []}
+
+        for epoch in range(self.n_epochs):
+            epoch_losses = []
+
+            for batch in self.dataloader:
+                # Unpack the collated batch.
+                # freq_indices: tuple of tensors (one per dim), each shape (B,)
+                # params: tensor shape (B, a)
+                # p_values: tensor shape (B,)
+                freq_indices, params, p_values = batch
+
+                # Convert frequency indices to (B, ndim) long tensor
+                batch_indices = torch.stack(
+                    [torch.as_tensor(fi, dtype=torch.long) for fi in freq_indices],
+                    dim=1,
+                )
+
+                # Move indices to the model's device (DataLoader collates
+                # Python ints into CPU tensors)
+                device = next(self.model.nn_module.parameters()).device
+                batch_indices = batch_indices.to(device)
+
+                # Group batch items by their parameter values.  Items from
+                # the same sample share the same parameters, so each group
+                # gets its own EP computation.
+                unique_params, inverse_indices = torch.unique(
+                    params, dim=0, return_inverse=True
+                )
+
+                # Sort items by group so we can concatenate per-group EPs.
+                sort_order = torch.argsort(inverse_indices)
+                sorted_indices = batch_indices[sort_order]
+                sorted_p = p_values[sort_order].to(dtype=torch.float64)
+
+                counts = torch.bincount(
+                    inverse_indices, minlength=len(unique_params)
+                )
+                offsets = torch.cumsum(
+                    torch.cat([torch.tensor([0]), counts[:-1]]), dim=0
+                )
+
+                self.optimizer.zero_grad()
+
+                ep_parts = []
+                for g in range(len(unique_params)):
+                    start = offsets[g].item()
+                    end = start + counts[g].item()
+                    group_indices = sorted_indices[start:end]
+
+                    self._set_model_params(unique_params[g])
+
+                    group_ep = (
+                        self.stochastic_whittle
+                        .compute_expected_periodogram_at_indices_autograd(
+                            self.model, group_indices
+                        )
+                    )
+                    ep_parts.append(group_ep)
+
+                # Concatenate per-group EPs (preserves autograd graph).
+                ep_sorted = torch.cat(ep_parts)
+
+                # Compute the loss in sorted order (ep_sorted matches sorted_p).
+                epsilon = 1e-10
+                loss = torch.mean(
+                    torch.log(ep_sorted + epsilon) + sorted_p / (ep_sorted + epsilon)
+                )
+
+                loss.backward()
+                self.optimizer.step()
+
+                loss_value = loss.item()
+                history["loss"].append(loss_value)
+                epoch_losses.append(loss_value)
+
+            if verbose and (epoch % 2 == 0 or epoch == self.n_epochs - 1):
+                mean_loss = sum(epoch_losses) / len(epoch_losses)
+                print(f"Epoch {epoch + 1}/{self.n_epochs}, Loss: {mean_loss:.6f}")
+
+        return history

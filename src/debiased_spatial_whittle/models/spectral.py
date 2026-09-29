@@ -150,3 +150,188 @@ class SpectralMatern(SpectralModel):
 
     def _gradient(self, x: xp.ndarray):
         raise NotImplementedError()
+
+
+try:
+    import torch
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
+
+class NnSpectralModel(SpectralModel):
+    """
+    :class:`SpectralModel` whose spectral density is computed by a PyTorch
+    neural network.
+
+    The neural network is a ``torch.nn.Module`` that takes ``a + d`` inputs —
+    ``a`` model parameter values followed by ``d`` frequency components — and
+    outputs a single scalar (the spectral density value at that frequency).
+
+    Subclasses define ``ModelParameter`` class attributes for the ``a`` model
+    parameters, exactly as in any other covariance model.  The number of
+    ``ModelParameter`` descriptors must match the number of parameter inputs
+    expected by the neural network.
+
+    This model requires the **torch** backend
+    (``BackendManager.set_backend("torch")``) so that FFT operations in
+    :meth:`call_on_rectangular_grid` preserve the autograd graph through the
+    neural-network evaluation.
+
+    Parameters
+    ----------
+    nn_module : torch.nn.Module
+        Neural network mapping ``(a + d)``-dimensional input vectors to scalar
+        spectral density values.
+    *params
+        Values for the ``ModelParameter`` descriptors, in declaration order.
+    name : str, optional
+        Model name.
+
+    Examples
+    --------
+    >>> from debiased_spatial_whittle.models.base import ModelParameter
+    >>> import torch
+    >>>
+    >>> class MyNnSpectralModel(NnSpectralModel):
+    ...     rho = ModelParameter(default=1.0, bounds=(0, float("inf")))
+    ...
+    ...     def __init__(self, nn_module, rho=None, name=None):
+    ...         super().__init__(nn_module, rho, name=name)
+    >>>
+    >>> net = torch.nn.Sequential(
+    ...     torch.nn.Linear(1 + 2, 32), torch.nn.Tanh(),
+    ...     torch.nn.Linear(32, 1), torch.nn.Softplus(),
+    ... )
+    >>> model = MyNnSpectralModel(net, rho=2.0)
+    """
+
+    def __init__(self, nn_module, *params, name: str = None):
+        if not TORCH_AVAILABLE:
+            raise RuntimeError("NnSpectralModel requires PyTorch to be installed.")
+        self.nn_module = nn_module
+        super().__init__(*params, name=name)
+
+    def compute(self, lags: xp.ndarray, *params) -> xp.ndarray:
+        """
+        Compute the covariance at the given lags.
+
+        This overrides :meth:`SpectralModel.compute` to use
+        :meth:`call_on_rectangular_grid` directly (building a grid from the lag
+        shape and the model's deltas), avoiding the fragile grid-inference
+        logic in the parent.  The covariance on the grid is obtained from the
+        spectral density via the inverse-FFT path in
+        :meth:`call_on_rectangular_grid`, and the values at the requested lags
+        are extracted by indexing.
+
+        Parameters
+        ----------
+        lags : xp.ndarray
+            Lag vectors, shape ``(d, n1, ..., nk, 1)`` where ``d`` is the
+            spatial dimension.  The trailing ``1`` is added by
+            ``ModelInterface.__call__``.
+        *params
+            Model parameters (ignored — the NN uses ``self``'s parameters).
+
+        Returns
+        -------
+        xp.ndarray
+            Covariance values, shape ``(n1, ..., nk, 1)``.
+        """
+        from debiased_spatial_whittle.grids.base import RectangularGrid
+
+        d = lags.shape[0]
+        delta = tuple(1.0 for _ in range(d))
+
+        # lags may have a trailing dim of 1 (added by __call__).
+        if lags.shape[-1] == 1:
+            lag_shape = lags.shape[1:-1]
+        else:
+            lag_shape = lags.shape[1:]
+
+        # Build a grid matching the lag array's spatial shape.
+        grid = RectangularGrid(lag_shape, delta=delta)
+
+        # Covariance on the grid via spectral density -> inverse FFT.
+        cov_on_grid = self.call_on_rectangular_grid(grid)
+
+        # Map lags to indices (unit delta -> integer index).
+        indices = []
+        for dim in range(d):
+            lags_dim = lags[dim]
+            indices_dim = torch.round(torch.abs(lags_dim)).long()
+            indices.append(indices_dim)
+
+        result = cov_on_grid[tuple(indices)]
+        return result
+
+    def spectral_density(self, frequencies: xp.ndarray) -> xp.ndarray:
+        """Evaluate the neural-network spectral density at the given frequencies.
+
+        The frequency array has shape ``(n1, ..., nk, d)``.  It is flattened to
+        ``(N, d)``, concatenated with broadcasted parameter values ``(N, a)``
+        to form ``(N, a + d)`` inputs, and the NN is called once on the full
+        batch.  The output is reshaped back to ``(n1, ..., nk)``.
+
+        Parameters
+        ----------
+        frequencies : xp.ndarray
+            Frequency grid, shape ``(n1, ..., nk, d)``.
+
+        Returns
+        -------
+        xp.ndarray
+            Spectral density values, shape ``(n1, ..., nk)``.
+        """
+        param_names = self._parameters
+        a = len(param_names)
+
+        # Detect the neural network's dtype and device from its parameters.
+        try:
+            nn_param = next(self.nn_module.parameters())
+            nn_dtype = nn_param.dtype
+            nn_device = nn_param.device
+        except StopIteration:
+            nn_dtype = torch.float64
+            nn_device = None
+
+        # Flatten frequencies to (N, d).
+        freq_shape = frequencies.shape[:-1]  # (n1, ..., nk)
+        d = frequencies.shape[-1]
+        if not isinstance(frequencies, torch.Tensor):
+            freqs_flat = torch.as_tensor(frequencies, dtype=nn_dtype, device=nn_device)
+        else:
+            freqs_flat = frequencies.to(dtype=nn_dtype, device=nn_device)
+        freqs_flat = freqs_flat.reshape(-1, d)
+
+        N = freqs_flat.shape[0]
+
+        # Collect parameter values as torch tensors on the right device/dtype.
+        param_values = []
+        for pname in param_names:
+            val = getattr(self, pname)
+            if not isinstance(val, torch.Tensor):
+                val = torch.as_tensor(val, dtype=torch.float64)
+            val = val.to(dtype=nn_dtype, device=nn_device)
+            param_values.append(val)
+
+        # Assemble the full (N, a + d) input.
+        if a > 0:
+            param_rows = [v.reshape(1).expand(N) for v in param_values]
+            params_flat = torch.stack(param_rows, dim=1)  # (N, a)
+            nn_input = torch.cat([params_flat, freqs_flat], dim=1)
+        else:
+            nn_input = freqs_flat
+
+        # Single batched forward pass (preserve autograd).
+        sdf_flat = self.nn_module(nn_input)  # (N, 1) or (N,)
+        if sdf_flat.dim() > 1 and sdf_flat.shape[-1] == 1:
+            sdf_flat = sdf_flat.squeeze(-1)
+
+        # Exponentiate to ensure a strictly positive spectral density.
+        sdf_flat = torch.exp(sdf_flat)
+
+        sdf = sdf_flat.reshape(*freq_shape)
+        return sdf
