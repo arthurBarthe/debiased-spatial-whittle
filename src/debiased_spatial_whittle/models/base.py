@@ -297,6 +297,7 @@ class CovarianceModel(ModelInterface, Freezable):
         self.name = name
         self._frozen_parameters = []
         self.children = children
+        self._check_name_uniqueness()
         self.assign_params(*params)
         super().__init__()
         self._parameter_bounds = self._init_parameter_bounds()
@@ -315,6 +316,37 @@ class CovarianceModel(ModelInterface, Freezable):
     def assign_params(self, *params):
         for param_name, param_value in zip(self._parameters, params):
             setattr(self, param_name, param_value)
+
+    def _model_names(self) -> list[str]:
+        """
+        Names of this model and of all models in its subtree. For a reparameterized
+        model, the name of its base model is used since that is the name appearing
+        in the parameter names.
+        """
+        names = [self.name]
+        for child in self.children:
+            if isinstance(child, CovarianceModel):
+                names.extend(child._model_names())
+            elif isinstance(child, ReparameterizedModel):
+                names.append(child.base_model.name)
+            else:
+                names.append(child.name)
+        return names
+
+    def _check_name_uniqueness(self) -> None:
+        """
+        Check that all models in the tree have distinct names, so that parameter
+        names of the form {model_name}_{param_name} are unambiguous.
+        """
+        names = self._model_names()
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(
+                f"Duplicate model name(s) {duplicates} in the model tree rooted at "
+                f"'{self.name}'. Model names must be unique, otherwise parameter "
+                f"names such as 'model_name_param_name' are ambiguous. Please "
+                f"provide distinct names via the name argument."
+            )
 
     @property
     def name(self):

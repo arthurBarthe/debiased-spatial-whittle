@@ -153,3 +153,42 @@ def test_cov_mat_x1_x2_2():
     mat = model.cov_mat_x1_x2(x1)
     assert mat.ndim == 2
     assert mat.shape == (25, 25)
+
+
+def test_duplicate_model_names_raise():
+    import pytest
+    from debiased_spatial_whittle.models.base import SumModel
+
+    m1 = ExponentialModel(rho=10, name="exp")
+    m2 = Matern32Model(rho=15, name="exp")
+    with pytest.raises(ValueError):
+        SumModel(m1, m2)
+
+    # two models without an explicit name fall back to their class names
+    with pytest.raises(ValueError):
+        ExponentialModel() + ExponentialModel()
+
+
+def test_distinct_model_names_ok():
+    from debiased_spatial_whittle.models.base import SumModel
+
+    m1 = ExponentialModel(rho=10, name="exp1")
+    m2 = Matern32Model(rho=15, name="matern")
+    model = SumModel(m1, m2)
+    assert model.parameter_names == [
+        "exp1_rho", "exp1_sigma", "matern_rho", "matern_sigma",
+    ]
+
+
+def test_duplicate_model_name_with_parent_raises():
+    import pytest
+    from debiased_spatial_whittle.models.base import SumModel
+    from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+
+    m1 = ExponentialModel(rho=10, name="exp")
+    m2 = Matern32Model(rho=15, name="matern")
+    with pytest.raises(ValueError):
+        BivariateUniformCorrelation(m1, r=0.2, f=1.0, name="exp")
+
+    with pytest.raises(ValueError):
+        SumModel(m1, m2, name="exp")
