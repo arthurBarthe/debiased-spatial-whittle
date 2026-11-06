@@ -10,24 +10,19 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("numpy")
 
-from debiased_spatial_whittle.models import (
-    ExponentialModel,
-    Matern32Model,
-    BivariateUniformCorrelation,
-)
-from debiased_spatial_whittle.multivariate_periodogram import Periodogram
-from debiased_spatial_whittle.periodogram import ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import MultivariateDebiasedWhittle, Estimator
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import (
-    SamplerBUCOnRectangularGrid,
+from debiased_spatial_whittle.models.univariate import Matern32Model
+from debiased_spatial_whittle.models.bivariate import BivariateUniformCorrelation
+from debiased_spatial_whittle.inference.multivariate_periodogram import Periodogram
+from debiased_spatial_whittle.inference.periodogram import ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import MultivariateDebiasedWhittle, Estimator
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.sampling.simulation import (
     MultivariateSamplerOnRectangularGrid,
 )
 
 # ##Grid specification
 
 # Note that we use the argument nvars=2 to specify that we observe a bivariate random field
-
 g = RectangularGrid((128, 128), nvars=2)
 
 
@@ -46,9 +41,9 @@ data = s()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1)
-ax.imshow(data[..., 0], cmap="inferno")
+ax.imshow(data.values[..., 0], cmap="inferno")
 ax = fig.add_subplot(1, 2, 2)
-ax.imshow(data[..., 1], cmap="inferno")
+ax.imshow(data.values[..., 1], cmap="inferno")
 plt.show()
 
 # ##Profile likelihood plot for the correlation parameter
@@ -75,7 +70,9 @@ plt.show()
 # ##Inference
 
 e = Estimator(db)
-m = ExponentialModel(rho=1, sigma=1)
+m = Matern32Model(rho=1, sigma=1, name="matern32")
+m.set_parameter_bounds("matern32_rho", (0.1, 100))
+m.set_parameter_bounds("matern32_sigma", (0.1, 10))
 bvm = BivariateUniformCorrelation(m, r=0.0, f=1.0)
 e(bvm, data)
-print(bvm.r)
+print(bvm)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "debiased-spatial-whittle"
-version = "1.1.1"
+version = "2.2.0"
 description = "Spatial Debiased Whittle likelihood for fast inference of spatio-temporal covariance models from gridded data"
 readme = "README.md"
 authors = ["arthur <ahw795@qmul.ac.uk>"]
@@ -9,7 +9,7 @@ homepage = "http://arthurpgb.pythonanywhere.com/sdw"
 keywords = ["random fields", "statistics", "whittle", "spatial", "matern", "kriging", "interpolation"]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <4.0"
+python = ">=3.10, <4.0"
 numpy = "^1.21.5"
 matplotlib = "^3.7.0"
 scipy = "^1.7.3"
@@ -22,6 +22,11 @@ seaborn = "^0.12.2"
 cupy-cuda12x = {version="^13.0.0", optional= true}
 cupy-cuda11x = {version="*", optional= true}
 torch = {version="2.2.2", optional=true}
+pytest-cov = "^6.2.1"
+rich = "^15.0.0"
+plotly = "^6.8.0"
+ipywidgets = "^8.1.9"
+ipympl = "^0.10.0"
 
 [tool.poetry.extras]
 gpu12 = ["cupy-cuda12x", "torch"]

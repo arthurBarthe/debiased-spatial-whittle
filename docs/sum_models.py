@@ -2,22 +2,19 @@ from debiased_spatial_whittle.backend import BackendManager
 
 BackendManager.set_backend("cupy")
 
-np = BackendManager.get_backend()
+xp = BackendManager.get_backend()
 
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.models import (
+from debiased_spatial_whittle.grids.base import RectangularGrid
+from debiased_spatial_whittle.models.univariate import (
     ExponentialModel,
     SquaredExponentialModel,
-    Matern32Model,
-    Matern52Model,
     NuggetModel,
-    AnisotropicModel,
 )
 
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.least_squares import LeastSquareEstimator
-from debiased_spatial_whittle.likelihood import DebiasedWhittle, Estimator
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.least_squares import LeastSquareEstimator
+from debiased_spatial_whittle.inference.likelihood import DebiasedWhittle, Estimator
 
 
 import matplotlib.pyplot as plt
@@ -25,8 +22,8 @@ import matplotlib.pyplot as plt
 # ##Set up grid and model
 
 grid = RectangularGrid((512, 512))
-model_1 = ExponentialModel(rho=5.0, sigma=np.sqrt(1 / 3))
-model_2 = SquaredExponentialModel(rho=32.0, sigma=np.sqrt(2 / 3))
+model_1 = ExponentialModel(rho=5.0, sigma=xp.sqrt(1 / 3))
+model_2 = SquaredExponentialModel(rho=32.0, sigma=xp.sqrt(2 / 3))
 model = model_1 + model_2
 model = NuggetModel(model, nugget=1e-2)
 model
@@ -47,6 +44,7 @@ model_2 = SquaredExponentialModel(rho=2.0, sigma=1 / 1.41)
 model = model_1 + model_2
 model = NuggetModel(model, nugget=1e-2)
 model.fix_parameter("nugget")
+print(model)
 
 periodogram = Periodogram()
 expected_periodogram = ExpectedPeriodogram(grid, periodogram)

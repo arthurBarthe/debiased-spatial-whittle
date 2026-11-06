@@ -1,23 +1,31 @@
 site_name: Documentation Debiased Spatial Whittle
-
+site_url: ""
 use_directory_urls: false
 
 theme:
   name: "material"
   features:
     - content.code.copy
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.instant
+    - navigation.instant.progress
 
 plugins:
+- search
 - mkdocs-jupyter:
-    include: ['france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
-    'anisotropic.py']
+    include: ['3dexponential.py', 'france.py', 'circle.py', 'multivariate_simple.py', 'multivariate_two_grids.py', 'non-isotropic.py',
+    'anisotropic.py', 'france_interpolation.py', 'dual_remote_sensing.py', 'corner_plot_example.py']
     execute: true
+    cache: false
+    no_prompt: true
 - mkdocstrings:
     handlers:
       python:
         options:
           show_properties: true
-          show_signature_annotations: false
+          show_bases: true
+          show_signature_annotations: true
           docstring_style: numpy
           merge_init_into_class: true
           show_root_heading: true
@@ -25,7 +33,7 @@ plugins:
           show_symbol_type_heading: true
           show_symbol_type_toc: true
           members_order: source
-          separate_signature: true
+          separate_signature: false
           show_source: false
 
 markdown_extensions:
@@ -60,8 +68,12 @@ nav:
       - Multivariate:
           - 'Same grid': multivariate_simple.py
           - 'Non-overlapping grids': multivariate_two_grids.py
+          - 'Dual remote sensing': dual_remote_sensing.py
+      - Interpolation: france_interpolation.py
+      - Predicted distributions of estimates: corner_plot_example.py
   - Reference:
-      - Grids: grids.md
-      - Models: models.md
-      - Estimation: periodogram.md
+      - grids: grids.md
+      - models: models.md
+      - sampling: sampling.md
+      - inference: estimation.md
   - Contributing: contribute.md

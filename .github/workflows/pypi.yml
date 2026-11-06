@@ -14,8 +14,8 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.9
       - name: cache poetry install
@@ -35,7 +35,7 @@ jobs:
       # them in the cache key. I'm not, so it can be simple and just depend on the poetry.lock.
       - name: cache deps
         id: cache-deps
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv
           key: pydeps-${{ hashFiles('**/poetry.lock') }}

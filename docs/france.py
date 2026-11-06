@@ -4,45 +4,52 @@
 # ##Imports
 
 from debiased_spatial_whittle.backend import BackendManager
+BackendManager.set_backend('numpy')
+xp = BackendManager.get_backend()
 
-BackendManager.set_backend("numpy")
 import matplotlib.pyplot as plt
-import debiased_spatial_whittle.grids as grids
-from debiased_spatial_whittle.models import SquaredExponentialModel
-from debiased_spatial_whittle.grids import RectangularGrid
-from debiased_spatial_whittle.simulation import SamplerOnRectangularGrid
-from debiased_spatial_whittle.periodogram import Periodogram, ExpectedPeriodogram
-from debiased_spatial_whittle.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.models.spectral import SpectralMatern
+from debiased_spatial_whittle.models.univariate import Matern32Model
+from debiased_spatial_whittle.grids.base import RectangularGrid, FourierGrid
+from debiased_spatial_whittle.sampling.simulation import SamplerOnRectangularGrid
+from debiased_spatial_whittle.inference.periodogram import Periodogram, ExpectedPeriodogram
+from debiased_spatial_whittle.inference.likelihood import Estimator, DebiasedWhittle
+from debiased_spatial_whittle.grids.old import ImgGrid
+from debiased_spatial_whittle.sampling.samples import FourierValues
 
 
 # ##Model specification
 
-model = SquaredExponentialModel(rho=15, sigma=0.9)
-
+model = Matern32Model(rho=15)
+lags = xp.zeros((2, ))
+model(lags)
 # ##Grid specification
 
 shape = (512, 512)
-mask_france = grids.ImgGrid(shape).get_new()
-grid_france = RectangularGrid(shape)
-grid_france.mask = mask_france
+mask_france = ImgGrid(shape).get_new()
+grid_france = RectangularGrid(shape, mask=mask_france)
 sampler = SamplerOnRectangularGrid(model, grid_france)
 
 # ##Sample generation
 
 z = sampler()
-plt.figure()
-plt.imshow(z, origin="lower", cmap="RdBu")
-plt.show()
+z.show()
 
 # ##Inference
 
 periodogram = Periodogram()
+f_grid = FourierGrid(grid_france)
+periodogram_values = FourierValues(f_grid, periodogram(z))
+periodogram_values.show()
+
 expected_periodogram = ExpectedPeriodogram(grid_france, periodogram)
 debiased_whittle = DebiasedWhittle(periodogram, expected_periodogram)
 estimator = Estimator(debiased_whittle)
 
-model_est = SquaredExponentialModel()
-model_est.sigma = 0.9
-model_est.fix_parameter("sigma")
-estimate = estimator(model_est, z)
-print(estimate.rho)
+model_est = Matern32Model()
+model_est.set_parameter_bounds("Matern32Model_rho", (1., 100.))
+model_est.set_parameter_bounds("Matern32Model_sigma", (.1, 10.))
+# model_est.set_parameter_bounds("SpectralMatern_nu", (.1, 10.))
+estimate = estimator(model_est, z, opt_callback=lambda *args, **kwargs: print(*args))
+
+print(estimate)
